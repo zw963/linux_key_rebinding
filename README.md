@@ -24,6 +24,23 @@ This package is base on following awesome open source project in github.
 $ git clone https://github.com/zw963/linux_key_rebinding
 ```
 
-2. Edit your's config in $HOME/.rbindkeys.rb
+2. Edit your's config in $HOME/.rbindkeys.rb, you can found a sample in example directory.
 
-3. Start as daemon.
+3. Start as daemon with
+```sh
+$: rbindkeys 'Your keyboard description'
+```
+
+your keybaord description can be found with:
+```sh
+$: rbindkeys -l
+
+/dev/input/event0:	AT Translated Set 2 keyboard (BUS_I8042)
+/dev/input/event1:	PS/2 Generic Mouse (BUS_I8042)
+/dev/input/event2:	Sleep Button (BUS_HOST)
+/dev/input/event3:	Lid Switch (BUS_HOST)
+...
+```
+
+Here `AT Translated Set 2 keyboard` is your keyboard description.
+it is not changed when you switch diffrence linux distribtion.
