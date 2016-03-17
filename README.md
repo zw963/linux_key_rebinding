@@ -10,11 +10,16 @@ This package is base on following awesome open source project in github.
 
 [ruinput](https://github.com/kui/ruinput)
 
+[active_window_x](https://github.com/kui/active_window_x)
+
 [traveling-ruby](https://github.com/phusion/traveling-ruby)
 
-# Purpose
+# Improve for old rbindkeys.
 
-- Can be use out of the box in X86_64 linux, Just throw into one directory, and run it.
+- Can be use out of the box in X86_64 linux, i386 is current not support.
+- No compile is need.
+- refactor old(non active)rebindkeys, keep going ...
+- More functions improve.
 
 # How to start
 
