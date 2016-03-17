@@ -1,4 +1,4 @@
-# Linux Key Rebinding
+# Linux Key Rebinding:  Linux key rebinding tools, config is base on application, individually, can be use out of the box
 
 # Thanks to
 
@@ -16,7 +16,7 @@ This package is base on following awesome open source project in github.
 
 - Can be use out of the box in X86_64 linux, Just throw into one directory, and run it.
 
-# Usage
+# How to start
 
 1. Download package.
 
@@ -28,7 +28,7 @@ $ git clone https://github.com/zw963/linux_key_rebinding
 
 3. Start as daemon with
 ```sh
-$: rbindkeys 'Your keyboard description'
+$: rbindkeys 'Your keyboard description' --daemon
 ```
 
 your keybaord description can be found with:
@@ -44,3 +44,9 @@ $: rbindkeys -l
 
 Here `AT Translated Set 2 keyboard` is your keyboard description.
 it is not changed when you switch diffrence linux distribtion.
+
+# How to stop daemon
+
+```sh
+$: pkill rbindkeys
+```
