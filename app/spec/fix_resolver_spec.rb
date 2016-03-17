@@ -5,15 +5,14 @@ require 'rbindkeys'
 include Rbindkeys
 
 describe FixResolver do
-
-  describe ".instance" do
-    context "with different value" do
-      it "should return different instances" do
+  describe '.instance' do
+    context 'with different value' do
+      it 'should return different instances' do
         f = FixResolver.instance :foo
         g = FixResolver.instance :bar
         expect(f).to_not eq g
       end
-      it "should return different instances" do
+      it 'should return different instances' do
         f = FixResolver.instance :foo
         g = FixResolver.instance :foo
         expect(f).to eq g
@@ -39,8 +38,8 @@ describe FixResolver do
     end
     context 'with any args' do
       it 'should return :foo' do
-        expect(@resolver.resolve(1, []   )).to eq :foo
-        expect(@resolver.resolve(3, [1,2])).to eq :foo
+        expect(@resolver.resolve(1, [])).to eq :foo
+        expect(@resolver.resolve(3, [1, 2])).to eq :foo
       end
     end
   end

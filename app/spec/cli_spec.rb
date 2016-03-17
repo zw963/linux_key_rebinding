@@ -12,7 +12,7 @@ describe CLI do
         @args = []
       end
       it 'shoud exit with code 1' do
-        expect { CLI::main @args }.to raise_error do |e|
+        expect { CLI.main @args }.to raise_error do |e|
           expect(e).to be_a SystemExit
           expect(e.status).to eq 1
         end
@@ -26,9 +26,9 @@ describe CLI do
         expect(@observer).to receive(:start) { nil }
       end
       it 'should call Observer#new#start' do
-        config = CLI::config
-        CLI::main @args
-        expect(CLI::config).to eq config
+        config = CLI.config
+        CLI.main @args
+        expect(CLI.config).to eq config
       end
     end
     context ', when ARGV have an invalid option (--config),' do
@@ -36,7 +36,7 @@ describe CLI do
         @args = ['--config']
       end
       it 'should exit with code 1' do
-        expect { CLI::main @args }.to raise_error do |e|
+        expect { CLI.main @args }.to raise_error do |e|
           expect(e).to be_a SystemExit
           expect(e.status).to eq 1
         end
@@ -51,8 +51,8 @@ describe CLI do
         expect(@observer).to receive(:start) { nil }
       end
       it 'should call Observer#new#start ' do
-        CLI::main @args
-        expect(CLI::config).to eq @config
+        CLI.main @args
+        expect(CLI.config).to eq @config
       end
     end
     context ', when ARGV have an option (--evdev-list),' do
@@ -60,17 +60,17 @@ describe CLI do
         @args = ['--evdev-list']
         @evdev = double Revdev::EventDevice
         @id = double Object
-        allow(@evdev).to receive(:device_name) { "foo" }
+        allow(@evdev).to receive(:device_name) { 'foo' }
         allow(@evdev).to receive(:device_id) { @id }
         allow(@id).to receive(:hr_bustype) { 'bar' }
         allow(Revdev::EventDevice).to receive(:new) { @evdev }
         expect(Dir).to receive(:glob).with(CLI::EVDEVS)
-                        .and_return(['/dev/input/event4',
-                                     '/dev/input/event2',
-                                     '/dev/input/event13'])
+          .and_return(['/dev/input/event4',
+                       '/dev/input/event2',
+                       '/dev/input/event13'])
       end
       it 'should pring device info' do
-        CLI::main @args
+        CLI.main @args
       end
     end
   end

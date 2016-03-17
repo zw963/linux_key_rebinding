@@ -21,8 +21,7 @@ describe KeyEventHandler do
     @ope = double DeviceOperator
   end
 
-  describe "bind keys methods" do
-
+  describe 'bind keys methods' do
     before do
       @defval = :hoge
       @bind_set = []
@@ -32,19 +31,15 @@ describe KeyEventHandler do
       allow(@res).to receive(:bind) do |i, o|
         @bind_set << [i, o]
       end
-      allow(@res).to receive(:resolve) do |input, pressed_key_set|
+      allow(@res).to receive(:resolve) do |input, _pressed_key_set|
         if input == 10
           BindResolver.new
         else
           @defval
         end
       end
-      allow(@res).to receive(:just_resolve) do |input, pressed_key_set|
-        if input == 10
-          BindResolver.new
-        else
-          nil
-        end
+      allow(@res).to receive(:just_resolve) do |input, _pressed_key_set|
+        BindResolver.new if input == 10
       end
       allow(@res).to receive(:kind_of?) do |klass|
         klass == Rbindkeys::BindResolver
@@ -54,15 +49,15 @@ describe KeyEventHandler do
       @handler = KeyEventHandler.new @ope
     end
 
-    describe KeyEventHandler, "#pre_bind_key" do
-      context "with a bind" do
-        it "map the bind to @pre_bind_resolver" do
+    describe KeyEventHandler, '#pre_bind_key' do
+      context 'with a bind' do
+        it 'map the bind to @pre_bind_resolver' do
           @handler.pre_bind_key 1, 0
           expect(@handler.pre_bind_resolver[1]).to eq 0
         end
       end
-      context "with duplicated binds" do
-        it "should raise a DuplicatedNodeError" do
+      context 'with duplicated binds' do
+        it 'should raise a DuplicatedNodeError' do
           @handler.pre_bind_key 1, 0
           expect do
             @handler.pre_bind_key(1, 2)
@@ -71,42 +66,42 @@ describe KeyEventHandler do
       end
     end
 
-    describe KeyEventHandler, "#bind_key" do
-      context "with two Fixnum" do
-        it "construct @bind_set" do
+    describe KeyEventHandler, '#bind_key' do
+      context 'with two Fixnum' do
+        it 'construct @bind_set' do
           @handler.bind_key 0, 1
-          expect(@bind_set).to eq [[[0],[1]]]
+          expect(@bind_set).to eq [[[0], [1]]]
         end
       end
-      context "with two Arrays" do
-        it "construct @bind_set" do
+      context 'with two Arrays' do
+        it 'construct @bind_set' do
           @handler.bind_key [0, 1], [2, 3]
           expect(@bind_set).to eq [[[0, 1], [2, 3]]]
         end
       end
-      context "with an Array and a KeyResolver" do
-        it "construct @bind_set" do
-          @handler.bind_key [0,1], @res
-          expect(@bind_set).to eq [[[0,1], @res]]
+      context 'with an Array and a KeyResolver' do
+        it 'construct @bind_set' do
+          @handler.bind_key [0, 1], @res
+          expect(@bind_set).to eq [[[0, 1], @res]]
         end
       end
-      context "with an Array and a block" do
-        it "construct @bind_set" do
-          @handler.bind_key [0,1] do
+      context 'with an Array and a block' do
+        it 'construct @bind_set' do
+          @handler.bind_key [0, 1] do
             # noop
           end
           expect(@bind_set.first[1]).to be_a Proc
         end
       end
-      context "with mix classes" do
-        it "construct @bind_set" do
+      context 'with mix classes' do
+        it 'construct @bind_set' do
           @handler.bind_key 1, [2, 3]
           @handler.bind_key [2, 3], 4
           expect(@bind_set).to eq [[[1], [2, 3]], [[2, 3], [4]]]
         end
       end
-      context "with invalid args" do
-        it "raise some error" do
+      context 'with invalid args' do
+        it 'raise some error' do
           expect do
             @handler.bind_key [1], [[[2]]]
           end.to raise_error ArgumentError
@@ -114,32 +109,32 @@ describe KeyEventHandler do
       end
     end
 
-    describe KeyEventHandler, "#bind_prefix_key" do
-      context "with a new prefix key" do
-        it "construct @bind_set" do
-          @handler.bind_prefix_key [0,1] do
+    describe KeyEventHandler, '#bind_prefix_key' do
+      context 'with a new prefix key' do
+        it 'construct @bind_set' do
+          @handler.bind_prefix_key [0, 1] do
             @handler.bind_key 2, 3
           end
           expect(@bind_set.length).to eq 2
-          expect(@bind_set.include?([[2],[3]])).to be true
+          expect(@bind_set.include?([[2], [3]])).to be true
         end
       end
-      context "with a existing prefix key" do
-        it "should construct @bind_set" do
-          @handler.bind_prefix_key [0,10] do
+      context 'with a existing prefix key' do
+        it 'should construct @bind_set' do
+          @handler.bind_prefix_key [0, 10] do
             @handler.bind_key 2, 3
           end
           expect(@bind_set.length).to eq 1
-          expect(@bind_set.include?([[2],[3]])).to be true
+          expect(@bind_set.include?([[2], [3]])).to be true
         end
       end
     end
 
-    describe KeyEventHandler, "#window" do
+    describe KeyEventHandler, '#window' do
       context 'with invalid arg' do
         it 'should raise ArgumentError' do
-          expect { @handler.window(nil, "foo") }.to raise_error ArgumentError
-          expect { @handler.window(nil, :class => "bar") }.to raise_error ArgumentError
+          expect { @handler.window(nil, 'foo') }.to raise_error ArgumentError
+          expect { @handler.window(nil, :class => 'bar') }.to raise_error ArgumentError
         end
       end
       context 'with nil and a regex' do
@@ -176,7 +171,7 @@ describe KeyEventHandler do
       end
     end
 
-    describe "KeyEventHandler#load_config" do
+    describe 'KeyEventHandler#load_config' do
       before :all do
         @config = File.join $tmp_dir, 'config'
         open @config, 'w' do |f|
@@ -190,7 +185,7 @@ end
 EOF
         end
       end
-      it "construct @pre_bind_key_set and @bind_key_set" do
+      it 'construct @pre_bind_key_set and @bind_key_set' do
         @handler.load_config @config
         expect(@handler.pre_bind_resolver.size).to eq 1
         expect(@bind_set.length).to eq 4
