@@ -1,25 +1,25 @@
-# Linux Key Rebinding:  Linux key rebinding tools, config is base on application, individually, can be use out of the box
+# Linux Key Rebinding:  Linux key rebinding tools, config is base on application, individually
 
-# Thanks to
+# Thanks
 
-This package is base on following awesome open source project in github.
+### This package is base on following awesome open source project in github.
 
-[rbindkeys](https://github.com/kui/rbindkeys)
+### [rbindkeys](https://github.com/kui/rbindkeys)
 
-[revdev](https://github.com/kui/revdev)
+### [revdev](https://github.com/kui/revdev)
 
-[ruinput](https://github.com/kui/ruinput)
+### [ruinput](https://github.com/kui/ruinput)
 
-[active_window_x](https://github.com/kui/active_window_x)
+### [active_window_x](https://github.com/kui/active_window_x)
 
-[traveling-ruby](https://github.com/phusion/traveling-ruby)
+### [traveling-ruby](https://github.com/phusion/traveling-ruby)
 
 # Improve for old rbindkeys.
 
 - Can be use out of the box in X86_64 linux, i386 is current not support.
 - No compile is need.
-- refactor old(non active)rebindkeys, keep going ...
-- More functions improve.
+- Refactor old(not active)rebindkeys, keep going ...
+- Lots of functions improve.
 
 # How to start
 
@@ -37,7 +37,18 @@ This package is base on following awesome open source project in github.
    $: $HOME/linux_key_rebinding/bin/rbindkeys 'Your keyboard description' --daemon
    ```
 
+    For boot autorun with no sudo password, you need add'
+    current user to /etc/sudoers with following command:'
+     $CURRENT_USER ALL=(ALL) NOPASSWD: ALL |sudo tee -a /etc/sudoers"
+
+   this need sudo privilege, if you want boot autorun with no sudo password, 
+   you need add current user to /etc/sudoers with following command:
+
+   ```sh
+   $: echo $CURRENT_USER ALL=(ALL) NOPASSWD: ALL |sudo tee -a /etc/sudoers
+   ```
    your keybaord description can be found with:
+   
    ```sh
    $: rbindkeys -l
 
