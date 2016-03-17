@@ -123,7 +123,8 @@ module Rbindkeys
       end
 
       begin
-        LOG.info 'try @device.ungrab'
+        LOG.info 'try release_all_key and ungrab device.'
+        @device.release_all_key
         @device.ungrab
         LOG.info '=> success'
       rescue => e
