@@ -1,6 +1,7 @@
 # -*- coding:utf-8; mode:ruby; -*-
 
 require 'rbindkeys/key_event_handler/configure'
+require 'rbindkeys/key_mapper'
 
 module Rbindkeys
   # retrive key binds with key event
@@ -109,8 +110,10 @@ module Rbindkeys
 
       handle_pressed_keys event
 
-      LOG.info "pressed_keys real:#{@pressed_key_set.inspect} " +
-        "virtual:#{@operator.pressed_key_set.inspect}" if LOG.info?
+      real_key_set = @pressed_key_set.map {|code| KEY_MAPPER[code] }
+      virtual_key_set = @operator.pressed_key_set.map {|code| KEY_MAPPER[code] }
+
+      LOG.info "\033[0;33mpressed_keys real:#{real_key_set} virtual:#{virtual_key_set}\033[0m" if LOG.info?
     end
 
     def handle_release_event(event)
