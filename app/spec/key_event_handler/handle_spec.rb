@@ -187,14 +187,15 @@ describe KeyEventHandler do
     before do
       @window = double ActiveWindowX::Window
       allow(@window).to receive(:app_name) { 'qux' }
+      allow(@window).to receive(:app_class) { 'some_class' }
+      allow(@window).to receive(:title) { 'title' }
       @resolver2 = double BindResolver
       allow(BindResolver).to receive(:new) { @resolver2 }
     end
     context 'with a Window, which contains "foo" in the title,' do
       before do
-        allow(@window).to receive(:title) { 'foobar' }
+        expect(@window).to receive(:title) { 'foobar' }
         @handler.window nil, /foo/ do
-          # noop
         end
       end
       it 'should change @bind_resolver' do
@@ -207,6 +208,31 @@ describe KeyEventHandler do
       before do
         expect(@window).to receive(:title) { 'barbaz' }
         @handler.window nil, /foo/ do
+        end
+      end
+      it 'should not change @bind_resolver' do
+        resolver = @handler.bind_resolver
+        @handler.active_window_changed(@window)
+        expect(@handler.bind_resolver).to eq resolver
+      end
+    end
+
+    context 'with a Window, which contains "foo" in the app_class,' do
+      before do
+        expect(@window).to receive(:app_class) { 'foobar' }
+        @handler.window nil, app_class: /foo/ do
+        end
+      end
+      it 'should change @bind_resolver' do
+        resolver = @handler.bind_resolver
+        @handler.active_window_changed(@window)
+        expect(@handler.bind_resolver).to_not eq resolver
+      end
+    end
+    context 'with a Window, which does not contain "foo" in the app_class,' do
+      before do
+        expect(@window).to receive(:app_class) { 'barbaz' }
+        @handler.window nil, app_class: /foo/ do
         end
       end
       it 'should not change @bind_resolver' do
