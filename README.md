@@ -25,30 +25,31 @@ This package is base on following awesome open source project in github.
 
 1. Download package.
 
-```sh
-$ git clone https://github.com/zw963/linux_key_rebinding
-```
+   ```sh
+   $ git clone https://github.com/zw963/linux_key_rebinding $HOME/linux_key_rebinding
+   ```
 
-2. Edit your's config in $HOME/.rbindkeys.rb, you can found a sample in example directory.
+2. Create and edit your's config file $HOME/.rbindkeys.rb, you can found a sample in example directory.
 
 3. Start as daemon with
-```sh
-$: rbindkeys 'Your keyboard description' --daemon
-```
 
-your keybaord description can be found with:
-```sh
-$: rbindkeys -l
+   ```sh
+   $: $HOME/linux_key_rebinding/bin/rbindkeys 'Your keyboard description' --daemon
+   ```
 
-/dev/input/event0:	AT Translated Set 2 keyboard (BUS_I8042)
-/dev/input/event1:	PS/2 Generic Mouse (BUS_I8042)
-/dev/input/event2:	Sleep Button (BUS_HOST)
-/dev/input/event3:	Lid Switch (BUS_HOST)
-...
-```
+   your keybaord description can be found with:
+   ```sh
+   $: rbindkeys -l
 
-Here `AT Translated Set 2 keyboard` is your keyboard description.
-it is not changed when you switch diffrence linux distribtion.
+   /dev/input/event0:	AT Translated Set 2 keyboard (BUS_I8042)
+   /dev/input/event1:	PS/2 Generic Mouse (BUS_I8042)
+   /dev/input/event2:	Sleep Button (BUS_HOST)
+   /dev/input/event3:	Lid Switch (BUS_HOST)
+   ...
+   ```
+
+   Here `AT Translated Set 2 keyboard` is your keyboard description.
+   it is not changed when you switch diffrence linux distribtion.
 
 # How to stop daemon
 
