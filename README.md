@@ -16,8 +16,8 @@
 
 # Improve for old rbindkeys.
 
-- Can be use out of the box in X86_64 linux, i386 is current not support.
-- No compile is need.
+- Can be use out of the box in X86_64 linux, i386 is current not support, but it easy to extension.
+- No compile is need in X86_64 linux.
 - Refactor old(not active)rebindkeys, keep going ...
 - Lots of functions improve.
 
@@ -36,6 +36,8 @@
    ```sh
    $: $HOME/linux_key_rebinding/bin/rbindkeys 'Your keyboard description' --daemon
    ```
+   
+    __NOTICE__ if you need debug, remove --daemon argument.
 
     For boot autorun with no sudo password, you need add'
     current user to /etc/sudoers with following command:'

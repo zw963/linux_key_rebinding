@@ -37,6 +37,13 @@ module Rbindkeys
       send_key code, 2
     end
 
+    def combination_key(*code)
+      code.each {|key| press_key key }
+      send_event Revdev::EV_SYN, 0, 0 # flush the event buffer
+      code.reverse_each {|key| release_key key }
+      send_event Revdev::EV_SYN, 0, 0
+    end
+
     #
     # 如何发送一个按键操作？发送一个 EV_KEY 类型事件, 并且传递一个代表按键的 code 即可。
     #

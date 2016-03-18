@@ -12,28 +12,30 @@
 pre_bind_key KEY_CAPSLOCK, KEY_LEFTCTRL
 pre_bind_key KEY_RIGHTALT, KEY_CAPSLOCK
 
+# bind Ctrl+J => left
 bind_key [KEY_LEFTCTRL, KEY_J], KEY_LEFT
+# bind Ctrl+L => right
 bind_key [KEY_LEFTCTRL, KEY_L], KEY_RIGHT
 
+# bind Alt+J => Ctrl+left
 bind_key [KEY_LEFTALT, KEY_J], [KEY_LEFTCTRL, KEY_LEFT]
+# bind Alt+L => Ctrl+right
 bind_key [KEY_LEFTALT, KEY_L], [KEY_LEFTCTRL, KEY_RIGHT]
 
 #
 # ============================== global default binding end ==============================
 #
 
-# For browser.
+# For browser, will overwrite glboal default debinding
 window(@default_bind_resolver, :app_class => /Firefox$|^chromium-browser$|^google-chrome$/) do
   # search bar
   bind_key [KEY_LEFTCTRL, KEY_S], [KEY_LEFTCTRL, KEY_K]
-  # address bar
-  bind_key [KEY_LEFTALT, KEY_E], [KEY_LEFTCTRL, KEY_L]
 end
 
 def terminal_global
   bind_key [KEY_LEFTCTRL, KEY_EQUAL], [KEY_LEFTSHIFT, KEY_LEFTCTRL, KEY_EQUAL]
 
-  # When press Ctrl+., can output ` => '.
+  # bind Ctrl+. to output a ` => '.
   bind_key [KEY_LEFTCTRL, KEY_DOT] do |_ev, op|
     op.release_key KEY_LEFTCTRL
 
@@ -43,13 +45,9 @@ def terminal_global
     op.press_key KEY_EQUAL
     op.release_key KEY_EQUAL
 
-    op.press_key KEY_LEFTSHIFT
-    op.press_key KEY_DOT
-    op.release_key KEY_DOT
-    op.release_key KEY_LEFTSHIFT
-
-    op.send_event EV_SYN, 0, 0 # flush the event buffer
-    sleep 0.01
+    # press combination key, can be any combination.
+    # here press Shift+. to output a  >
+    op.combination_key KEY_LEFTSHIFT, KEY_DOT
 
     op.press_key KEY_SPACE
     op.release_key KEY_SPACE
