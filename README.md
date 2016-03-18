@@ -60,7 +60,8 @@
    ```
 
    Here `AT Translated Set 2 keyboard` is your keyboard description.
-   it is not changed when you switch diffrence linux distribtion.
+   it is not changed when you switch diffrence linux distribtion
+   or use same plug-in external keyboard.
 
 # How to stop daemon
 
