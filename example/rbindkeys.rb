@@ -92,3 +92,6 @@ window(@default_bind_resolver, :app_class => terminal_app_class) do
 
   terminal_global
 end
+
+# Emacs skip all key rebinding
+window(:through, :app_class => /Emacs$/)
