@@ -36,8 +36,6 @@
    ```sh
    $: $HOME/linux_key_rebinding/bin/rbindkeys 'Your keyboard description' --daemon
    ```
-   
-    __NOTICE__ if you need debug, remove --daemon argument.
 
     For boot autorun with no sudo password, you need add'
     current user to /etc/sudoers with following command:'
@@ -64,6 +62,16 @@
    Here `AT Translated Set 2 keyboard` is your keyboard description.
    it is not changed when you switch diffrence linux distribtion
    or use same plug-in external keyboard.
+   
+   __HINT__: you can export a environment variable to simplify startup process
+
+   $: export keyboard_description='You keyboard description' # add this to your's .bashrc.
+   $: rbindkeys --daemon
+
+#  How to debug
+
+remove --daemon argument, will run rbindkeys in foreground.
+you will get many useful infomation.
 
 # How to stop daemon
 

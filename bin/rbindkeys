@@ -7,25 +7,35 @@ sudo chmod 0666 /dev/input/event* /dev/uinput
 ROOT=$(dirname "${0%/*}")
 rbindkeys="$ROOT/ruby/bin/ruby -I$ROOT/app/lib -rrbconfig $ROOT/app/bin/rbindkeys.rb"
 
+function help () {
+    echo '         ***** rbindkeys shell wrapper *****         '
+    echo
+    echo "Run rbindkeys 'keyboard device description' to start."
+    echo "e.g. rbindkeys 'AT Translated Set 2 keyboard'"
+    echo
+    echo "you can export keyboard description with environment variable"
+    echo "then invoke rbindkeys directly."
+    echo e.g.
+    echo "$: export keyboard_description='keyboard device descriptoin' # add this to .bashrc"
+    echo "$: rbindkeys"
+    echo
+    echo 'use rbindkeys -l for available keybard device.'
+    echo 'append --daemon  will start as a daemon.'
+    echo
+    echo 'For boot autorun with no sudo password, you need add'
+    echo 'current user to /etc/sudoers with following command:'
+    echo "echo $CURRENT_USER ALL=(ALL) NOPASSWD: ALL |sudo tee -a /etc/sudoers"
+    echo
+    echo 'default config is $HOME/.rbindkeys.rb'
+    echo
+    echo 'You can run original rbindkeys with: rbindkeys.rb [OPTION]'
+    echo
+}
+
 case $(basename $0) in
     rbindkeys)
-        if [ -z "$*" ]; then
-            echo '         ***** rbindkeys shell wrapper *****         '
-            echo
-            echo "Run rbindkeys 'Keyboard device description' to start."
-            echo "e.g. rbindkeys 'AT Translated Set 2 keyboard'"
-            echo
-            echo 'use rbindkeys -l for available keybard device.'
-            echo 'append --daemon as argument will start as a daemon.'
-            echo
-            echo 'For boot autorun with no sudo password, you need add'
-            echo 'current user to /etc/sudoers with following command:'
-            echo "echo $CURRENT_USER ALL=(ALL) NOPASSWD: ALL |sudo tee -a /etc/sudoers"
-            echo
-            echo 'default config is $HOME/.rbindkeys.rb'
-            echo
-            echo 'You can run original rbindkeys with: rbindkeys.rb [OPTION]'
-            echo
+        if [ -z "$*$keyboard_description" ]; then
+            help
             exit
         fi
 
@@ -34,10 +44,17 @@ case $(basename $0) in
             exit
         fi
 
-        input_device=$($rbindkeys -l |fgrep -e "$1" |cut -d':' -f1)
+        if [ "$1" -a "$1" != '--daemon' ]; then
+            input_device=$($rbindkeys -l |fgrep -e "$1" |cut -d':' -f1)
+        elif [ "$keyboard_description" ]; then
+            input_device=$($rbindkeys -l |fgrep -e "$keyboard_description" |cut -d':' -f1)
+        else
+            help
+            exit
+        fi
 
         if [ "$input_device" ]; then
-            if [ "$2" == '--daemon' ]; then
+            if [[ " $* " =~ ' --daemon ' ]]; then
                 tmpdir=$(dirname $(mktemp -u))
                 (exec $rbindkeys $input_device &> $tmpdir/rbindkeys.log &)
             else
@@ -45,7 +62,7 @@ case $(basename $0) in
             fi
         else
             echo
-            echo "Keyboard description \`$1' is not exist."
+            echo "Keyboard description \`${1-$keyboard_description}' is not exist."
             echo
             echo 'All available input device.'
             echo
