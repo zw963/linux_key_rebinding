@@ -24,7 +24,7 @@ function help () {
     echo
     echo 'For boot autorun with no sudo password, you need add'
     echo 'current user to /etc/sudoers with following command:'
-    echo "echo $CURRENT_USER ALL=(ALL) NOPASSWD: ALL |sudo tee -a /etc/sudoers"
+    echo "echo $USER ALL=(ALL) NOPASSWD: ALL |sudo tee -a /etc/sudoers"
     echo
     echo 'default config is $HOME/.rbindkeys.rb'
     echo

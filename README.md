@@ -37,15 +37,13 @@
    $: $HOME/linux_key_rebinding/bin/rbindkeys 'Your keyboard description' --daemon
    ```
 
-    For boot autorun with no sudo password, you need add'
-    current user to /etc/sudoers with following command:'
-     $CURRENT_USER ALL=(ALL) NOPASSWD: ALL |sudo tee -a /etc/sudoers"
-
+   For boot autorun with no sudo password, you need add'
+   current user to /etc/sudoers with following command:'
    this need sudo privilege, if you want boot autorun with no sudo password, 
    you need add current user to /etc/sudoers with following command:
 
    ```sh
-   $: echo $CURRENT_USER ALL=(ALL) NOPASSWD: ALL |sudo tee -a /etc/sudoers
+   $: echo $USER ALL=(ALL) NOPASSWD: ALL |sudo tee -a /etc/sudoers
    ```
    your keybaord description can be found with:
    
