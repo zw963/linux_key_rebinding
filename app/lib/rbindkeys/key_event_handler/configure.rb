@@ -84,18 +84,18 @@ module Rbindkeys
     end
 
     # 这个没有用到？
-    def new_bind_resolver(upper_resolver=@bind_resolver, &_block)
-      fail ArgumentError, 'expect a block' unless block_given?
+    # def new_bind_resolver(upper_resolver=@bind_resolver, &_block)
+    #   fail ArgumentError, 'expect a block' unless block_given?
 
-      new_resolver = BindResolver.new upper_resolver
+    #   new_resolver = BindResolver.new upper_resolver
 
-      old_resolver = @bind_resolver
-      @bind_resolver = new_resolver
-      yield
-      @bind_resolver = old_resolver
+    #   old_resolver = @bind_resolver
+    #   @bind_resolver = new_resolver
+    #   yield
+    #   @bind_resolver = old_resolver
 
-      new_resolver
-    end
+    #   new_resolver
+    # end
 
     # switch bind_resolver if the active window match _arg_
     #

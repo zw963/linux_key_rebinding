@@ -52,6 +52,15 @@ module Rbindkeys
       send_event Revdev::EV_KEY, code, state
     end
 
+    def release_modifier_key
+      # 29 97 CTRL, 56 100 ALT, auto release control & alt.
+      [29, 97, 56, 100].each {|code| send_key code, 0 }
+    end
+
+    def release_shift_key
+      [42, 54].each {|code| send_key code, 0 }
+    end
+
     #
     # send_event 具体做的事情是：
     # 1. 新建一个 Redev::InputEvent(如果不存在的话), 即：确保只建立一个设备即可。

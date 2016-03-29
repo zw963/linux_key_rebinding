@@ -40,9 +40,6 @@ def terminal_global
 
   # bind Ctrl+. to output a ` => ', Here use block form.
   bind_key [KEY_LEFTCTRL, KEY_DOT] do |_ev, op|
-    # release recent pressed modifier key first. (maybe it is a bug.)
-    op.release_key KEY_LEFTCTRL
-
     # press space key
     op.press_key KEY_SPACE
     op.release_key KEY_SPACE

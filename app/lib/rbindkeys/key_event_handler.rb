@@ -168,6 +168,7 @@ module Rbindkeys
           set_bind_resolver r.output
           :ignore
         elsif r.output.is_a? Proc
+          @operator.release_modifier_key
           r.output.call event, @operator
         elsif r.output.is_a? Symbol
           r
