@@ -5,6 +5,9 @@
 
 module Rbindkeys
   class KeyEventHandler
+    def active_window
+      @@active_window
+    end
     # pre-prosessed key codes replacement for all inputs
     # 在所有应用程序下面都会被执行的换绑键。
     # 支持两个参数：input, 输入的键绑定。output, 输出的键绑定。

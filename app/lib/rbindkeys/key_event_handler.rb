@@ -59,8 +59,6 @@ module Rbindkeys
     #    根据这个符号，再决定是否需要发送 InputEvent 到 Uinput 设备。
     #    这里所谓的 handle, 其实只是根据不同的 config 选项(:through, :ignore)
 
-
-
     def initialize(device_operator)
       @operator = device_operator
       @default_bind_resolver = BindResolver.new
@@ -71,7 +69,7 @@ module Rbindkeys
       @pressed_key_set = []
       @active_bind_set = []
     end
-
+    
     # 加载 ruby 配置文件。
     def load_config(file)
       code = File.read file
@@ -210,6 +208,7 @@ module Rbindkeys
         app_name = window.app_name
         app_class = window.app_class
         title = window.title
+        @@active_window = window
 
         if LOG.info?
           LOG.info '' unless LOG.debug?
@@ -231,11 +230,9 @@ module Rbindkeys
           @window_bind_resolver = bind_resolver
           return
         end
-      else
-        if LOG.info?
-          LOG.info '' unless LOG.debug?
-          LOG.info 'change active_window: nil'
-        end
+      elsif LOG.info?
+        LOG.info '' unless LOG.debug?
+        LOG.info 'change active_window: nil'
       end
 
       LOG.info '=> no matcher' if LOG.info?
