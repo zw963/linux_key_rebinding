@@ -50,7 +50,7 @@ def terminal_global
 
     # press combination key, can be any combination.
     # here press Shift+. to output a  >
-    op.combination_key KEY_LEFTSHIFT, KEY_DOT
+    op.combination_key [KEY_LEFTSHIFT, KEY_DOT]
 
     # press space key
     op.press_key KEY_SPACE

@@ -37,7 +37,9 @@ module Rbindkeys
       send_key code, 2
     end
 
-    def combination_key(*code)
+    def combination_key(code)
+      code = Array(code)
+
       code.each {|key| press_key key }
       send_event Revdev::EV_SYN, 0, 0 # flush the event buffer
       code.reverse_each {|key| release_key key }
