@@ -166,7 +166,8 @@ module Rbindkeys
           set_bind_resolver r.output
           :ignore
         elsif r.output.is_a? Proc
-          @operator.release_modifier_key
+          # release input key.
+          r.input.each {|code| @operator.send_key code, 0 }
           r.output.call event, @operator
         elsif r.output.is_a? Symbol
           r

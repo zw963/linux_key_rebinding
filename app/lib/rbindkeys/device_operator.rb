@@ -55,12 +55,8 @@ module Rbindkeys
     end
 
     def release_modifier_key
-      # 29 97 CTRL, 56 100 ALT, auto release control & alt.
-      [29, 97, 56, 100].each {|code| send_key code, 0 }
-    end
-
-    def release_shift_key
-      [42, 54].each {|code| send_key code, 0 }
+      # 29 97 CTRL, 56 100 ALT, 42 54 shift
+      [29, 97, 56, 100, 42, 54].each {|code| send_key code, 0 }
     end
 
     #
