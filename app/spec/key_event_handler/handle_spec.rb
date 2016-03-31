@@ -98,6 +98,8 @@ describe KeyEventHandler do
         @proc = proc { :foo }
         @key_bind = KeyBind.new [0, 1], @proc
         expect(@resolver).to receive(:resolve).and_return(@key_bind)
+        expect(@ope).to receive(:send_key).with(0, 0)
+        expect(@ope).to receive(:send_key).with(1, 0)
       end
       it 'should return :ignore and update @bind_resolver' do
         expect(@handler.handle_press_event(@event)).to be :foo
