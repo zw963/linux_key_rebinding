@@ -5,10 +5,18 @@
 
 module Rbindkeys
   class KeyEventHandler
-    def active_window_title
+    def title
       @@active_window.title if @@active_window
     end
 
+    def app_class
+      @@active_window.app_class if @@active_window
+    end
+
+    def app_name
+      @@active_window.app_name if @@active_window
+    end
+    
     # pre-prosessed key codes replacement for all inputs
     # 在所有应用程序下面都会被执行的换绑键。
     # 支持两个参数：input, 输入的键绑定。output, 输出的键绑定。

@@ -56,6 +56,20 @@ def terminal_global
     op.press_key KEY_SPACE
     op.release_key KEY_SPACE
   end
+
+  bind_key [KEY_LEFTCTRL, KEY_D] do |_ev, op|
+    # title method return active window title
+    # app_class method return active window app_class
+    # app_name method return active window app_name
+    # you can use those condition in bind_key method.
+    if title =~ /nano/
+      # nano use Ctrl+D to delete char forward.
+      op.combination_key KEY_DELETE
+    elsif title =~ /terminal_app_class/
+      # if terminal, pass through C-d. (because in Terminal C-d default is delete char forward.)
+      :through
+    end
+  end
 end
 
 terminal_app_class = /(terminal|XTerm|Terminator)$/
