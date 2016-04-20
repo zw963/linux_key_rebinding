@@ -4,6 +4,13 @@
 
 # NOTICE: REMOVE ALL your's .Xmodmap, .inputrc before use this.
 
+# hook which run when switch to a new active window.
+def window_active_hook
+  # you can use @region_mode in config anywhere as a flag.
+  # when switch to another window, this flag is restore to default value.
+  @region_mode = false
+end
+
 #
 # ============================== global default binding start ==============================
 #

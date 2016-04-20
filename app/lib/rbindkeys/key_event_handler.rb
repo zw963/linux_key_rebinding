@@ -69,7 +69,7 @@ module Rbindkeys
       @pressed_key_set = []
       @active_bind_set = []
     end
-    
+
     # 加载 ruby 配置文件。
     def load_config(file)
       code = File.read file
@@ -229,6 +229,7 @@ module Rbindkeys
           end
           set_bind_resolver bind_resolver
           @window_bind_resolver = bind_resolver
+          window_active_hook
           return
         end
       elsif LOG.info?
@@ -240,6 +241,9 @@ module Rbindkeys
       set_bind_resolver @default_bind_resolver
       @window_bind_resolver = nil
       nil
+    end
+
+    def window_active_hook
     end
 
     class << self
