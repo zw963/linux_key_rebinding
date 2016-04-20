@@ -9,7 +9,7 @@ module Rbindkeys
     DEFAULT_LEVEL = Logger::INFO
     @output = DEFAULT_LOG_OUTPUT
     @format = DEFAULT_FORMAT
-    @level = DEFAULT_LEVEL
+    # @level = DEFAULT_LEVEL
 
     class << self
       attr_accessor :output, :format, :level
@@ -18,7 +18,16 @@ module Rbindkeys
         logger = Logger.new @output
 
         logger.progname = progname
-        logger.level = @level
+
+        if $stdin.tty?
+          if @level
+            logger.level = @level
+          else
+            logger.level = DEFAULT_LEVEL
+          end
+        else
+          logger.level = Logger::WARN
+        end
         set_formatter logger
 
         logger
