@@ -1,0 +1,4 @@
+#!/bin/sh
+
+ROOT=$(dirname `(readlink -e $0)`)/..
+/bin/bash $ROOT/ruby/bin/ruby -I$ROOT/app/lib -rrbconfig "$@"
