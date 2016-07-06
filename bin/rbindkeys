@@ -2,6 +2,7 @@
 
 set -e
 
+set -x
 sudo chmod 0666 /dev/input/event* /dev/uinput
 
 export RUBYOPT=
@@ -58,7 +59,7 @@ case $(basename $0) in
         if [ "$input_device" ]; then
             if [[ " $* " =~ ' --daemon ' ]]; then
                 tmpdir=$(dirname $(mktemp -u))
-                (exec $rbindkeys $input_device &>> $tmpdir/rbindkeys.log &)
+                (exec $rbindkeys $input_device &> $tmpdir/rbindkeys.log &)
             else
                 $rbindkeys $input_device
             fi
