@@ -2,7 +2,6 @@
 
 set -e
 
-set -x
 sudo chmod 0666 /dev/input/event* /dev/uinput
 
 export RUBYOPT=
