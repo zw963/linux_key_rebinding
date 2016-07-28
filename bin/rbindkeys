@@ -7,7 +7,7 @@ sudo chmod 0666 /dev/input/event* /dev/uinput
 export RUBYOPT=
 export RUBYLIB=
 ROOT=$(dirname `(readlink -e $0)`)
-rbindkeys="$ROOT/ruby-2.2.2 $ROOT/../app/bin/rbindkeys.rb"
+rbindkeys="$ROOT/ruby-2.1.6 $ROOT/../app/bin/rbindkeys.rb"
 
 function help () {
     echo '         ***** rbindkeys shell wrapper *****         '
