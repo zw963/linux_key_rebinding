@@ -1,6 +1,6 @@
 # -*- coding:utf-8; mode:ruby; -*-
 
-require "revdev/revdev.#{RbConfig::CONFIG['ruby_version']}.#{RbConfig::CONFIG["DLEXT"]}"
+require "revdev/revdev"
 
 require "revdev/each_values_equal"
 
