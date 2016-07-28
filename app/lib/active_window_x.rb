@@ -1,7 +1,7 @@
 # -*- coding:utf-8; mode:ruby; -*-
 
 require "active_window_x/version"
-require "active_window_x/xlib.#{RbConfig::CONFIG['ruby_version']}.#{RbConfig::CONFIG['DLEXT']}"
+require "active_window_x/xlib"
 require "active_window_x/display"
 require "active_window_x/xid"
 require "active_window_x/window"
