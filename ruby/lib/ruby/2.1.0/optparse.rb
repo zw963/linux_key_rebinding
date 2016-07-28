@@ -82,43 +82,6 @@
 #   p options
 #   p ARGV
 #
-# === Generating Help
-#
-# OptionParser can be used to automatically generate help for the commands you
-# write:
-#
-#   require 'optparse'
-#
-#   Options = Struct.new(:name)
-#
-#   class Parser
-#     def self.parse(options)
-#       args = Options.new("world")
-#
-#       opt_parser = OptionParser.new do |opts|
-#         opts.banner = "Usage: example.rb [options]"
-#
-#         opts.on("-nNAME", "--name=NAME", "Name to say hello to") do |n|
-#           args.name = n
-#         end
-#
-#         opts.on("-h", "--help", "Prints this help") do
-#           puts opts
-#           exit
-#         end
-#       end
-#
-#       opt_parser.parse!(options)
-#       return args
-#     end
-#   end
-#   options = Parser.parse %w[--help]
-#
-#   #=>
-#      # Usage: example.rb [options]
-#      #     -n, --name=NAME                  Name to say hello to
-#      #     -h, --help                       Prints this help#
-#
 # === Complete example
 #
 # The following example is a complete Ruby program.  You can run it and see the
@@ -1495,12 +1458,11 @@ XXX
   #
   # Wrapper method for getopts.rb.
   #
-  #   params = ARGV.getopts("ab:", "foo", "bar:", "zot:Z;zot option)
+  #   params = ARGV.getopts("ab:", "foo", "bar:")
   #   # params[:a] = true   # -a
   #   # params[:b] = "1"    # -b1
   #   # params[:foo] = "1"  # --foo
   #   # params[:bar] = "x"  # --bar x
-  #   # params[:zot] = "z"  # --zot Z
   #
   def getopts(*args)
     argv = Array === args.first ? args.shift : default_argv
@@ -1519,14 +1481,13 @@ XXX
     end if single_options
 
     long_options.each do |arg|
-      arg, desc = arg.split(';', 2)
       opt, val = arg.split(':', 2)
       if val
         result[opt] = val.empty? ? nil : val
-        define("--#{opt}=#{result[opt] || "VAL"}", *[desc].compact)
+        define("--#{opt} VAL")
       else
         result[opt] = false
-        define("--#{opt}", *[desc].compact)
+        define("--#{opt}")
       end
     end
 
@@ -1835,7 +1796,7 @@ XXX
     end
 
     def inspect
-      "#<#{self.class}: #{args.join(' ')}>"
+      "#<#{self.class.to_s}: #{args.join(' ')}>"
     end
 
     #
@@ -1993,5 +1954,3 @@ end
 
 # ARGV is arguable by OptionParser
 ARGV.extend(OptionParser::Arguable)
-
-OptParse = OptionParser
