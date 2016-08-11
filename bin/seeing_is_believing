@@ -1,0 +1,7 @@
+#!/bin/sh
+
+ROOT=$(dirname `(readlink -e $0)`)
+export RUBYOPT=
+export RUBYLIB=$ROOT
+
+$ROOT/ruby-2.2.2 $ROOT/../app/bin/seeing_is_believing "$@"
