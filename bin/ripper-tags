@@ -1,0 +1,52 @@
+#!/bin/sh
+
+# etags 方式.
+# find $MY_RUBY_HOME/lib/ruby/1.9.1 -name "*.rb" > /tmp/rubylib
+# find $GEM_HOME -name "*.rb" >> /tmp/rubylib
+# cat /tmp/rubylib |command etags --regex='/^[ \t]*\(def\|class\|module\|alias\)[ \t]+[a-zA-Z_.!?=+\-]+(?[^()\n#]*)?$/' -
+
+INCLUDED "--js" "$@" 2>/dev/null
+
+exclude_lists='--exclude=*.elc --exclude=*.class --exclude=.git --exclude=.svn --exclude=SCCS
+--exclude=RCS --exclude=CVS --exclude=EIFGEN --exclude=vendor --exclude=.#*.rb'
+
+ROOT=$(dirname `(readlink -e $0)`)
+rippertags="$ROOT/ruby-2.2.2 $ROOT/../app/bin/ripper-tags"
+
+if [ $(basename $0) == 'ripper-tags' ]; then
+    $rippertags "$@"
+    exit
+fi
+
+if [ $INCLUDED__js ]; then
+    find . -name '*.js' -not -path "*/tmp/*" |egrep -v '(\.min|-min|jasmine.*|angular.*|jquery.*|require-.*)\.js' > /tmp/jslib &&
+        ctags-exuberant \
+            -L /tmp/jslib -e -f CTAGS \
+            --langdef=js \
+            --langmap=js:.js \
+            --regex-js="/(,|(;|^)[ \t]*(var|let|([A-Za-z_$][A-Za-z0-9_$.]+\.)*))[ \t]*([A-Za-z0-9_$]+)[ \t]*=[ \t]*\{/\5/,object/" \
+            --regex-js="/(,|(;|^)[ \t]*(var|let|([A-Za-z_$][A-Za-z0-9_$.]+\.)*))[ \t]*([A-Za-z0-9_$]+)[ \t]*=[ \t]*function[ \t]*\(/\5/,function/" \
+            --regex-js="/(,|(;|^)[ \t]*(var|let|([A-Za-z_$][A-Za-z0-9_$.]+\.)*))[ \t]*([A-Za-z0-9_$]+)[ \t]*=[ \t]*\[/\5/,array/" \
+            --regex-js="/(,|(;|^)[ \t]*(var|let|([A-Za-z_$][A-Za-z0-9_$.]+\.)*))[ \t]*([A-Za-z0-9_$]+)[ \t]*=[ \t]*[^\"]'[^']*/\5/,string/" \
+            --regex-js="/(,|(;|^)[ \t]*(var|let|([A-Za-z_$][A-Za-z0-9_$.]+\.)*))[ \t]*([A-Za-z0-9_$]+)[ \t]*=[ \t]*(true|false)/\5/,boolean/" \
+            --regex-js="/(,|(;|^)[ \t]*(var|let|([A-Za-z_$][A-Za-z0-9_$.]+\.)*))[ \t]*([A-Za-z0-9_$]+)[ \t]*=[ \t]*[0-9]+/\5/,number/" \
+            --regex-js="/(,|(;|^)[ \t]*(var|let|([A-Za-z_$][A-Za-z0-9_$.]+\.)*))[ \t]*([A-Za-z0-9_$]+)[ \t]*=[ \t]*.+([,;=]|$)/\5/,variable/" \
+            --regex-js="/(,|(;|^)[ \t]*(var|let|([A-Za-z_$][A-Za-z0-9_$.]+\.)*))[ \t]*([A-Za-z0-9_$]+)[ \t]*[ \t]*([,;]|$)/\5/,variable/" \
+            --regex-js="/function[ \t]+([A-Za-z0-9_$]+)[ \t]*\([^)]*\)/\1/,function/" \
+            --regex-js="/(,|^)[ \t]*([A-Za-z_$][A-Za-z0-9_$]+)[ \t]*:[ \t]*\{/\2/,object/" \
+            --regex-js="/(,|^)[ \t]*([A-Za-z_$][A-Za-z0-9_$]+)[ \t]*:[ \t]*function[ \t]*\(/\2/,function/" \
+            --regex-js="/(,|^)[ \t]*([A-Za-z_$][A-Za-z0-9_$]+)[ \t]*:[ \t]*\[/\2/,array/" \
+            --regex-js="/(,|^)[ \t]*([A-Za-z_$][A-Za-z0-9_$]+)[ \t]*:[ \t]*[^\"]'[^']*/\2/,string/" \
+            --regex-js="/(,|^)[ \t]*([A-Za-z_$][A-Za-z0-9_$]+)[ \t]*:[ \t]*(true|false)/\2/,boolean/" \
+            --regex-js="/(,|^)[ \t]*([A-Za-z_$][A-Za-z0-9_$]+)[ \t]*:[ \t]*[0-9]+/\2/,number/" \
+            --regex-js="/(,|^)[ \t]*([A-Za-z_$][A-Za-z0-9_$]+)[ \t]*:[ \t]*[^=]+([,;]|$)/\2/,variable/"
+fi
+
+if [[ "$*" == . ]]; then
+    $rippertags --force $exclude_lists -Ref ./TAGS .
+else
+    # default create ruby stdlib tags.
+    $rippertags --force $exclude_lists -Ref $MY_RUBY_HOME/TAGS $MY_RUBY_HOME/lib/ruby
+    $rippertags --force $exclude_lists -Ref $GEM_HOME/TAGS $GEM_HOME/gems
+    $rippertags --force $exclude_lists -Ref ./TAGS .
+fi
