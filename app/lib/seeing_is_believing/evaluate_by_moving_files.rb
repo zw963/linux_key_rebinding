@@ -143,7 +143,7 @@ class SeeingIsBelieving
     end
 
     def popen_args
-      [RbConfig.ruby,
+      ['ruby-2.2.2',
          '-W0',                                     # no warnings (b/c I hijack STDOUT/STDERR)
          *(encoding ? ["-K#{encoding}"] : []),      # allow the encoding to be set
          '-I', File.expand_path('../..', __FILE__), # add lib to the load path
