@@ -3,25 +3,26 @@
 # changes made to this file will be lost the next time ruby is built.
 
 module RbConfig
-  RUBY_VERSION == "2.1.6" or
-    raise "ruby lib version (2.1.6) doesn't match executable version (#{RUBY_VERSION})"
+  RUBY_VERSION.start_with?("2.2.2"[/^[0-9]+[.][0-9]+[.]/]) or
+    raise "ruby lib version (2.2.2) doesn't match executable version (#{RUBY_VERSION})"
 
-  TOPDIR = File.dirname(__FILE__).chomp!("/lib/ruby/2.1.0/x86_64-linux")
+  TOPDIR = File.dirname(__FILE__).chomp!("/lib/ruby/2.2.0/x86_64-linux")
   DESTDIR = '' unless defined? DESTDIR
   CONFIG = {}
   CONFIG["DESTDIR"] = DESTDIR
   CONFIG["MAJOR"] = "2"
-  CONFIG["MINOR"] = "1"
+  CONFIG["MINOR"] = "2"
   CONFIG["TEENY"] = "0"
-  CONFIG["PATCHLEVEL"] = "336"
+  CONFIG["PATCHLEVEL"] = "95"
   CONFIG["INSTALL"] = '/usr/bin/install -c'
   CONFIG["EXEEXT"] = ""
   CONFIG["prefix"] = (TOPDIR || DESTDIR + "/tmp/ruby")
-  CONFIG["ruby_install_name"] = "ruby"
-  CONFIG["RUBY_INSTALL_NAME"] = "ruby"
-  CONFIG["RUBY_SO_NAME"] = "ruby"
+  CONFIG["ruby_install_name"] = "$(RUBY_BASE_NAME)"
+  CONFIG["RUBY_INSTALL_NAME"] = "$(RUBY_BASE_NAME)"
+  CONFIG["RUBY_SO_NAME"] = "$(RUBY_BASE_NAME)"
+  CONFIG["DESTDIR"] = ""
   CONFIG["exec"] = "exec"
-  CONFIG["ruby_pc"] = "ruby-2.1.pc"
+  CONFIG["ruby_pc"] = "ruby-2.2.pc"
   CONFIG["PACKAGE"] = "ruby"
   CONFIG["BUILTIN_TRANSSRCS"] = " newline.c"
   CONFIG["USE_RUBYGEMS"] = "YES"
@@ -45,7 +46,7 @@ module RbConfig
   CONFIG["sitedir"] = "$(rubylibprefix)/site_ruby"
   CONFIG["rubyarchdir"] = "$(rubylibdir)/$(arch)"
   CONFIG["rubylibdir"] = "$(rubylibprefix)/$(ruby_version)"
-  CONFIG["ruby_version"] = "2.1.0"
+  CONFIG["ruby_version"] = "2.2.0"
   CONFIG["sitearch"] = "$(arch)"
   CONFIG["arch"] = "x86_64-linux"
   CONFIG["sitearchincludedir"] = "$(includedir)/$(sitearch)"
@@ -72,8 +73,8 @@ module RbConfig
   CONFIG["ENABLE_SHARED"] = "no"
   CONFIG["DLDLIBS"] = " -lc"
   CONFIG["SOLIBS"] = ""
-  CONFIG["LIBRUBYARG_SHARED"] = "-Wl,-R -Wl,$(libdir) -L$(libdir) "
-  CONFIG["LIBRUBYARG_STATIC"] = "-Wl,-R -Wl,$(libdir) -L$(libdir) -l$(RUBY_SO_NAME)-static"
+  CONFIG["LIBRUBYARG_SHARED"] = "-Wl,-R$(libdir) -L$(libdir) "
+  CONFIG["LIBRUBYARG_STATIC"] = "-Wl,-R$(libdir) -L$(libdir) -l$(RUBY_SO_NAME)-static"
   CONFIG["LIBRUBYARG"] = "$(LIBRUBYARG_STATIC)"
   CONFIG["LIBRUBY"] = "$(LIBRUBY_A)"
   CONFIG["LIBRUBY_ALIASES"] = "lib$(RUBY_SO_NAME).so"
@@ -84,7 +85,7 @@ module RbConfig
   CONFIG["EXTDLDFLAGS"] = ""
   CONFIG["EXTLDFLAGS"] = ""
   CONFIG["strict_warnflags"] = "-std=iso9899:1999"
-  CONFIG["warnflags"] = "-Wall -Wextra -Wno-unused-parameter -Wno-parentheses -Wno-long-long -Wno-missing-field-initializers -Wunused-variable -Wpointer-arith -Wwrite-strings -Wdeclaration-after-statement -Wimplicit-function-declaration"
+  CONFIG["warnflags"] = "-Wall -Wextra -Wno-unused-parameter -Wno-parentheses -Wno-long-long -Wno-missing-field-initializers -Wunused-variable -Wpointer-arith -Wwrite-strings -Wdeclaration-after-statement -Wimplicit-function-declaration -Wdeprecated-declarations"
   CONFIG["debugflags"] = "-ggdb3"
   CONFIG["optflags"] = "-O3 -fno-fast-math"
   CONFIG["cxxflags"] = " $(optflags) $(debugflags) $(warnflags)"
@@ -95,7 +96,7 @@ module RbConfig
   CONFIG["INSTALLDOC"] = "nodoc"
   CONFIG["CAPITARGET"] = "nodoc"
   CONFIG["RDOCTARGET"] = "nodoc"
-  CONFIG["DTRACE_GLOMMED_OBJ"] = ""
+  CONFIG["DTRACE_REBUILD"] = ""
   CONFIG["DTRACE_OBJ"] = ""
   CONFIG["DTRACE_EXT"] = "dmyh"
   CONFIG["EXECUTABLE_EXTS"] = ""
@@ -109,6 +110,7 @@ module RbConfig
   CONFIG["TEST_RUNNABLE"] = "yes"
   CONFIG["rubylibprefix"] = "$(libdir)/$(RUBY_BASE_NAME)"
   CONFIG["setup"] = "Setup"
+  CONFIG["ENCSTATIC"] = ""
   CONFIG["EXTSTATIC"] = ""
   CONFIG["STRIP"] = "strip -S -x"
   CONFIG["TRY_LINK"] = ""
@@ -116,6 +118,7 @@ module RbConfig
   CONFIG["RPATHFLAG"] = " -Wl,-R%1$-s"
   CONFIG["LIBPATHFLAG"] = " -L%1$-s"
   CONFIG["LINK_SO"] = ""
+  CONFIG["ASMEXT"] = "S"
   CONFIG["LIBEXT"] = "a"
   CONFIG["DLEXT2"] = ""
   CONFIG["DLEXT"] = "so"
@@ -168,12 +171,13 @@ module RbConfig
   CONFIG["GREP"] = "/bin/grep"
   CONFIG["CPP"] = "$(CC) -E"
   CONFIG["CXXFLAGS"] = "-I/usr/local/override/include"
-  CONFIG["CXX"] = "g++"
   CONFIG["OBJEXT"] = "o"
   CONFIG["CPPFLAGS"] = " $(DEFS) $(cppflags)"
   CONFIG["LDFLAGS"] = "-L. -L/usr/local/override/lib -fstack-protector -rdynamic -Wl,-export-dynamic"
   CONFIG["CFLAGS"] = "-I/usr/local/override/include"
+  CONFIG["CXX"] = "g++"
   CONFIG["CC"] = "gcc"
+  CONFIG["NACL_LIB_PATH"] = ""
   CONFIG["NACL_SDK_VARIANT"] = ""
   CONFIG["NACL_SDK_ROOT"] = ""
   CONFIG["NACL_TOOLCHAIN"] = ""
@@ -192,8 +196,8 @@ module RbConfig
   CONFIG["build_vendor"] = "unknown"
   CONFIG["build_cpu"] = "x86_64"
   CONFIG["build"] = "x86_64-unknown-linux-gnu"
-  CONFIG["RUBY_RELEASE_DATE"] = "2015-04-13"
-  CONFIG["RUBY_PROGRAM_VERSION"] = "2.1.6"
+  CONFIG["RUBY_PROGRAM_VERSION"] = "2.2.2"
+  CONFIG["HAVE_BASERUBY"] = "no"
   CONFIG["target_alias"] = ""
   CONFIG["host_alias"] = ""
   CONFIG["build_alias"] = ""
@@ -264,7 +268,6 @@ module RbConfig
     )
   end
 end
-autoload :Config, "rbconfig/obsolete.rb" # compatibility for ruby-1.8.4 and older.
 CROSS_COMPILING = nil unless defined? CROSS_COMPILING
 
 # Traveling Ruby modifications:
