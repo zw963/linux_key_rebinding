@@ -56,7 +56,7 @@ case $(basename $0) in
         if [ "$1" -a "$1" != '--daemon' ]; then
             input_device=$($rbindkeys -l |fgrep -e "$1" |cut -d':' -f1)
         elif [ "$keyboard_description" ]; then
-            input_device=$($rbindkeys -l |fgrep -e "$keyboard_description" |cut -d':' -f1)
+            input_device=$($rbindkeys -l |fgrep -e "$keyboard_description" |cut -d':' -f1 |head -n1)
         else
             help
             exit
