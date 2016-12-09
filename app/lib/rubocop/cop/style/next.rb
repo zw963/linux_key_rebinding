@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -81,6 +80,7 @@ module RuboCop
         end
 
         def simple_if_without_break?(node)
+          return false unless node
           return false unless if_without_else?(node)
           return false if style == :skip_modifier_ifs && modifier_if?(node)
           return false if !modifier_if?(node) && !min_body_length?(node)
@@ -155,9 +155,8 @@ module RuboCop
                     else
                       cond.source_range.end_pos
                     end
-          Parser::Source::Range.new(node.source_range.source_buffer,
-                                    node.source_range.begin_pos,
-                                    end_pos)
+
+          range_between(node.source_range.begin_pos, end_pos)
         end
 
         def end_range(node)
@@ -167,7 +166,7 @@ module RuboCop
           begin_pos -= 1 if end_followed_by_whitespace_only?(source_buffer,
                                                              end_pos)
 
-          Parser::Source::Range.new(source_buffer, begin_pos, end_pos)
+          range_between(begin_pos, end_pos)
         end
 
         def end_followed_by_whitespace_only?(source_buffer, end_pos)

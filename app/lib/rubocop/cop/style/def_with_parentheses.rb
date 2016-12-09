@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -14,12 +13,10 @@ module RuboCop
               'any arguments.'.freeze
 
         def on_method_def(node, _method_name, args, _body)
-          start_line = node.loc.keyword.line
-          end_line = node.loc.end.line
+          return if node.single_line?
+          return unless args.children.empty? && args.loc.begin
 
-          return if start_line == end_line
-
-          add_offense(args, :begin) if args.children == [] && args.loc.begin
+          add_offense(args, :begin)
         end
 
         def autocorrect(node)

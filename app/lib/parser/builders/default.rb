@@ -24,9 +24,28 @@ module Parser
 
     class << self
       ##
+      # AST compatibility attribute; block arguments of `m { |a| }` are
+      # not semantically equivalent to block arguments of `m { |a,| }` or `m { |a, b| }`,
+      # all new code should set this attribute to true.
+      #
+      # If set to false (the default), arguments of `m { |a| }` are emitted as
+      # `s(:args, s(:arg, :a))`
+      #
+      # If set to true, arguments of `m { |a| }` are emitted as
+      # `s(:args, s(:procarg0, :a))
+      #
+      # @return [Boolean]
+      attr_accessor :emit_procarg0
+    end
+
+    @emit_procarg0 = false
+
+    class << self
+      ##
       # @api private
       def modernize
         @emit_lambda = true
+        @emit_procarg0 = true
       end
     end
 
@@ -487,7 +506,7 @@ module Parser
 
     def op_assign(lhs, op_t, rhs)
       case lhs.type
-      when :gvasgn, :ivasgn, :lvasgn, :cvasgn, :casgn, :send
+      when :gvasgn, :ivasgn, :lvasgn, :cvasgn, :casgn, :send, :csend
         operator   = value(op_t)[0..-1].to_sym
         source_map = lhs.loc.
                         with_operator(loc(op_t)).
@@ -635,6 +654,14 @@ module Parser
     def blockarg(amper_t, name_t)
       n(:blockarg, [ value(name_t).to_sym ],
         arg_prefix_map(amper_t, name_t))
+    end
+
+    def procarg0(arg)
+      if self.class.emit_procarg0
+        arg.updated(:procarg0)
+      else
+        arg
+      end
     end
 
     # Ruby 1.8 block arguments
@@ -982,6 +1009,21 @@ module Parser
               [ compound_stmt, *(rescue_bodies + [ nil ]) ],
               eh_keyword_map(compound_stmt, nil, rescue_bodies, nil, nil))
         end
+      elsif else_t
+        statements = []
+        if !compound_stmt.nil?
+          if compound_stmt.type == :begin
+            statements += compound_stmt.children
+          else
+            statements.push(compound_stmt)
+          end
+        end
+        statements.push(
+          n(:begin, [ else_ ],
+            collection_map(else_t, [ else_ ], nil)))
+        compound_stmt =
+          n(:begin, statements,
+            collection_map(nil, statements, nil))
       end
 
       if ensure_t
@@ -1097,7 +1139,7 @@ module Parser
         case this_arg.type
         when :arg, :optarg, :restarg, :blockarg,
              :kwarg, :kwoptarg, :kwrestarg,
-             :shadowarg
+             :shadowarg, :procarg0
 
           this_name, = *this_arg
 

@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -59,22 +58,27 @@ module RuboCop
       end
 
       def align(node, align_to)
-        source_buffer = node.source_range.source_buffer
-        begin_pos = node.loc.end.begin_pos
-        whitespace = Parser::Source::Range.new(source_buffer,
-                                               begin_pos - node.loc.end.column,
-                                               begin_pos)
+        whitespace = whitespace_range(node)
         return false unless whitespace.source.strip.empty?
 
-        column = if !align_to
-                   0
-                 elsif align_to.respond_to?(:loc)
-                   align_to.source_range.column
-                 else
-                   align_to.column
-                 end
-
+        column = alignment_column(align_to)
         ->(corrector) { corrector.replace(whitespace, ' ' * column) }
+      end
+
+      def whitespace_range(node)
+        begin_pos = node.loc.end.begin_pos
+
+        range_between(begin_pos - node.loc.end.column, begin_pos)
+      end
+
+      def alignment_column(align_to)
+        if !align_to
+          0
+        elsif align_to.respond_to?(:loc)
+          align_to.source_range.column
+        else
+          align_to.column
+        end
       end
     end
   end

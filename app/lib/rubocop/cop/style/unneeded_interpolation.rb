@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -39,11 +38,11 @@ module RuboCop
         end
 
         def single_child?(node)
-          node.children.size == 1
+          node.children.one?
         end
 
         def interpolation?(node)
-          variable_interpolation?(node) || node.type == :begin
+          variable_interpolation?(node) || node.begin_type?
         end
 
         def variable_interpolation?(node)
@@ -51,12 +50,11 @@ module RuboCop
         end
 
         def implicit_concatenation?(node)
-          node.parent && node.parent.type == :dstr
+          node.parent && node.parent.dstr_type?
         end
 
         def embedded_in_percent_array?(node)
-          node.parent &&
-            node.parent.type == :array &&
+          node.parent && node.parent.array_type? &&
             percent_literal?(node.parent)
         end
 

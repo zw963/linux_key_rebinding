@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -44,11 +43,7 @@ module RuboCop
         transposition_count =
           count_transpositions(common_chars_a, common_chars_b)
 
-        sum = (matched_count / shorter.size.to_f) +
-              (matched_count / longer.size.to_f) +
-              ((matched_count - transposition_count / 2) / matched_count.to_f)
-
-        sum / 3.0
+        compute_non_zero_distance(matched_count.to_f, transposition_count)
       end
 
       def find_common_characters
@@ -78,6 +73,14 @@ module RuboCop
         common_chars_a.size.times.count do |index|
           common_chars_a[index] != common_chars_b[index]
         end
+      end
+
+      def compute_non_zero_distance(matched_count, transposition_count)
+        sum = (matched_count / shorter.size.to_f) +
+              (matched_count / longer.size.to_f) +
+              ((matched_count - transposition_count / 2) / matched_count)
+
+        sum / 3.0
       end
 
       def matching_index_range(origin)

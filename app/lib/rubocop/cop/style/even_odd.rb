@@ -1,10 +1,9 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
   module Cop
     module Style
-      # This cop checks for places where Fixnum#even? or Fixnum#odd?
+      # This cop checks for places where Integer#even? or Integer#odd?
       # should have been used.
       #
       # @example
@@ -15,61 +14,41 @@ module RuboCop
       #   # good
       #   if x.even?
       class EvenOdd < Cop
-        MSG = 'Replace with `Fixnum#%s?`.'.freeze
+        MSG = 'Replace with `Integer#%s?`.'.freeze
 
-        ZERO = s(:int, 0)
-        ONE = s(:int, 1)
-        TWO = s(:int, 2)
+        def_node_matcher :even_odd_candidate?, <<-PATTERN
+          (send
+            {(send $_ :% (int 2))
+             (begin (send $_ :% (int 2)))}
+            ${:== :!=}
+            (int ${0 1 2}))
+        PATTERN
 
         def on_send(node)
-          offense = offense_type(node)
-          add_offense(node, :expression, format(MSG, offense)) if offense
+          even_odd_candidate?(node) do |_base_number, method, arg|
+            replacement_method = replacement_method(arg, method)
+            add_offense(node, :expression, format(MSG, replacement_method))
+          end
         end
 
         def autocorrect(node)
-          correction = "#{base_number(node)}.#{offense_type(node)}?"
-          ->(corrector) { corrector.replace(node.source_range, correction) }
+          even_odd_candidate?(node) do |base_number, method, arg|
+            replacement_method = replacement_method(arg, method)
+
+            correction = "#{base_number.source}.#{replacement_method}?"
+            ->(corrector) { corrector.replace(node.source_range, correction) }
+          end
         end
 
         private
 
-        def base_number(node)
-          receiver, = *node
-          node = expression(receiver)
-          node.children[0].source
-        end
-
-        def offense_type(node)
-          receiver, method, args = *node
-
-          return unless [:==, :!=].include?(method)
-          return unless div_by_2?(receiver)
-
-          if args == ZERO
+        def replacement_method(arg, method)
+          case arg
+          when 0
             method == :== ? :even : :odd
-          elsif args == ONE
+          when 1
             method == :== ? :odd : :even
           end
-        end
-
-        def div_by_2?(node)
-          node = expression(node)
-
-          _receiver, method, args = *node
-
-          method == :% && args == TWO
-        end
-
-        def expression(node)
-          return unless node
-
-          # check for scenarios like (x % 2) == 0
-          if node.type == :begin && node.children.size == 1
-            node = node.children.first
-          end
-
-          return unless node.type == :send
-          node
         end
       end
     end

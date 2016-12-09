@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -27,12 +26,12 @@ module RuboCop
         end
 
         def validate_config
-          if style == :aligned && cop_config['IndentationWidth']
-            raise ValidationError, 'The `Style/MultilineOperationIndentation`' \
-                                  ' cop only accepts an `IndentationWidth` ' \
-                                  'configuration parameter when ' \
-                                  '`EnforcedStyle` is `indented`.'
-          end
+          return unless style == :aligned && cop_config['IndentationWidth']
+
+          raise ValidationError, 'The `Style/MultilineOperationIndentation`' \
+                                ' cop only accepts an `IndentationWidth` ' \
+                                'configuration parameter when ' \
+                                '`EnforcedStyle` is `indented`.'
         end
 
         private

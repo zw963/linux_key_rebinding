@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -27,8 +26,7 @@ module RuboCop
                            comment.text.index(first_offense)
           end_position   = start_position + first_offense.length
 
-          Parser::Source::Range.new(comment.loc.expression.source_buffer,
-                                    start_position, end_position)
+          range_between(start_position, end_position)
         end
 
         def first_non_ascii_chars(string)

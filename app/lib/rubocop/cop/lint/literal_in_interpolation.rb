@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -14,7 +13,7 @@ module RuboCop
         COMPOSITE = [:array, :hash, :pair, :irange, :erange].freeze
 
         def on_dstr(node)
-          node.children.select { |n| n.type == :begin }.each do |begin_node|
+          node.each_child_node(:begin) do |begin_node|
             final_node = begin_node.children.last
             next unless final_node
             next if special_keyword?(final_node)
@@ -35,7 +34,7 @@ module RuboCop
 
         def special_keyword?(node)
           # handle strings like __FILE__
-          (node.type == :str && !node.loc.respond_to?(:begin)) ||
+          (node.str_type? && !node.loc.respond_to?(:begin)) ||
             node.source_range.is?('__LINE__')
         end
 
@@ -54,9 +53,7 @@ module RuboCop
           end_pos =
             node.loc.end ? node.loc.end.begin_pos : node.loc.expression.end_pos
 
-          Parser::Source::Range.new(node.source_range.source_buffer,
-                                    node.loc.begin.end_pos,
-                                    end_pos).source
+          range_between(node.loc.begin.end_pos, end_pos).source
         end
 
         # Does node print its own source when converted to a string?

@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -19,13 +18,17 @@ module RuboCop
       class ReadWriteAttribute < Cop
         MSG = 'Prefer `%s` over `%s`.'.freeze
 
-        def on_send(node)
-          receiver, method_name, *_args = *node
-          return if receiver
-          return unless [:read_attribute,
-                         :write_attribute].include?(method_name)
+        def_node_matcher :read_write_attribute?, <<-PATTERN
+          {
+            (send nil :read_attribute _)
+            (send nil :write_attribute _ _)
+          }
+        PATTERN
 
-          add_offense(node, :selector)
+        def on_send(node)
+          read_write_attribute?(node) do
+            add_offense(node, :selector)
+          end
         end
 
         def message(node)

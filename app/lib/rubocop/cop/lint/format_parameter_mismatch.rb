@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -73,7 +72,7 @@ module RuboCop
 
           _receiver_node, _method_name, *args = *node
 
-          args.butfirst.any? { |arg| arg.type == :splat }
+          args.butfirst.any?(&:splat_type?)
         end
 
         def heredoc?(node)
@@ -118,7 +117,7 @@ module RuboCop
             .source
             .scan(FIELD_REGEX)
             .select { |x| x.first != PERCENT_PERCENT }
-            .reduce(0) { |a, e| a + (e[2] =~ /\*/ ? 2 : 1) }
+            .reduce(0) { |acc, elem| acc + (elem[2] =~ /\*/ ? 2 : 1) }
         end
 
         def format?(node)

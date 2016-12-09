@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -87,7 +86,7 @@ module RuboCop
         end
 
         def block_argument?
-          argument? && @scope.node.type == :block
+          argument? && @scope.node.block_type?
         end
 
         def keyword_argument?
@@ -95,7 +94,7 @@ module RuboCop
         end
 
         def explicit_block_local_variable?
-          @declaration_node.type == :shadowarg
+          @declaration_node.shadowarg_type?
         end
       end
     end

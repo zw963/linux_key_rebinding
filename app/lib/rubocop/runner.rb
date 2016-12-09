@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -15,6 +14,8 @@ module RuboCop
         @offenses = offenses
       end
     end
+
+    MAX_ITERATIONS = 200
 
     attr_reader :errors, :warnings, :aborting
     alias aborting? aborting
@@ -50,23 +51,30 @@ module RuboCop
 
     def inspect_files(files)
       inspected_files = []
-      all_passed = true
 
       formatter_set.started(files)
 
-      files.each do |file|
-        break if aborting?
-        offenses = process_file(file)
-        all_passed = false if offenses.any? { |o| considered_failure?(o) }
-        inspected_files << file
-        break if @options[:fail_fast] && !all_passed
-      end
-
-      all_passed
+      each_inspected_file(files) { |file| inspected_files << file }
     ensure
       ResultCache.cleanup(@config_store, @options[:debug]) if cached_run?
       formatter_set.finished(inspected_files.freeze)
       formatter_set.close_output_files
+    end
+
+    def each_inspected_file(files)
+      files.reduce(true) do |all_passed, file|
+        break false if aborting?
+
+        offenses = process_file(file)
+        yield file
+
+        if offenses.any? { |o| considered_failure?(o) }
+          break false if @options[:fail_fast]
+          next false
+        end
+
+        all_passed
+      end
     end
 
     def list_files(paths)
@@ -108,10 +116,7 @@ module RuboCop
     end
 
     def add_unneeded_disables(file, offenses, source)
-      if source.disabled_line_ranges.any? &&
-         # Don't check unneeded disable if --only or --except option is
-         # given, because these options override configuration.
-         (@options[:except] || []).empty? && (@options[:only] || []).empty?
+      if check_for_unneded_disables?(source)
         config = @config_store.for(file)
         if config.cop_enabled?(Cop::Lint::UnneededDisable)
           cop = Cop::Lint::UnneededDisable.new(config, @options)
@@ -125,6 +130,14 @@ module RuboCop
       end
 
       offenses.sort.reject(&:disabled?).freeze
+    end
+
+    def check_for_unneded_disables?(source)
+      !source.disabled_line_ranges.empty? && !filtered_run?
+    end
+
+    def filtered_run?
+      @options[:except] || @options[:only]
     end
 
     def autocorrect_unneeded_disables(source, cop)
@@ -166,27 +179,11 @@ module RuboCop
     def do_inspection_loop(file, processed_source)
       offenses = []
 
-      # Keep track of the state of the source. If a cop modifies the source
-      # and another cop undoes it producing identical source we have an
-      # infinite loop.
-      @processed_sources = []
-
-      # It is also possible for a cop to keep adding indefinitely to a file,
-      # making it bigger and bigger. If the inspection loop runs for an
-      # excessively high number of iterations, this is likely happening.
-      @iterations = 0
-
       # When running with --auto-correct, we need to inspect the file (which
       # includes writing a corrected version of it) until no more corrections
       # are made. This is because automatic corrections can introduce new
       # offenses. In the normal case the loop is only executed once.
-      loop do
-        check_for_infinite_loop(processed_source, offenses)
-
-        if (@iterations += 1) > 200
-          raise InfiniteCorrectionLoop.new(processed_source.path, offenses)
-        end
-
+      iterate_until_no_changes(processed_source, offenses) do
         # The offenses that couldn't be corrected will be found again so we
         # only keep the corrected ones in order to avoid duplicate reporting.
         offenses.select!(&:corrected?)
@@ -202,6 +199,29 @@ module RuboCop
       end
 
       [processed_source, offenses]
+    end
+
+    def iterate_until_no_changes(source, offenses)
+      # Keep track of the state of the source. If a cop modifies the source
+      # and another cop undoes it producing identical source we have an
+      # infinite loop.
+      @processed_sources = []
+
+      # It is also possible for a cop to keep adding indefinitely to a file,
+      # making it bigger and bigger. If the inspection loop runs for an
+      # excessively high number of iterations, this is likely happening.
+      iterations = 0
+
+      loop do
+        check_for_infinite_loop(source, offenses)
+
+        if (iterations += 1) > MAX_ITERATIONS
+          raise InfiniteCorrectionLoop.new(source.path, offenses)
+        end
+
+        source = yield
+        break unless source
+      end
     end
 
     # Check whether a run created source identical to a previous run, which
@@ -254,9 +274,9 @@ module RuboCop
 
     def filter_cop_classes(cop_classes, config)
       # use only cops that link to a style guide if requested
-      if style_guide_cops_only?(config)
-        cop_classes.select! { |cop| config.for_cop(cop)['StyleGuide'] }
-      end
+      return unless style_guide_cops_only?(config)
+
+      cop_classes.select! { |cop| config.for_cop(cop)['StyleGuide'] }
     end
 
     def style_guide_cops_only?(config)

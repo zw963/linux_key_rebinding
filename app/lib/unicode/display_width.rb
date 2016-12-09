@@ -1,14 +1,15 @@
 require_relative 'display_width/constants'
+require_relative 'display_width/index'
 
 module Unicode
   module DisplayWidth
-    def self.of(string, ambiguous = 1, overwrite = {})
-      require_relative 'display_width/index' unless defined? ::Unicode::DisplayWidth::INDEX
+    DEPTHS = [0x10000, 0x1000, 0x100, 0x10].freeze
 
-      res = string.unpack('U*').inject(0){ |total_width, codepoint|
+    def self.of(string, ambiguous = 1, overwrite = {})
+      res = string.unpack('U*'.freeze).inject(0){ |total_width, codepoint|
         index_or_value = INDEX
         codepoint_depth_offset = codepoint
-        [0x10000, 0x1000, 0x100, 0x10].each{ |depth|
+        DEPTHS.each{ |depth|
           index_or_value         = index_or_value[codepoint_depth_offset / depth]
           codepoint_depth_offset = codepoint_depth_offset % depth
           break unless index_or_value.is_a? Array

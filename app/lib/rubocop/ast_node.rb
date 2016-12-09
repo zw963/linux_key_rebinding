@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -468,6 +467,7 @@ module RuboCop
     # So, does the return value of this node matter? If we changed it to
     # `(...; nil)`, might that affect anything?
     #
+    # rubocop:disable Metrics/MethodLength
     def value_used?
       # Be conservative and return true if we're not sure
       return false if parent.nil?
@@ -489,6 +489,7 @@ module RuboCop
         true
       end
     end
+    # rubocop:enable Metrics/MethodLength
 
     # Some expressions are evaluated for their value, some for their side
     # effects, and some for both

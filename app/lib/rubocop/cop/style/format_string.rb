@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -54,7 +53,7 @@ module RuboCop
 
           method_name == :% &&
             ([:str, :dstr].include?(receiver_node.type) ||
-             arg_nodes[0].type == :array)
+             arg_nodes.first.array_type?)
         end
 
         def message(node)

@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -25,6 +24,8 @@ module RuboCop
 
           @node = node
           @scope = scope
+
+          super
         end
 
         # There's an implicit variable reference by the zero-arity `super`:

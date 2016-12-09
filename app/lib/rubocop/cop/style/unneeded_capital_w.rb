@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -18,11 +17,17 @@ module RuboCop
         private
 
         def on_percent_literal(node)
-          requires_interpolation = node.children.any? do |string|
-            string.type == :dstr ||
-              double_quotes_acceptable?(string.str_content)
+          return if requires_interpolation?(node)
+
+          add_offense(node, :expression)
+        end
+
+        def requires_interpolation?(node)
+          node.child_nodes.any? do |string|
+            string.dstr_type? ||
+              double_quotes_acceptable?(string.str_content) ||
+              string.source == '\s'
           end
-          add_offense(node, :expression) unless requires_interpolation
         end
 
         def autocorrect(node)

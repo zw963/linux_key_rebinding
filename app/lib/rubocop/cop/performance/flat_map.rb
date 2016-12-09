@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -20,58 +19,53 @@ module RuboCop
         FLATTEN_MULTIPLE_LEVELS = ' Beware, `flat_map` only flattens 1 level ' \
                                   'and `flatten` can be used to flatten ' \
                                   'multiple levels.'.freeze
-        FLATTEN = [:flatten, :flatten!].freeze
+
+        def_node_matcher :flat_map_candidate?, <<-PATTERN
+          (send (block $(send _ ${:collect :map}) ...) ${:flatten :flatten!} $...)
+        PATTERN
 
         def on_send(node)
-          left, second_method, flatten_param = *node
-          return unless FLATTEN.include?(second_method)
-
-          flatten_level, = *flatten_param
-          expression, = *left
-          _array, first_method = *expression
-          return unless first_method == :map || first_method == :collect
-
-          if cop_config['EnabledForFlattenWithoutParams'] && flatten_level.nil?
-            offense_for_levels(node, expression, first_method, second_method)
-          elsif flatten_level == 1
-            offense_for_method(node, expression, first_method, second_method)
+          flat_map_candidate?(node) do |map_node, first_method, flatten, params|
+            flatten_level, = *params.first
+            if cop_config['EnabledForFlattenWithoutParams'] &&
+               flatten_level.nil?
+              offense_for_levels(node, map_node, first_method, flatten)
+            elsif flatten_level == 1
+              offense_for_method(node, map_node, first_method, flatten)
+            end
           end
         end
 
         def autocorrect(node)
-          receiver, _flatten, flatten_param = *node
-          flatten_level, = *flatten_param
+          map_node, _first_method, _flatten, params = flat_map_candidate?(node)
+          flatten_level, = *params.first
           return if flatten_level.nil?
 
-          array, = *receiver
-
           lambda do |corrector|
-            range = Parser::Source::Range.new(node.source_range.source_buffer,
-                                              node.loc.dot.begin_pos,
-                                              node.source_range.end_pos)
+            range = range_between(node.loc.dot.begin_pos,
+                                  node.source_range.end_pos)
 
             corrector.remove(range)
-            corrector.replace(array.loc.selector, 'flat_map')
+            corrector.replace(map_node.loc.selector, 'flat_map')
           end
         end
 
         private
 
-        def offense_for_levels(node, expression, first_method, second_method)
+        def offense_for_levels(node, map_node, first_method, flatten)
           message = MSG + FLATTEN_MULTIPLE_LEVELS
-          offense(node, expression, first_method, second_method, message)
+          offense(node, map_node, first_method, flatten, message)
         end
 
-        def offense_for_method(node, expression, first_method, second_method)
-          offense(node, expression, first_method, second_method, MSG)
+        def offense_for_method(node, map_node, first_method, flatten)
+          offense(node, map_node, first_method, flatten, MSG)
         end
 
-        def offense(node, expression, first_method, second_method, message)
-          range = Parser::Source::Range.new(node.source_range.source_buffer,
-                                            expression.loc.selector.begin_pos,
-                                            node.loc.selector.end_pos)
+        def offense(node, map_node, first_method, flatten, message)
+          range = range_between(map_node.loc.selector.begin_pos,
+                                node.loc.expression.end_pos)
 
-          add_offense(node, range, format(message, first_method, second_method))
+          add_offense(node, range, format(message, first_method, flatten))
         end
       end
     end

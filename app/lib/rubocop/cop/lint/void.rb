@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -34,8 +33,7 @@ module RuboCop
         end
 
         def check_for_void_op(node)
-          return unless node.type == :send
-          return unless node.loc.selector
+          return unless node.send_type? && node.loc.selector
 
           op = node.loc.selector.source
 
@@ -48,8 +46,7 @@ module RuboCop
         end
 
         def check_for_literal(node)
-          return unless node.literal?
-          return if node.xstr_type?
+          return if !node.literal? || node.xstr_type?
 
           add_offense(node, :expression, format(LIT_MSG, node.source))
         end

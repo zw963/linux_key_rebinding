@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -20,6 +19,8 @@ module RuboCop
         include CheckAssignment
         include IfNode
         include AccessModifierNode
+
+        SPECIAL_MODIFIERS = %w(private protected).freeze
 
         def on_rescue(node)
           _begin_node, *rescue_nodes, else_node = *node
@@ -48,36 +49,33 @@ module RuboCop
           # assignments, etc, would be more difficult. The end/} must be at the
           # beginning of its line.
           loc = node.loc
-          check_indentation(loc.end, body) if begins_its_line?(loc.end)
+          return unless begins_its_line?(loc.end)
+
+          check_indentation(loc.end, body)
+          return unless indentation_consistency_style == 'rails'
+
+          check_members(loc.end, [body])
         end
 
         def on_module(node)
           _module_name, *members = *node
-          check_members(node, members)
+          check_members(node.loc.keyword, members)
         end
 
         def on_class(node)
           _class_name, _base_class, *members = *node
-          check_members(node, members)
+          check_members(node.loc.keyword, members)
         end
 
-        def check_members(node, members)
-          check_indentation(node.loc.keyword, members.first)
+        def check_members(base, members)
+          check_indentation(base, members.first)
 
           return unless members.any? && members.first.begin_type?
-          style =
-            config.for_cop('Style/IndentationConsistency')['EnforcedStyle']
-          return unless style == 'rails'
+          return unless indentation_consistency_style == 'rails'
 
-          special = %w(protected private) # Extra indentation step after these.
-          previous_modifier = nil
-          members.first.children.each do |m|
-            if modifier_node?(m) && special.include?(m.source)
-              previous_modifier = m
-            elsif previous_modifier
-              check_indentation(previous_modifier.source_range, m, style)
-              previous_modifier = nil
-            end
+          each_member(members) do |member, previous_modifier|
+            check_indentation(previous_modifier, member,
+                              indentation_consistency_style)
           end
         end
 
@@ -121,7 +119,7 @@ module RuboCop
           _condition, *branches = *node
           latest_when = nil
           branches.compact.each do |b|
-            if b.type == :when
+            if b.when_type?
               # TODO: Revert to the original expression once the fix in Rubinius
               #   is released.
               #
@@ -161,6 +159,26 @@ module RuboCop
         end
 
         private
+
+        def each_member(members)
+          previous_modifier = nil
+          members.first.children.each do |member|
+            if special_modifier?(member)
+              previous_modifier = member
+            elsif previous_modifier
+              yield member, previous_modifier.source_range
+              previous_modifier = nil
+            end
+          end
+        end
+
+        def special_modifier?(node)
+          modifier_node?(node) && SPECIAL_MODIFIERS.include?(node.source)
+        end
+
+        def indentation_consistency_style
+          config.for_cop('Style/IndentationConsistency')['EnforcedStyle']
+        end
 
         def check_assignment(node, rhs)
           # If there are method calls chained to the right hand side of the
@@ -208,7 +226,7 @@ module RuboCop
         def offense(body_node, indentation, style)
           # This cop only auto-corrects the first statement in a def body, for
           # example.
-          if body_node.type == :begin && !parentheses?(body_node)
+          if body_node.begin_type? && !parentheses?(body_node)
             body_node = body_node.children.first
           end
 
@@ -268,11 +286,11 @@ module RuboCop
           begin_pos = expr.begin_pos
           ind = expr.begin_pos - indentation
           pos = indentation >= 0 ? ind..begin_pos : begin_pos..ind
-          Parser::Source::Range.new(expr.source_buffer, pos.begin, pos.end)
+          range_between(pos.begin, pos.end)
         end
 
         def starts_with_access_modifier?(body_node)
-          body_node.type == :begin && modifier_node?(body_node.children.first)
+          body_node.begin_type? && modifier_node?(body_node.children.first)
         end
 
         def configured_indentation_width

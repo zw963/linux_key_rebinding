@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -83,6 +82,15 @@ module RuboCop
           _receiver, _method_name, *args = *node
 
           args
+        end
+
+        def ignored_literal?(node)
+          single_line_ignoring_receiver?(node) || super
+        end
+
+        def single_line_ignoring_receiver?(node)
+          return false unless node.loc.begin && node.loc.end
+          node.loc.begin.line == node.loc.end.line
         end
       end
     end

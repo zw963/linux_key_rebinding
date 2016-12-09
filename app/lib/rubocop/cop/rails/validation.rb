@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -51,7 +50,7 @@ module RuboCop
 
         def correct_validate_type(corrector, node)
           _receiver, method_name, *args = *node
-          options = args.find { |arg| arg.type != :sym }
+          options = args.find { |arg| !arg.sym_type? }
           validate_type = method_name.to_s.split('_')[1]
 
           if options

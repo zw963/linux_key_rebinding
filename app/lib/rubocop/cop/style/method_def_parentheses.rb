@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -33,9 +32,8 @@ module RuboCop
             else
               args_expr = args_node(node).source_range
               args_with_space = range_with_surrounding_space(args_expr, :left)
-              just_space = Parser::Source::Range.new(args_expr.source_buffer,
-                                                     args_with_space.begin_pos,
-                                                     args_expr.begin_pos)
+              just_space = range_between(args_with_space.begin_pos,
+                                         args_expr.begin_pos)
               corrector.replace(just_space, '(')
               corrector.insert_after(args_expr, ')')
             end
@@ -68,7 +66,7 @@ module RuboCop
         end
 
         def args_node(def_node)
-          if def_node.type == :def
+          if def_node.def_type?
             _method_name, args, _body = *def_node
           else
             _scope, _method_name, args, _body = *def_node

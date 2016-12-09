@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -39,34 +38,40 @@ module RuboCop
       #
       #   Model.where(id: [1, 2, 3]).to_a.count { |m| m.method == true }
       class Count < Cop
+        include SafeMode
+
         MSG = 'Use `count` instead of `%s...%s`.'.freeze
 
-        SELECTORS = [:reject, :select].freeze
-        COUNTERS = [:count, :length, :size].freeze
+        def_node_matcher :count_candidate?, <<-PATTERN
+          {
+            (send (block $(send _ ${:select :reject}) ...) ${:count :length :size})
+            (send $(send _ ${:select :reject} (:block_pass _)) ${:count :length :size})
+          }
+        PATTERN
 
         def on_send(node)
-          return unless should_run?
-          selector, selector_loc, params, counter = parse(node)
-          return unless COUNTERS.include?(counter)
-          return unless SELECTORS.include?(selector)
-          return if params && !params.block_pass_type?
-          return if node.parent && node.parent.block_type?
+          return if rails_safe_mode?
 
-          range = Parser::Source::Range.new(node.source_range.source_buffer,
-                                            selector_loc.begin_pos,
-                                            node.source_range.end_pos)
+          count_candidate?(node) do |selector_node, selector, counter|
+            return unless eligible_node?(node)
 
-          add_offense(node, range, format(MSG, selector, counter))
+            range = source_starting_at(node) do
+              selector_node.loc.selector.begin_pos
+            end
+
+            add_offense(node, range, format(MSG, selector, counter))
+          end
         end
 
+        private
+
         def autocorrect(node)
-          selector, selector_loc = parse(node)
+          selector_node, selector, _counter = count_candidate?(node)
+          selector_loc = selector_node.loc.selector
 
           return if selector == :reject
 
-          range = Parser::Source::Range.new(node.source_range.source_buffer,
-                                            node.loc.dot.begin_pos,
-                                            node.source_range.end_pos)
+          range = source_starting_at(node) { |n| n.loc.dot.begin_pos }
 
           lambda do |corrector|
             corrector.remove(range)
@@ -74,36 +79,18 @@ module RuboCop
           end
         end
 
-        private
-
-        def should_run?
-          !(cop_config['SafeMode'.freeze] ||
-            config['Rails'.freeze] &&
-            config['Rails'.freeze]['Enabled'.freeze])
+        def eligible_node?(node)
+          !(node.parent && node.parent.block_type?)
         end
 
-        def parse(node)
-          left, counter = *node
-          expression, selector, params = *left
+        def source_starting_at(node)
+          begin_pos = if block_given?
+                        yield node
+                      else
+                        node.source_range.begin_pos
+                      end
 
-          selector_loc =
-            if selector.is_a?(Symbol)
-              if expression && expression.parent.loc.respond_to?(:selector)
-                expression.parent.loc.selector
-              elsif left.loc.respond_to?(:selector)
-                left.loc.selector
-              end
-            else
-              _enumerable, selector, params = *expression
-
-              expression.loc.selector if contains_selector?(expression)
-            end
-
-          [selector, selector_loc, params, counter]
-        end
-
-        def contains_selector?(node)
-          node.respond_to?(:loc) && node.loc.respond_to?(:selector)
+          range_between(begin_pos, node.source_range.end_pos)
         end
       end
     end

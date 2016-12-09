@@ -1,12 +1,11 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
   module Cop
     module Rails
-      # This cop enforces the consistent use of action filters methods.
+      # This cop enforces the consistent use of action filter methods.
       #
-      # The cop is configurable and the enforce the use of older
+      # The cop is configurable and can enforce the use of the older
       # something_filter methods or the newer something_action methods.
       class ActionFilter < Cop
         include ConfigurableEnforcedStyle

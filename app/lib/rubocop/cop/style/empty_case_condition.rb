@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -82,10 +81,8 @@ module RuboCop
 
             first = children.first
             last = children.last
-            range =
-              Parser::Source::Range.new(when_node.loc.expression.source_buffer,
-                                        first.loc.expression.begin_pos,
-                                        last.loc.expression.end_pos)
+            range = range_between(first.loc.expression.begin_pos,
+                                  last.loc.expression.end_pos)
 
             corrector.replace(range, children.map(&:source).join(' || '))
           end

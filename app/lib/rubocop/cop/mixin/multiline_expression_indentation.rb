@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -126,7 +125,7 @@ module RuboCop
       def part_of_assignment_rhs(node, candidate)
         node.each_ancestor.find do |a|
           case a.type
-          when :if, :while, :until, :for, :return, :array
+          when :if, :while, :until, :for, :return, :array, :kwbegin
             break # other kinds of alignment
           when :block
             break if part_of_block_body?(candidate, a)
@@ -177,12 +176,12 @@ module RuboCop
       end
 
       def grouped_expression?(node)
-        node.type == :begin && node.loc.respond_to?(:begin) && node.loc.begin
+        node.begin_type? && node.loc.respond_to?(:begin) && node.loc.begin
       end
 
       def inside_arg_list_parentheses?(node, ancestor)
         a = ancestor.loc
-        return false unless ancestor.type == :send && a.begin &&
+        return false unless ancestor.send_type? && a.begin &&
                             a.begin.is?('(')
         n = node.source_range
         n.begin_pos > a.begin.begin_pos && n.end_pos < a.end.end_pos

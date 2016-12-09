@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -26,7 +25,9 @@ module RuboCop
         UNDERSCORE = '_'.freeze
 
         def on_masgn(node)
-          return unless (range = unneeded_range(node))
+          range = unneeded_range(node)
+
+          return unless range
 
           good_code = node.source
           offset = range.begin_pos - node.source_range.begin_pos
@@ -36,8 +37,9 @@ module RuboCop
         end
 
         def autocorrect(node)
+          range = unneeded_range(node)
+
           lambda do |corrector|
-            range = unneeded_range(node)
             corrector.remove(range) if range
           end
         end
@@ -45,27 +47,38 @@ module RuboCop
         private
 
         def find_first_offense(variables)
-          first_offense = nil
+          first_offense = find_first_possible_offense(variables.reverse)
 
-          variables.reverse_each do |variable|
+          return unless first_offense
+          return if splat_variable_before?(first_offense, variables)
+
+          first_offense
+        end
+
+        def find_first_possible_offense(variables)
+          variables.reduce(nil) do |offense, variable|
             var, = *variable
             var, = *var
             if allow_named_underscore_variables
-              break unless var == :_
+              break offense unless var == :_
             else
-              break unless var.to_s.start_with?(UNDERSCORE)
+              break offense unless var.to_s.start_with?(UNDERSCORE)
             end
-            first_offense = variable
+
+            variable
           end
+        end
 
-          return nil if first_offense.nil?
+        def splat_variable_before?(first_offense, variables)
+          # Account for cases like `_, *rest, _`, where we would otherwise get
+          # the index of the first underscore.
+          first_offense_index = reverse_index(variables, first_offense)
 
-          first_offense_index = variables.index(first_offense)
-          0.upto(first_offense_index - 1).each do |index|
-            return nil if variables[index].splat_type?
-          end
+          variables[0...first_offense_index].any?(&:splat_type?)
+        end
 
-          first_offense
+        def reverse_index(collection, item)
+          collection.size - 1 - collection.reverse.index(item)
         end
 
         def allow_named_underscore_variables
@@ -87,10 +100,8 @@ module RuboCop
               node.loc.operator.begin_pos
             end
 
-          range =
-            Parser::Source::Range.new(node.source_range.source_buffer,
-                                      first_offense.source_range.begin_pos,
-                                      end_position)
+          range = range_between(first_offense.source_range.begin_pos,
+                                end_position)
           range_with_surrounding_space(range, :right)
         end
       end

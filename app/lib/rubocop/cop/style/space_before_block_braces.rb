@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -11,15 +10,6 @@ module RuboCop
 
         def on_block(node)
           return if node.loc.begin.is?('do') # No braces.
-
-          # If braces are on separate lines, and the BlockDelimiters cop is
-          # enabled, those braces will be changed to do..end by the user or by
-          # auto-correct, so reporting space issues is not useful, and it
-          # creates auto-correct conflicts.
-          if config.for_cop('Style/BlockDelimiters')['Enabled'] &&
-             block_length(node) > 0
-            return
-          end
 
           left_brace = node.loc.begin
           space_plus_brace = range_with_surrounding_space(left_brace)
@@ -43,9 +33,8 @@ module RuboCop
         end
 
         def space_detected(left_brace, space_plus_brace)
-          space = Parser::Source::Range.new(left_brace.source_buffer,
-                                            space_plus_brace.begin_pos,
-                                            left_brace.begin_pos)
+          space = range_between(space_plus_brace.begin_pos,
+                                left_brace.begin_pos)
           add_offense(space, space, 'Space detected to the left of {.') do
             opposite_style_detected
           end

@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -39,13 +38,13 @@ module RuboCop
         end
 
         def check_context_dependent(arg, args)
-          braces_around_2nd_from_end = args.length > 1 && args[-2].type == :hash
+          braces_around_second_from_end = args.length > 1 && args[-2].hash_type?
           if braces?(arg)
-            unless braces_around_2nd_from_end
+            unless braces_around_second_from_end
               add_offense(arg.parent, arg.source_range,
                           format(MSG, 'Redundant'))
             end
-          elsif braces_around_2nd_from_end
+          elsif braces_around_second_from_end
             add_offense(arg.parent, arg.source_range, format(MSG, 'Missing'))
           end
         end
@@ -102,7 +101,7 @@ module RuboCop
         end
 
         def non_empty_hash?(arg)
-          arg && arg.type == :hash && arg.children.any?
+          arg && arg.hash_type? && !arg.children.empty?
         end
 
         def braces?(arg)

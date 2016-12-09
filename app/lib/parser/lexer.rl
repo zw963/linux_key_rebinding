@@ -385,13 +385,19 @@ class Parser::Lexer
     new_literal = Literal.new(self, *args)
     @literal_stack.push(new_literal)
 
-    if new_literal.words?
+    if new_literal.words? && new_literal.backslash_delimited?
+      if new_literal.interpolate?
+        self.class.lex_en_interp_backslash_delimited_words
+      else
+        self.class.lex_en_plain_backslash_delimited_words
+      end
+    elsif new_literal.words? && !new_literal.backslash_delimited?
       if new_literal.interpolate?
         self.class.lex_en_interp_words
       else
         self.class.lex_en_plain_words
       end
-    elsif new_literal.backslash_delimited?
+    elsif !new_literal.words? && new_literal.backslash_delimited?
       if new_literal.interpolate?
         self.class.lex_en_interp_backslash_delimited
       else
@@ -1066,6 +1072,20 @@ class Parser::Lexer
       c_any       => extend_string;
   *|;
 
+  interp_backslash_delimited_words := |*
+      interp_code => extend_interp_code;
+      interp_var  => extend_interp_var;
+      c_space+    => extend_string_space;
+      c_eol       => extend_string_eol;
+      c_any       => extend_string;
+  *|;
+
+  plain_backslash_delimited_words := |*
+      c_space+    => extend_string_space;
+      c_eol       => extend_string_eol;
+      c_any       => extend_string;
+  *|;
+
   regexp_modifiers := |*
       [A-Za-z]+
       => {
@@ -1545,8 +1565,15 @@ class Parser::Lexer
   # `do` (as `kDO_BLOCK` in `expr_beg`).
   expr_endarg := |*
       e_lbrace
-      => { emit(:tLBRACE_ARG, '{'.freeze)
-           fnext expr_value; };
+      => {
+        if @lambda_stack.last == @paren_nest
+          @lambda_stack.pop
+          emit(:tLAMBEG, '{'.freeze)
+        else
+          emit(:tLBRACE_ARG, '{'.freeze)
+        end
+        fnext expr_value;
+      };
 
       'do'
       => { emit_do(true)

@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 require 'pathname'
@@ -11,13 +10,13 @@ module RuboCop
   # file from which it was read. Several different Configs can be used
   # during a run of the rubocop program, if files in several
   # directories are inspected.
-  class Config < Hash
+  class Config
     include PathUtil
 
     COMMON_PARAMS = %w(Exclude Include Severity
                        AutoCorrect StyleGuide Details).freeze
-    # 2.0 is the oldest officially supported Ruby version.
-    DEFAULT_RUBY_VERSION = 2.0
+    # 2.1 is the oldest officially supported Ruby version.
+    DEFAULT_RUBY_VERSION = 2.1
     KNOWN_RUBIES = [1.9, 2.0, 2.1, 2.2, 2.3, 2.4].freeze
     OBSOLETE_COPS = {
       'Style/TrailingComma' =>
@@ -48,11 +47,55 @@ module RuboCop
       @for_cop = Hash.new do |h, cop|
         h[cop] = self[Cop::Cop.qualified_cop_name(cop, loaded_path)] || {}
       end
-      replace(hash)
+      @hash = hash
+    end
+
+    def [](key)
+      @hash[key]
+    end
+
+    def []=(key, value)
+      @hash[key] = value
+    end
+
+    def delete(key)
+      @hash.delete(key)
+    end
+
+    def each(&block)
+      @hash.each(&block)
+    end
+
+    def key?(key)
+      @hash.key?(key)
+    end
+
+    def keys
+      @hash.keys
+    end
+
+    def map(&block)
+      @hash.map(&block)
+    end
+
+    def merge(other_hash)
+      @hash.merge(other_hash)
+    end
+
+    def to_h
+      @hash
+    end
+
+    def to_hash
+      @hash
+    end
+
+    def to_s
+      @to_s ||= @hash.to_s
     end
 
     def make_excludes_absolute
-      each_key do |key|
+      each do |key, _|
         validate_section_presence(key)
         next unless self[key]['Exclude']
 
@@ -108,16 +151,6 @@ module RuboCop
       for_cop(cop).empty? || for_cop(cop)['Enabled']
     end
 
-    def add_missing_namespaces
-      keys.each do |k|
-        q = Cop::Cop.qualified_cop_name(k, loaded_path)
-        next if q == k
-
-        self[q] = self[k]
-        delete(k)
-      end
-    end
-
     def validate
       # Don't validate RuboCop's own files. Avoids infinite recursion.
       base_config_path = File.expand_path(File.join(ConfigLoader::RUBOCOP_HOME,
@@ -156,7 +189,9 @@ module RuboCop
     # Returns true if there's a chance that an Include pattern matches hidden
     # files, false if that's definitely not possible.
     def possibly_include_hidden?
-      @possibly_include_hidden ||= patterns_to_include.any? do |s|
+      return @possibly_include_hidden if defined?(@possibly_include_hidden)
+
+      @possibly_include_hidden = patterns_to_include.any? do |s|
         s.is_a?(Regexp) || s.start_with?('.') || s.include?('/.')
       end
     end
@@ -169,11 +204,11 @@ module RuboCop
     end
 
     def patterns_to_include
-      @patterns_to_include ||= for_all_cops['Include']
+      for_all_cops['Include']
     end
 
     def patterns_to_exclude
-      @patterns_to_exclude ||= for_all_cops['Exclude']
+      for_all_cops['Exclude']
     end
 
     def path_relative_to_config(path)
@@ -274,11 +309,11 @@ module RuboCop
     end
 
     def check_obsolete_parameter(cop, parameter, alternative = nil)
-      if self[cop] && self[cop].key?(parameter)
-        raise ValidationError, "obsolete parameter #{parameter} (for #{cop}) " \
-                              "found in #{loaded_path}" \
-                              "#{"\n" if alternative}#{alternative}"
-      end
+      return unless self[cop] && self[cop].key?(parameter)
+
+      raise ValidationError, "obsolete parameter #{parameter} (for #{cop}) " \
+                            "found in #{loaded_path}" \
+                            "#{"\n" if alternative}#{alternative}"
     end
 
     def reject_obsolete_cops
@@ -291,23 +326,21 @@ module RuboCop
     end
 
     def check_target_ruby
-      return unless target_ruby_version
+      return if KNOWN_RUBIES.include?(target_ruby_version)
 
-      unless KNOWN_RUBIES.include?(target_ruby_version)
-        msg = "Unknown Ruby version #{target_ruby_version.inspect} found "
+      msg = "Unknown Ruby version #{target_ruby_version.inspect} found "
 
-        msg +=
-          case @target_ruby_version_source
-          when :dot_ruby_version
-            'in `.ruby-version`.'
-          when :rubocop_yml
-            "in `TargetRubyVersion` parameter (in #{loaded_path})." \
-          end
+      msg +=
+        case @target_ruby_version_source
+        when :dot_ruby_version
+          'in `.ruby-version`.'
+        when :rubocop_yml
+          "in `TargetRubyVersion` parameter (in #{loaded_path})." \
+        end
 
-        msg += "\nKnown versions: #{KNOWN_RUBIES.join(', ')}"
+      msg += "\nKnown versions: #{KNOWN_RUBIES.join(', ')}"
 
-        raise ValidationError, msg
-      end
+      raise ValidationError, msg
     end
   end
 end

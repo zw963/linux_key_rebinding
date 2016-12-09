@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -16,11 +15,8 @@ module RuboCop
         MSG = 'Use `%s` instead of `%s`.'.freeze
 
         def_node_matcher :redundant_merge, '(send $_ :merge! (hash $...))'
-        def_node_matcher :modifier_flow_control, <<-END
+        def_node_matcher :modifier_flow_control?, <<-END
           [{if while until} modifier_form?]
-        END
-        def_node_matcher :each_with_object_node, <<-END
-          (block (send _ :each_with_object _) (args _ $_) ...)
         END
 
         def on_send(node)
@@ -33,21 +29,13 @@ module RuboCop
 
         def autocorrect(node)
           redundant_merge(node) do |receiver, pairs|
-            lambda do |corrector|
-              new_source = to_assignments(receiver, pairs).join("\n")
+            new_source = to_assignments(receiver, pairs).join("\n")
 
-              parent = node.parent
-              if parent && pairs.size > 1
-                if modifier_flow_control(parent)
-                  new_source = rewrite_with_modifier(node, parent, new_source)
-                  node = parent
-                else
-                  padding = "\n#{leading_spaces(node)}"
-                  new_source.gsub!(/\n/, padding)
-                end
-              end
-
-              corrector.replace(node.source_range, new_source)
+            parent = node.parent
+            if parent && pairs.size > 1
+              correct_multiple_elements(node, parent, new_source)
+            else
+              correct_single_element(node, new_source)
             end
           end
         end
@@ -56,8 +44,9 @@ module RuboCop
 
         def each_redundant_merge(node)
           redundant_merge(node) do |receiver, pairs|
+            next unless receiver
             next if node.value_used? &&
-                    !value_used_inside_each_with_object?(node, receiver)
+                    !EachWithObjectInspector.new(node, receiver).value_used?
             next if pairs.size > 1 && !receiver.pure?
             next if pairs.size > max_key_value_pairs
 
@@ -65,21 +54,20 @@ module RuboCop
           end
         end
 
-        def value_used_inside_each_with_object?(node, receiver)
-          while receiver.respond_to?(:send_type?) && receiver.send_type?
-            receiver, = *receiver
+        def correct_multiple_elements(node, parent, new_source)
+          if modifier_flow_control?(parent)
+            new_source = rewrite_with_modifier(node, parent, new_source)
+            node = parent
+          else
+            padding = "\n#{leading_spaces(node)}"
+            new_source.gsub!(/\n/, padding)
           end
 
-          unless receiver.respond_to?(:lvar_type?) && receiver.lvar_type?
-            return false
-          end
+          ->(corrector) { corrector.replace(node.source_range, new_source) }
+        end
 
-          parent = node.parent
-          grandparent = parent.parent if parent.begin_type?
-          second_arg = each_with_object_node(grandparent || parent)
-          return false if second_arg.nil?
-
-          receiver.loc.name.source == second_arg.loc.name.source
+        def correct_single_element(node, new_source)
+          ->(corrector) { corrector.replace(node.source_range, new_source) }
         end
 
         def to_assignments(receiver, pairs)
@@ -114,6 +102,49 @@ module RuboCop
 
         def max_key_value_pairs
           cop_config['MaxKeyValuePairs'].to_i
+        end
+
+        # A utility class for checking the use of values within an
+        # `each_with_object` call.
+        class EachWithObjectInspector
+          extend NodePattern::Macros
+
+          def initialize(node, receiver)
+            @node = node
+            @receiver = unwind(receiver)
+          end
+
+          def value_used?
+            return false unless eligible_receiver? && second_argument
+
+            receiver.loc.name.source == second_argument.loc.name.source
+          end
+
+          private
+
+          attr_reader :node, :receiver
+
+          def eligible_receiver?
+            receiver.respond_to?(:lvar_type?) && receiver.lvar_type?
+          end
+
+          def second_argument
+            parent = node.parent
+            parent = parent.parent if parent.begin_type?
+
+            @second_argument ||= each_with_object_node(parent)
+          end
+
+          def unwind(receiver)
+            while receiver.respond_to?(:send_type?) && receiver.send_type?
+              receiver, = *receiver
+            end
+            receiver
+          end
+
+          def_node_matcher :each_with_object_node, <<-END
+            (block (send _ :each_with_object _) (args _ $_) ...)
+          END
         end
       end
     end

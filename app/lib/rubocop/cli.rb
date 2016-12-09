@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -19,7 +18,7 @@ module RuboCop
     # Entry point for the application logic. Here we
     # do the command line arguments processing and inspect
     # the target files
-    # @return [Fixnum] UNIX exit code
+    # @return [Integer] UNIX exit code
     def run(args = ARGV)
       @options, paths = Options.new.parse(args)
       act_on_options
@@ -55,6 +54,7 @@ module RuboCop
       ConfigLoader.auto_gen_config = @options[:auto_gen_config]
 
       @config_store.options_config = @options[:config] if @options[:config]
+      @config_store.force_default_config! if @options[:force_default_config]
 
       if @options[:color]
         # color output explicitly forced on
@@ -95,10 +95,10 @@ module RuboCop
         [[formatter, @options[:output_path]]]
       end
 
-      if @options[:auto_gen_config]
-        @options[:formatters] << [Formatter::DisabledConfigFormatter,
-                                  ConfigLoader::AUTO_GENERATED_FILE]
-      end
+      return unless @options[:auto_gen_config]
+
+      @options[:formatters] << [Formatter::DisabledConfigFormatter,
+                                ConfigLoader::AUTO_GENERATED_FILE]
     end
 
     def print_available_cops

@@ -1,12 +1,12 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
   module Cop
     module Lint
-      # This cop looks for error classes inheriting from `Exception`.
-      # It is configurable to suggest using either `RuntimeError` (default) or
-      # `StandardError` instead.
+      # This cop looks for error classes inheriting from `Exception`
+      # and its standard library subclasses, excluding subclasses of
+      # `StandardError`. It is configurable to suggest using either
+      # `RuntimeError` (default) or `StandardError` instead.
       #
       # @example
       #
@@ -32,11 +32,24 @@ module RuboCop
       class InheritException < Cop
         include ConfigurableEnforcedStyle
 
-        MSG = 'Inherit from `%s` instead of `Exception`.'.freeze
+        MSG = 'Inherit from `%s` instead of `%s`.'.freeze
         PREFERRED_BASE_CLASS = {
           runtime_error: 'RuntimeError',
           standard_error: 'StandardError'
         }.freeze
+        ILLEGAL_CLASSES = %w(
+          Exception
+          SystemStackError
+          NoMemoryError
+          SecurityError
+          NotImplementedError
+          LoadError
+          SyntaxError
+          ScriptError
+          Interrupt
+          SignalException
+          SystemExit
+        ).freeze
 
         def on_class(node)
           _class, base_class, _body = *node
@@ -49,9 +62,10 @@ module RuboCop
         private
 
         def check(node)
-          if node.const_name == 'Exception'
-            add_offense(node, :expression, format(MSG, preferred_base_class))
-          end
+          return unless ILLEGAL_CLASSES.include?(node.const_name)
+
+          msg = format(MSG, preferred_base_class, node.const_name)
+          add_offense(node, :expression, msg)
         end
 
         def autocorrect(node)

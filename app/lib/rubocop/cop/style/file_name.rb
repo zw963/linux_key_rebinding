@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 require 'pathname'
@@ -97,16 +96,7 @@ module RuboCop
         end
 
         def match_namespace(node, namespace, expected)
-          expected = expected.dup
-
-          match_partial = lambda do |ns|
-            next if ns.nil?
-            while ns
-              return expected.empty? || expected == [:Object] if ns.cbase_type?
-              ns, name = *ns
-              name == expected.last ? expected.pop : (return false)
-            end
-          end
+          match_partial = partial_matcher!(expected)
 
           match_partial.call(namespace)
 
@@ -115,6 +105,24 @@ module RuboCop
             match_partial.call(ancestor.defined_module)
           end
 
+          match?(expected)
+        end
+
+        def partial_matcher!(expected)
+          lambda do |namespace|
+            while namespace
+              return match?(expected) if namespace.cbase_type?
+
+              namespace, name = *namespace
+
+              expected.pop if name == expected.last
+            end
+
+            false
+          end
+        end
+
+        def match?(expected)
           expected.empty? || expected == [:Object]
         end
 

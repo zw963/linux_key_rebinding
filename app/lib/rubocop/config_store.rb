@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -24,6 +23,10 @@ module RuboCop
       loaded_config = ConfigLoader.load_file(options_config)
       @options_config = ConfigLoader.merge_with_default(loaded_config,
                                                         options_config)
+    end
+
+    def force_default_config!
+      @options_config = ConfigLoader.default_configuration
     end
 
     def for(file_or_dir)

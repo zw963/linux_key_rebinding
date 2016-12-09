@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -73,7 +72,7 @@ module RuboCop
         end
 
         def not?(node)
-          return false unless node && node.type == :send
+          return false unless node && node.send_type?
 
           _receiver, method_name, *_args = *node
 
@@ -81,7 +80,7 @@ module RuboCop
         end
 
         def basic_literal?(node)
-          if node && node.type == :array
+          if node && node.array_type?
             primitive_array?(node)
           else
             node.basic_literal?
@@ -104,7 +103,7 @@ module RuboCop
             operands.each do |op|
               handle_node(op)
             end
-          elsif node.type == :begin && node.children.size == 1
+          elsif node.begin_type? && node.children.one?
             child_node = node.children.first
             handle_node(child_node)
           end
@@ -119,8 +118,8 @@ module RuboCop
         end
 
         def check_case_cond(node)
-          return if node.type == :array && !primitive_array?(node)
-          return if node.type == :dstr
+          return if node.array_type? && !primitive_array?(node)
+          return if node.dstr_type?
 
           handle_node(node)
         end

@@ -1,10 +1,11 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
   module Cop
     # Common functionality for checking if nodes.
     module IfNode
+      extend NodePattern::Macros
+
       def ternary?(node)
         node.loc.respond_to?(:question)
       end
@@ -32,6 +33,10 @@ module RuboCop
 
         [condition, body, else_clause]
       end
+
+      def_node_matcher :guard_clause?, <<-PATTERN
+          [{(send nil {:raise :fail} ...) return break next} single_line?]
+      PATTERN
     end
   end
 end

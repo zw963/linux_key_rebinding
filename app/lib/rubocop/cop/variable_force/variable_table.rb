@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -99,7 +98,7 @@ module RuboCop
             variable = scope.variables[name]
             return variable if variable
             # Only block scope allows referencing outer scope variables.
-            return nil unless scope.node.type == :block
+            return nil unless scope.node.block_type?
           end
 
           nil
@@ -112,14 +111,14 @@ module RuboCop
         def accessible_variables
           scope_stack.reverse_each.each_with_object([]) do |scope, variables|
             variables.concat(scope.variables.values)
-            break variables unless scope.node.type == :block
+            break variables unless scope.node.block_type?
           end
         end
 
         private
 
         def mark_variable_as_captured_by_block_if_so(variable)
-          return unless current_scope.node.type == :block
+          return unless current_scope.node.block_type?
           return if variable.scope == current_scope
           variable.capture_with_block!
         end

@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -40,9 +39,12 @@ module RuboCop
         end
 
         def autocorrect(node)
+          receiver, _method, arg = *node
+
           # Regexp#match can take a second argument, but this cop doesn't
           # register an offense in that case
-          receiver, _method, arg = *node
+          return unless arg.regexp_type?
+
           new_source = receiver.source + ' =~ ' + arg.source
           ->(corrector) { corrector.replace(node.source_range, new_source) }
         end

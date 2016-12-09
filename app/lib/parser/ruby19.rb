@@ -3270,10 +3270,7 @@ def _reduce_32(val, _values, result)
 end
 
 def _reduce_33(val, _values, result)
-                      result = @builder.op_assign(
-                                  @builder.call_method(
-                                    val[0], val[1], val[2]),
-                                  val[3], val[4])
+                      diagnostic :error, :const_reassignment, nil, val[3]
                     
     result
 end
@@ -4949,7 +4946,11 @@ def _reduce_355(val, _values, result)
 end
 
 def _reduce_356(val, _values, result)
-                      result = val[0].concat(val[1])
+                      if val[1].empty? && val[0].size == 1
+                        result = [@builder.procarg0(val[0][0])]
+                      else
+                        result = val[0].concat(val[1])
+                      end
                     
     result
 end

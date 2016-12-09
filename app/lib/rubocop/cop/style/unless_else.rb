@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -32,15 +31,11 @@ module RuboCop
         end
 
         def range_between_condition_and_else(node, condition)
-          Parser::Source::Range.new(node.source_range.source_buffer,
-                                    condition.source_range.end_pos,
-                                    node.loc.else.begin_pos)
+          range_between(condition.source_range.end_pos, node.loc.else.begin_pos)
         end
 
         def range_between_else_and_end(node)
-          Parser::Source::Range.new(node.source_range.source_buffer,
-                                    node.loc.else.end_pos,
-                                    node.loc.end.begin_pos)
+          range_between(node.loc.else.end_pos, node.loc.end.begin_pos)
         end
       end
     end

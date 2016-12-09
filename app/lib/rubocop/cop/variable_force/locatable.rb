@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -21,6 +20,12 @@ module RuboCop
 
         NON_FOR_LOOP_TYPES = LOOP_TYPES - [FOR_LOOP_TYPE]
         NON_FOR_LOOP_TYPES_CHILD_INDEX = 1
+
+        def initialize(*)
+          @branch_point_node = @branch_body_node = nil
+
+          super()
+        end
 
         def node
           raise '#node must be declared!'
@@ -45,7 +50,7 @@ module RuboCop
           #   rescue
           #     # resbody
           #   end
-          if branch_point_node.type == :rescue &&
+          if branch_point_node.rescue_type? &&
              (branch_body_name == 'main' || other.branch_body_name == 'main')
             return false
           end
@@ -65,9 +70,7 @@ module RuboCop
 
         # Inner if, case, rescue, or ensure node.
         def branch_point_node
-          if instance_variable_defined?(:@branch_point_node)
-            return @branch_point_node
-          end
+          return @branch_point_node if @branch_point_node
 
           set_branch_point_and_body_nodes!
           @branch_point_node
@@ -75,14 +78,13 @@ module RuboCop
 
         # A child node of #branch_point_node this assignment belongs.
         def branch_body_node
-          if instance_variable_defined?(:@branch_body_node)
-            return @branch_body_node
-          end
+          return @branch_body_node if @branch_body_node
 
           set_branch_point_and_body_nodes!
           @branch_body_node
         end
 
+        # TODO: Replace case statement with function mapping
         def branch_body_name
           case branch_point_node.type
           when :if                     then if_body_name
@@ -91,11 +93,10 @@ module RuboCop
           when ENSURE_TYPE             then ensure_body_name
           when *LOGICAL_OPERATOR_TYPES then logical_operator_body_name
           when *LOOP_TYPES             then loop_body_name
-          else raise InvalidBranchBodyError
+          else
+            raise InvalidBranchBodyError, "Invalid body index #{body_index} " \
+                                          "of #{branch_point_node.type}"
           end
-        rescue InvalidBranchBodyError
-          raise InvalidBranchBodyError,
-                "Invalid body index #{body_index} of #{branch_point_node.type}"
         end
 
         private
@@ -109,7 +110,7 @@ module RuboCop
         end
 
         def case_body_name
-          if branch_body_node.type == :when
+          if branch_body_node.when_type?
             "when#{body_index - 1}"
           else
             'else'
@@ -169,6 +170,7 @@ module RuboCop
           end
         end
 
+        # rubocop:disable Metrics/MethodLength
         def branch?(parent_node, child_node)
           child_index = parent_node.children.index(child_node)
 
@@ -189,6 +191,7 @@ module RuboCop
             false
           end
         end
+        # rubocop:enable Metrics/MethodLength
 
         class InvalidBranchBodyError < StandardError; end
       end

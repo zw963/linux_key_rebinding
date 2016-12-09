@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -12,13 +11,11 @@ module RuboCop
               'use `if` or `unless` instead.'.freeze
 
         def on_if(node)
-          _condition, _if_branch, else_branch = *node
+          _condition, _if_branch, = *node
 
-          return unless ternary?(node)
+          return unless ternary?(node) && node.multiline?
 
-          unless node.loc.line == else_branch.loc.line
-            add_offense(node, :expression)
-          end
+          add_offense(node, :expression)
         end
       end
     end

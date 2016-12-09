@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -69,14 +68,14 @@ module RuboCop
         end
 
         def check_node(node)
-          if node && node.begin_type?
-            clear
-            check_scope(node)
+          return unless node && node.begin_type?
 
-            @useless.each do |_name, (defs_node, visibility, modifier)|
-              add_offense(defs_node, :keyword,
-                          format_message(visibility, modifier))
-            end
+          clear
+          check_scope(node)
+
+          @useless.each do |_name, (defs_node, visibility, modifier)|
+            add_offense(defs_node, :keyword,
+                        format_message(visibility, modifier))
           end
         end
 

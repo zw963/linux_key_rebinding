@@ -39,6 +39,9 @@ AllCops:
   # behavior by overriding DisplayStyleGuide, or by giving the
   # -S/--display-style-guide option.
   DisplayStyleGuide: false
+  # When specifying style guide URLs, any paths and/or fragments will be
+  # evaluated relative to the base URL.
+  StyleGuideBaseURL: https://github.com/bbatsov/ruby-style-guide
   # Extra details are not displayed in offense messages by default. Change
   # behavior by overriding ExtraDetails, or by giving the
   # -E/--extra-details option.
@@ -77,7 +80,7 @@ AllCops:
   # run on? (If there is more than one, set this to the lowest version.)
   # If a value is specified for TargetRubyVersion then it is used.
   # Else if .ruby-version exists and it contains an MRI version it is used.
-  # Otherwise we fallback to the oldest officially supported Ruby version (2.0).
+  # Otherwise we fallback to the oldest officially supported Ruby version (2.1).
   TargetRubyVersion: ~
 
 # Indent private/protected/public as deep as method definitions
@@ -395,6 +398,9 @@ Style/Copyright:
   Notice: '^Copyright (\(c\) )?2[0-9]{3} .+'
   AutocorrectNotice: ''
 
+Style/DocumentationMethod:
+  RequireForNonPublicMethods: false
+
 # Multi-line method chaining should be done with leading dots.
 Style/DotPosition:
   EnforcedStyle: leading
@@ -429,13 +435,23 @@ Style/EmptyLinesAroundClassBody:
   EnforcedStyle: no_empty_lines
   SupportedStyles:
     - empty_lines
+    - empty_lines_except_namespace
+    - empty_lines_special
     - no_empty_lines
 
 Style/EmptyLinesAroundModuleBody:
   EnforcedStyle: no_empty_lines
   SupportedStyles:
     - empty_lines
+    - empty_lines_except_namespace
+    - empty_lines_special
     - no_empty_lines
+
+Style/EmptyMethod:
+  EnforcedStyle: compact
+  SupportedStyles:
+    - compact
+    - expanded
 
 # Checks whether the source file has a utf-8 encoding comment or not
 # AutoCorrectEncodingComment must match the regex
@@ -532,9 +548,14 @@ Style/GuardClause:
 Style/HashSyntax:
   EnforcedStyle: ruby19
   SupportedStyles:
+    # checks for 1.9 syntax (e.g. {a: 1}) for all symbol keys
     - ruby19
-    - ruby19_no_mixed_keys
+    # checks for hash rocket syntax for all hashes
     - hash_rockets
+    # forbids mixed key syntaxes (e.g. {a: 1, :b => 2})
+    - no_mixed_keys
+    # enforces both ruby19 and no_mixed_keys styles
+    - ruby19_no_mixed_keys
   # Force hashes that have a symbol value to use hash rockets
   UseHashRocketsWithSymbolValues: false
   # Do not suggest { a?: 1 } over { :a? => 1 } in ruby19 style
@@ -616,6 +637,12 @@ Style/Lambda:
     - lambda
     - literal
 
+Style/SpaceInLambdaLiteral:
+  EnforcedStyle: require_no_space
+  SupportedStyles:
+    - require_no_space
+    - require_space
+
 Style/LambdaCall:
   EnforcedStyle: call
   SupportedStyles:
@@ -648,6 +675,10 @@ Style/NumericPredicate:
   SupportedStyles:
     - predicate
     - comparison
+  # Exclude RSpec specs because assertions like `expect(1).to be > 0` cause
+  # false positives.
+  Exclude:
+    - 'spec/**/*'
 
 Style/MethodDefParentheses:
   EnforcedStyle: require_parentheses
@@ -771,6 +802,7 @@ Style/PercentLiteralDelimiters:
   PreferredDelimiters:
     '%':  ()
     '%i': ()
+    '%I': ()
     '%q': ()
     '%Q': ()
     '%r': '{}'
@@ -805,6 +837,12 @@ Style/PredicateName:
   Exclude:
     - 'spec/**/*'
 
+Style/PreferredHashMethods:
+  EnforcedStyle: short
+  SupportedStyles:
+    - short
+    - verbose
+
 Style/RaiseArgs:
   EnforcedStyle: exploded
   SupportedStyles:
@@ -829,6 +867,11 @@ Style/RegexpLiteral:
   # are found in the regexp string.
   AllowInnerSlashes: false
 
+Style/SafeNavigation:
+  # Safe navigation may cause a statement to start returning `nil` in addition
+  # to whatever it used to return.
+  ConvertCodeThatCanStartToReturnNil: false
+
 Style/Semicolon:
   # Allow ; to separate several expressions on the same line.
   AllowAsExpressionSeparator: false
@@ -843,11 +886,11 @@ Style/SignalException:
 Style/SingleLineBlockParams:
   Methods:
     - reduce:
-        - a
-        - e
+        - acc
+        - elem
     - inject:
-        - a
-        - e
+        - acc
+        - elem
 
 Style/SingleLineMethods:
   AllowIfMethodIsEmpty: true
@@ -963,6 +1006,7 @@ Style/TernaryParentheses:
   SupportedStyles:
     - require_parentheses
     - require_no_parentheses
+    - require_parentheses_when_complex
   AllowSafeAssignment: true
 
 Style/TrailingBlankLines:
@@ -1041,6 +1085,13 @@ Style/VariableName:
     - snake_case
     - camelCase
 
+Style/VariableNumber:
+  EnforcedStyle: normalcase
+  SupportedStyles:
+    - snake_case
+    - normalcase
+    - non_integer
+
 Style/WhileUntilModifier:
   MaxLineLength: 80
 
@@ -1062,7 +1113,7 @@ Style/WordArray:
 ##################### Metrics ##################################
 
 Metrics/AbcSize:
-  # The ABC size is a calculated magnitude, so this number can be a Fixnum or
+  # The ABC size is a calculated magnitude, so this number can be an Integer or
   # a Float.
   Max: 15
 
@@ -1090,10 +1141,25 @@ Metrics/LineLength:
   URISchemes:
     - http
     - https
+  # The IgnoreCopDirectives option causes the LineLength rule to ignore cop
+  # directives like '# rubocop: enable ...' when calculating a line's length.
+  IgnoreCopDirectives: false
+  # The IgnoredPatterns option is a list of !ruby/regexp and/or string
+  # elements. Strings will be converted to Regexp objects. A line that matches
+  # any regular expression listed in this option will be ignored by LineLength.
+  IgnoredPatterns: []
 
 Metrics/MethodLength:
   CountComments: false  # count full line comments?
   Max: 10
+
+Metrics/BlockLength:
+  CountComments: false  # count full line comments?
+  Max: 25
+  Exclude:
+    - 'Rakefile'
+    - '**/*.rake'
+    - 'spec/**/*.rb'
 
 Metrics/ParameterLists:
   Max: 5
@@ -1192,6 +1258,14 @@ Rails/Date:
     - strict
     - flexible
 
+Rails/DynamicFindBy:
+  Whitelist:
+    - find_by_sql
+
+Rails/EnumUniqueness:
+  Include:
+    - app/models/**/*.rb
+
 Rails/Exit:
   Include:
     - app/**/*.rb
@@ -1212,6 +1286,10 @@ Rails/HasAndBelongsToMany:
   Include:
     - app/models/**/*.rb
 
+Rails/NotNullColumn:
+  Include:
+    - db/migrate/*.rb
+
 Rails/Output:
   Include:
     - app/**/*.rb
@@ -1228,6 +1306,13 @@ Rails/RequestReferer:
   SupportedStyles:
     - referer
     - referrer
+
+Rails/SafeNavigation:
+  # This will convert usages of `try` to use safe navigation as well as `try!`.
+  # `try` and `try!` work slighly differently. `try!` and safe navigation will
+  # both raise a `NoMethodError` if the receiver of the method call does not
+  # implement the intended method. `try` will not raise an exception for this.
+  ConvertTry: false
 
 Rails/ScopeArgs:
   Include:

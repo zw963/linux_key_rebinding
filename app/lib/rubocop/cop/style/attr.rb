@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -20,9 +19,7 @@ module RuboCop
           attr_expr = attr_name.source_range
 
           if setter && (setter.true_type? || setter.false_type?)
-            remove = Parser::Source::Range.new(node_expr.source_buffer,
-                                               attr_expr.end_pos,
-                                               node_expr.end_pos)
+            remove = range_between(attr_expr.end_pos, node_expr.end_pos)
           end
 
           lambda do |corrector|

@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -35,7 +34,7 @@ module RuboCop
           var_name, rhs = *node
           return unless rhs
 
-          if rhs.type == :send
+          if rhs.send_type?
             check_send_node(node, rhs, var_name, var_type)
           elsif [:and, :or].include?(rhs.type)
             check_boolean_node(node, rhs, var_name, var_type)
@@ -65,7 +64,7 @@ module RuboCop
         def autocorrect(node)
           _var_name, rhs = *node
 
-          if rhs.type == :send
+          if rhs.send_type?
             autocorrect_send_node(node, rhs)
           elsif [:and, :or].include?(rhs.type)
             autocorrect_boolean_node(node, rhs)

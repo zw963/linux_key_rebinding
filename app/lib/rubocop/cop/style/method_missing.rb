@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -60,13 +59,21 @@ module RuboCop
         end
 
         def implements_respond_to_missing?(node)
-          node.parent.children.any? do |sibling|
-            respond_to_missing_def?(sibling)
+          node.parent.each_child_node(node.type).any? do |sibling|
+            if node.def_type?
+              respond_to_missing_def?(sibling)
+            elsif node.defs_type?
+              respond_to_missing_defs?(sibling)
+            end
           end
         end
 
         def_node_matcher :respond_to_missing_def?, <<-PATTERN
           (def :respond_to_missing? (...) ...)
+        PATTERN
+
+        def_node_matcher :respond_to_missing_defs?, <<-PATTERN
+          (defs (self) :respond_to_missing? (...) ...)
         PATTERN
       end
     end

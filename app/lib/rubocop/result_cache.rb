@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 require 'digest/md5'
@@ -24,8 +23,20 @@ module RuboCop
       return unless File.exist?(cache_root)
 
       files, dirs = Find.find(cache_root).partition { |path| File.file?(path) }
-      if files.length > config_store.for('.').for_all_cops['MaxFilesInCache'] &&
-         files.length > 1
+      return unless requires_file_removal?(files.length, config_store)
+
+      remove_oldest_files(files, dirs, cache_root, verbose)
+    end
+
+    class << self
+      private
+
+      def requires_file_removal?(file_count, config_store)
+        file_count > 1 &&
+          file_count > config_store.for('.').for_all_cops['MaxFilesInCache']
+      end
+
+      def remove_oldest_files(files, dirs, cache_root, verbose)
         # Add 1 to half the number of files, so that we remove the file if
         # there's only 1 left.
         remove_count = 1 + files.length / 2
@@ -35,10 +46,6 @@ module RuboCop
         sorted = files.sort_by { |path| File.mtime(path) }
         remove_files(sorted, dirs, remove_count, verbose)
       end
-    end
-
-    class << self
-      private
 
       def remove_files(files, dirs, remove_count, verbose)
         # Batch file deletions, deleting over 130,000+ files will crash
@@ -83,7 +90,7 @@ module RuboCop
     end
 
     def load
-      @cached_data.from_json(IO.binread(@path))
+      @cached_data.from_json(IO.read(@path, encoding: Encoding::UTF_8))
     end
 
     def save(offenses)
@@ -95,7 +102,7 @@ module RuboCop
       # indication that a symlink attack is being waged.
       return if symlink_protection_triggered?(dir)
 
-      File.open(preliminary_path, 'wb') do |f|
+      File.open(preliminary_path, 'w', encoding: Encoding::UTF_8) do |f|
         f.write(@cached_data.to_json(offenses))
       end
       # The preliminary path is used so that if there are multiple RuboCop
@@ -150,7 +157,7 @@ module RuboCop
           sources = source_files
                     .select { |path| File.file?(path) }
                     .sort
-                    .map { |path| IO.read(path) }
+                    .map { |path| IO.read(path, encoding: Encoding::UTF_8) }
           Digest::MD5.hexdigest(sources.join)
         end
     end

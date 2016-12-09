@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -9,8 +8,13 @@ module RuboCop
       class RequestReferer < Cop
         include ConfigurableEnforcedStyle
 
+        def_node_matcher :referer?, <<-PATTERN
+          (send (send nil :request) ${:referer :referrer})
+        PATTERN
+
         def on_send(node)
-          if offense?(node)
+          referer?(node) do |method_name|
+            return unless method_name == wrong_method_name
             add_offense(node.source_range, node.source_range, message)
           end
         end
@@ -20,12 +24,6 @@ module RuboCop
         end
 
         private
-
-        def offense?(node)
-          return false unless node.receiver
-          receiver_name = node.receiver.method_name
-          receiver_name == :request && node.method_name == wrong_method_name
-        end
 
         def message
           "Use `request.#{style}` instead of `request.#{wrong_method_name}`."

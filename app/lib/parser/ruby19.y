@@ -203,10 +203,7 @@ rule
                     }
                 | primary_value tCOLON2 tCONSTANT tOP_ASGN command_call
                     {
-                      result = @builder.op_assign(
-                                  @builder.call_method(
-                                    val[0], val[1], val[2]),
-                                  val[3], val[4])
+                      diagnostic :error, :const_reassignment, nil, val[3]
                     }
                 | primary_value tCOLON2 tIDENTIFIER tOP_ASGN command_call
                     {
@@ -1339,7 +1336,11 @@ rule
                     }
                 | f_arg                                                      opt_f_block_arg
                     {
-                      result = val[0].concat(val[1])
+                      if val[1].empty? && val[0].size == 1
+                        result = [@builder.procarg0(val[0][0])]
+                      else
+                        result = val[0].concat(val[1])
+                      end
                     }
                 | f_block_optarg tCOMMA f_rest_arg              opt_f_block_arg
                     {

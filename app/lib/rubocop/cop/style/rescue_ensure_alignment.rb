@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -42,12 +41,7 @@ module RuboCop
         end
 
         def autocorrect(node)
-          source_buffer = node.loc.keyword.source_buffer
-          begin_pos = node.loc.keyword.begin_pos
-          current_column = node.loc.keyword.column
-          whitespace = Parser::Source::Range.new(source_buffer,
-                                                 begin_pos - current_column,
-                                                 begin_pos)
+          whitespace = whitespace_range(node)
           return false unless whitespace.source.strip.empty?
 
           new_column = ancestor_node(node).loc.end.column
@@ -74,6 +68,13 @@ module RuboCop
         def modifier?(node)
           return false unless @modifier_locations.respond_to?(:include?)
           @modifier_locations.include?(node.loc.keyword)
+        end
+
+        def whitespace_range(node)
+          begin_pos = node.loc.keyword.begin_pos
+          current_column = node.loc.keyword.column
+
+          range_between(begin_pos - current_column, begin_pos)
         end
 
         def ancestor_node(node)

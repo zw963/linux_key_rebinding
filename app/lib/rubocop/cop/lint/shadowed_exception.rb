@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -9,25 +8,25 @@ module RuboCop
       # exception is rescued.
       #
       # @example
-      # # bad
-      # begin
-      #   something
-      # rescue Exception
-      #   handle_exception
-      # rescue StandardError
-      #   handle_standard_error
-      # end
+      #   # bad
+      #   begin
+      #     something
+      #   rescue Exception
+      #     handle_exception
+      #   rescue StandardError
+      #     handle_standard_error
+      #   end
       #
-      # #good
-      # begin
-      #   something
-      # rescue StandardError
-      #   handle_standard_error
-      # rescue Exception
-      #   handle_exception
-      # end
+      #   # good
+      #   begin
+      #     something
+      #   rescue StandardError
+      #     handle_standard_error
+      #   rescue Exception
+      #     handle_exception
+      #   end
       class ShadowedException < Cop
-        MSG = 'Do not shadow rescued Exceptions'.freeze
+        MSG = 'Do not shadow rescued Exceptions.'.freeze
 
         def on_rescue(node)
           return if rescue_modifier?(node)
@@ -43,20 +42,25 @@ module RuboCop
           end
 
           return if !rescue_group_rescues_multiple_levels &&
-                    rescued_groups == sort_rescued_groups(rescued_groups)
+                    sorted?(rescued_groups)
 
-          add_offense(node, offense_range(node, rescues))
+          add_offense(node, offense_range(rescues))
         end
 
         private
 
-        def offense_range(node, rescues)
+        def offense_range(rescues)
           first_rescue = rescues.first
           last_rescue = rescues.last
           last_exceptions, = *last_rescue
-          Parser::Source::Range.new(node.loc.expression.source_buffer,
-                                    first_rescue.loc.expression.begin_pos,
-                                    last_exceptions.loc.expression.end_pos)
+          # last_rescue clause may not specify exception class
+          end_pos = if last_exceptions
+                      last_exceptions.loc.expression.end_pos
+                    else
+                      last_rescue.loc.keyword.end_pos
+                    end
+
+          range_between(first_rescue.loc.expression.begin_pos, end_pos)
         end
 
         def rescue_modifier?(node)
@@ -72,20 +76,7 @@ module RuboCop
             return !(group.size == 2 && group.include?(NilClass))
           end
 
-          group.any? do |exception|
-            higher_exception = false
-            group.each_with_index do |_e, i|
-              higher_exception ||= begin
-                                     if group[i].nil? || exception.nil?
-                                       false
-                                     else
-                                       group[i] < exception
-                                     end
-                                   end
-            end
-
-            higher_exception
-          end
+          group.combination(2).any? { |a, b| a && b && a <=> b }
         end
 
         def evaluate_exceptions(rescue_group)
@@ -93,8 +84,8 @@ module RuboCop
             rescued_exceptions = rescued_exceptions(rescue_group)
             rescued_exceptions.each_with_object([]) do |exception, converted|
               begin
-                converted << instance_eval(exception, __FILE__, __LINE__)
-              rescue StandardError, ScriptError
+                converted << Kernel.const_get(exception)
+              rescue NameError
                 converted << nil
               end
             end
@@ -104,16 +95,18 @@ module RuboCop
           end
         end
 
-        def sort_rescued_groups(groups)
-          groups.sort do |x, y|
+        def sorted?(rescued_groups)
+          rescued_groups.each_cons(2).all? do |x, y|
             if x.include?(Exception)
-              1
+              false
             elsif y.include?(Exception)
-              -1
-            elsif x.empty? || y.empty?
-              0
+              true
+            elsif x.none? || y.none?
+              # consider sorted if a group is empty or only contains
+              # `nil`s
+              true
             else
-              x <=> y || 0
+              (x <=> y || 0) <= 0
             end
           end
         end

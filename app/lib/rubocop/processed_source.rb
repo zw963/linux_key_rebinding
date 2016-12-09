@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 require 'digest/md5'
@@ -14,16 +13,16 @@ module RuboCop
                 :parser_error, :raw_source, :ruby_version
 
     def self.from_file(path, ruby_version)
-      file = File.read(path)
+      file = File.read(path, mode: 'rb')
       new(file, ruby_version, path)
     rescue Errno::ENOENT
       raise RuboCop::Error, "No such file or directory: #{path}"
     end
 
     def initialize(source, ruby_version, path = nil)
-      # In Ruby 2, source code encoding defaults to UTF-8. We follow the same
-      # principle regardless of which Ruby version we're running under.
-      # Encoding comments will override this setting.
+      # Defaults source encoding to UTF-8, regardless of the encoding it has
+      # been read with, which could be non-utf8 depending on the default
+      # external encoding.
       unless source.encoding == Encoding::UTF_8
         source.force_encoding(Encoding::UTF_8)
       end
@@ -32,6 +31,7 @@ module RuboCop
       @path = path
       @diagnostics = []
       @ruby_version = ruby_version
+      @parser_error = nil
 
       parse(source, ruby_version)
     end
@@ -91,16 +91,20 @@ module RuboCop
         return
       end
 
-      parser = create_parser(ruby_version)
+      @ast, @comments, @tokens = tokenize(create_parser(ruby_version))
+    end
 
+    def tokenize(parser)
       begin
-        @ast, @comments, tokens = parser.tokenize(@buffer)
-        @ast.complete! if @ast
+        ast, comments, tokens = parser.tokenize(@buffer)
+        ast.complete! if ast
       rescue Parser::SyntaxError # rubocop:disable Lint/HandleExceptions
         # All errors are in diagnostics. No need to handle exception.
       end
 
-      @tokens = tokens.map { |t| Token.from_parser_token(t) } if tokens
+      tokens = tokens.map { |t| Token.from_parser_token(t) } if tokens
+
+      [ast, comments, tokens]
     end
 
     def parser_class(ruby_version) # rubocop:disable Metrics/MethodLength

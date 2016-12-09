@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -23,13 +22,10 @@ module RuboCop
 
         def on_send(node)
           reverse_each?(node) do |receiver|
-            source_buffer = node.source_range.source_buffer
             location_of_reverse = receiver.loc.selector.begin_pos
             end_location = node.loc.selector.end_pos
 
-            range = Parser::Source::Range.new(source_buffer,
-                                              location_of_reverse,
-                                              end_location)
+            range = range_between(location_of_reverse, end_location)
             add_offense(node, range, MSG)
           end
         end

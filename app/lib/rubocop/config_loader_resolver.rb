@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 require 'yaml'
@@ -34,8 +33,10 @@ module RuboCop
         end
 
         hash['inherit_from'] = Array(hash['inherit_from'])
-        # Put gem configuration first so local configuration overrides it.
-        hash['inherit_from'].unshift gem_config_path(gem_name, config_path)
+        Array(config_path).reverse.each do |path|
+          # Put gem configuration first so local configuration overrides it.
+          hash['inherit_from'].unshift gem_config_path(gem_name, path)
+        end
       end
     end
   end

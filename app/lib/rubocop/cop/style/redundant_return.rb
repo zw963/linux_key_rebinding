@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -23,6 +22,7 @@ module RuboCop
       # or a case expression with a default branch.
       class RedundantReturn < Cop
         include OnMethodDef
+        include IfNode
 
         MSG = 'Redundant `return` detected.'.freeze
 
@@ -72,15 +72,15 @@ module RuboCop
         def on_method_def(_node, _method_name, _args, body)
           return unless body
 
-          if body.type == :return
-            check_return_node(body)
-          elsif body.type == :begin
-            expressions = *body
-            last_expr = expressions.last
+          check_branch(body)
+        end
 
-            if last_expr && last_expr.type == :return
-              check_return_node(last_expr)
-            end
+        def check_branch(node)
+          case node.type
+          when :return then check_return_node(node)
+          when :case then check_case_node(node)
+          when :if then check_if_node(node)
+          when :begin then check_begin_node(node)
           end
         end
 
@@ -89,6 +89,35 @@ module RuboCop
                     node.children.size > 1
 
           add_offense(node, :keyword)
+        end
+
+        def check_case_node(node)
+          _cond, *when_nodes, else_node = *node
+          when_nodes.each { |when_node| check_when_node(when_node) }
+          check_branch(else_node) if else_node
+        end
+
+        def check_when_node(node)
+          return unless node
+          _cond, body = *node
+          check_branch(body) if body
+        end
+
+        def check_if_node(node)
+          return if modifier_if?(node) || ternary?(node)
+
+          _cond, if_node, else_node = if_node_parts(node)
+          check_branch(if_node) if if_node
+          check_branch(else_node) if else_node
+        end
+
+        def check_begin_node(node)
+          expressions = *node
+          last_expr = expressions.last
+
+          return unless last_expr && last_expr.return_type?
+
+          check_return_node(last_expr)
         end
       end
     end

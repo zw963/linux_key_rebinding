@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -11,6 +10,7 @@ module RuboCop
       #
       # @example
       #   # good for all styles
+      #
       #   if condition
       #     statement
       #   else
@@ -22,8 +22,9 @@ module RuboCop
       #     statement
       #   end
       #
-      # empty - warn only on empty else
-      #   @example
+      # @example
+      #   # empty - warn only on empty else
+      #
       #   # bad
       #   if condition
       #     statement
@@ -37,8 +38,9 @@ module RuboCop
       #     nil
       #   end
       #
-      # nil - warn on else with nil in it
-      #   @example
+      # @example
+      #   # nil - warn on else with nil in it
+      #
       #   # bad
       #   if condition
       #     statement
@@ -52,8 +54,9 @@ module RuboCop
       #   else
       #   end
       #
-      # both - warn on empty else and else with nil in it
-      #   @example
+      # @example
+      #   # both - warn on empty else and else with nil in it
+      #
       #   # bad
       #   if condition
       #     statement
@@ -111,17 +114,16 @@ module RuboCop
           return false if autocorrect_forbidden?(node.type.to_s)
 
           lambda do |corrector|
-            end_pos = if node.loc.end
-                        node.loc.end.begin_pos
-                      else
-                        node.parent.loc.end.begin_pos
-                      end
+            end_pos = base_if_node(node).loc.end.begin_pos
 
-            range = Parser::Source::Range.new(node.source_range.source_buffer,
-                                              node.loc.else.begin_pos,
-                                              end_pos)
-            corrector.remove(range)
+            corrector.remove(range_between(node.loc.else.begin_pos, end_pos))
           end
+        end
+
+        def base_if_node(node)
+          parent_node = node
+          parent_node = parent_node.parent until parent_node.loc.end
+          parent_node
         end
 
         def autocorrect_forbidden?(type)

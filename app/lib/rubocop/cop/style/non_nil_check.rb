@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -26,21 +25,31 @@ module RuboCop
       #  end
       class NonNilCheck < Cop
         include OnMethodDef
+        include IfNode
 
-        NIL_NODE = s(:nil)
+        def_node_matcher :not_equal_to_nil?, '(send _ :!= (:nil))'
+        def_node_matcher :unless_check?, '(if (send _ :nil?) ...)'
+        def_node_matcher :nil_check?, '(send _ :nil?)'
+        def_node_matcher :not_and_nil_check?, '(send (send _ :nil?) :!)'
 
         def on_send(node)
           return if ignored_node?(node)
-          receiver, method, args = *node
 
-          if method == :!=
-            add_offense(node, :selector) if args == NIL_NODE
-          elsif method == :! && include_semantic_changes?
-            add_offense(node, :expression) if nil_check?(receiver)
+          if not_equal_to_nil?(node)
+            add_offense(node, :selector)
+          elsif include_semantic_changes? &&
+                (not_and_nil_check?(node) || unless_and_nil_check?(node))
+            add_offense(node, :expression)
           end
         end
 
         private
+
+        def unless_and_nil_check?(send_node)
+          parent = send_node.parent
+          nil_check?(send_node) && unless_check?(parent) && !ternary?(parent) &&
+            parent.loc.keyword.is?('unless')
+        end
 
         def message(node)
           _receiver, method, _args = *node
@@ -57,48 +66,40 @@ module RuboCop
 
         def on_method_def(_node, name, _args, body)
           # only predicate methods are handled differently
-          return unless name.to_s.end_with?('?')
-          return unless body
+          return unless name.to_s.end_with?('?') && body
 
-          if body.type != :begin
-            ignore_node(body)
-          elsif body.type == :begin
+          if body.begin_type?
             ignore_node(body.children.last)
+          else
+            ignore_node(body)
           end
-        end
-
-        def nil_check?(node)
-          return false unless node && node.type == :send
-
-          _receiver, method, *_args = *node
-          method == :nil?
         end
 
         def autocorrect(node)
           receiver, method, _args = *node
 
-          if method == :!=
+          case method
+          when :!=
             autocorrect_comparison(node)
-          elsif method == :!
+          when :!
             autocorrect_non_nil(node, receiver)
+          when :nil?
+            autocorrect_unless_nil(node, receiver)
           end
         end
 
         def autocorrect_comparison(node)
           expr = node.source
 
-          new_code =
-            if include_semantic_changes?
-              expr.sub(/\s*!=\s*nil/, '')
-            else
-              expr.sub(/^(\S*)\s*!=\s*nil/, '!\1.nil?')
-            end
+          new_code = if include_semantic_changes?
+                       expr.sub(/\s*!=\s*nil/, '')
+                     else
+                       expr.sub(/^(\S*)\s*!=\s*nil/, '!\1.nil?')
+                     end
 
           return if expr == new_code
 
-          lambda do |corrector|
-            corrector.replace(node.source_range, new_code)
-          end
+          ->(corrector) { corrector.replace(node.source_range, new_code) }
         end
 
         def autocorrect_non_nil(node, inner_node)
@@ -109,6 +110,13 @@ module RuboCop
             else
               corrector.replace(node.source_range, 'self')
             end
+          end
+        end
+
+        def autocorrect_unless_nil(node, receiver)
+          lambda do |corrector|
+            corrector.replace(node.parent.loc.keyword, 'if')
+            corrector.replace(node.source_range, receiver.source)
           end
         end
       end

@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -7,11 +6,12 @@ module RuboCop
       # Checks for unnecessary additional spaces inside array percent literals
       # (i.e. %i/%w).
       #
-      # @good
-      # %i(foo bar baz)
+      # @example
+      #   @good
+      #   %i(foo bar baz)
       #
-      # @bad
-      # %w(foo  bar  baz)
+      #   @bad
+      #   %w(foo  bar  baz)
       class SpaceInsideArrayPercentLiteral < Cop
         include MatchRange
         include PercentLiteral
@@ -21,7 +21,7 @@ module RuboCop
           /(?:[\S&&[^\\]](?:\\ )*)( {2,})(?=\S)/
 
         def on_array(node)
-          process(node, *%w(%i %I %w %W))
+          process(node, '%i', '%I', '%w', '%W')
         end
 
         def on_percent_literal(node)

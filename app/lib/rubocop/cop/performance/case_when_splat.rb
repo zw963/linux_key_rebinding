@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -82,7 +81,7 @@ module RuboCop
           *conditions, _body = *node
 
           lambda do |corrector|
-            if needs_reorder?(conditions)
+            if needs_reorder?(node)
               reorder_condition(corrector, node, replacement(conditions))
             else
               inline_fix_branch(corrector, node, conditions,
@@ -94,37 +93,24 @@ module RuboCop
         private
 
         def replacement(conditions)
-          new_condition = conditions.map do |condition|
-            variable, = *condition
-            if variable.respond_to?(:array_type?) && variable.array_type?
-              expand_percent_array(variable)
-            else
-              condition.source
-            end
-          end
-
-          new_condition.join(', ')
+          ordered_conditions = conditions.partition { |cond| !cond.splat_type? }
+          ordered_conditions.flatten!
+          ordered_conditions.map!(&:source)
+          ordered_conditions.join(', ')
         end
 
-        def inline_fix_branch(corrector, node, conditions, new_condition)
-          range =
-            Parser::Source::Range.new(node.loc.expression.source_buffer,
-                                      conditions[0].loc.expression.begin_pos,
-                                      conditions[-1].loc.expression.end_pos)
+        def inline_fix_branch(corrector, _node, conditions, new_condition)
+          range = range_between(conditions[0].loc.expression.begin_pos,
+                                conditions[-1].loc.expression.end_pos)
           corrector.replace(range, new_condition)
         end
 
         def reorder_condition(corrector, node, new_condition)
           *_conditions, body = *node
-          parent = node.parent
-          _case_branch, *when_branches, _else_branch = *parent
-          current_index = when_branches.index { |branch| branch == node }
-          next_branch = when_branches[current_index + 1]
-          range = Parser::Source::Range.new(parent,
-                                            node.source_range.begin_pos,
-                                            next_branch.source_range.begin_pos)
+          _case_branch, *when_branches, _else_branch = *node.parent
+          return if when_branches.size == 1 # Can't reorder one branch
 
-          corrector.remove(range)
+          corrector.remove(when_branch_range(node, when_branches))
 
           correction = if same_line?(node, body)
                          new_condition_with_then(node, new_condition)
@@ -135,18 +121,26 @@ module RuboCop
           corrector.insert_after(when_branches.last.source_range, correction)
         end
 
+        def when_branch_range(node, when_branches)
+          current_index = when_branches.index { |branch| branch == node }
+          next_branch = when_branches[current_index + 1]
+
+          range_between(node.source_range.begin_pos,
+                        next_branch.source_range.begin_pos)
+        end
+
         def same_line?(node, other)
           node.loc.first_line == other.loc.first_line
         end
 
         def new_condition_with_then(node, new_condition)
           "\n#{' ' * node.loc.column}when " \
-            "#{new_condition} then #{node.children.last.source}"
+          "#{new_condition} then #{node.children.last.source}"
         end
 
         def new_branch_without_then(node, body, new_condition)
           "\n#{' ' * node.loc.column}when #{new_condition}\n" \
-            "#{' ' * body.loc.column}#{node.children.last.source}"
+          "#{' ' * body.loc.column}#{node.children.last.source}"
         end
 
         def splat_offenses(when_conditions)
@@ -155,6 +149,8 @@ module RuboCop
             found_non_splat ||= error_condition?(condition)
 
             next unless condition.splat_type?
+            variable, = *condition
+            next if variable.array_type?
             result << condition if found_non_splat
           end
         end
@@ -166,28 +162,15 @@ module RuboCop
             !condition.splat_type?
         end
 
-        def needs_reorder?(conditions)
-          conditions.any? do |condition|
-            variable, = *condition
-            condition.splat_type? && !(variable && variable.array_type?)
-          end
-        end
-
-        def expand_percent_array(array)
-          array_start = array.loc.begin.source
-          elements = *array
-          elements = elements.map(&:source)
-
-          if array_start.start_with?(PERCENT_W)
-            "'#{elements.join("', '")}'"
-          elsif array_start.start_with?(PERCENT_CAPITAL_W)
-            %("#{elements.join('", "')}")
-          elsif array_start.start_with?(PERCENT_I)
-            ":#{elements.join(', :')}"
-          elsif array_start.start_with?(PERCENT_CAPITAL_I)
-            %(:"#{elements.join('", :"')}")
-          else
-            elements.join(', ')
+        def needs_reorder?(node)
+          _case_condition, *when_branches, _else_branch = *node.parent
+          current_index = when_branches.index { |branch| branch == node }
+          when_branches[(current_index + 1)..-1].any? do |branch|
+            *conditions, _ = *branch
+            conditions.none? do |condition|
+              variable, = *condition
+              condition.splat_type? && !(variable && variable.array_type?)
+            end
           end
         end
       end

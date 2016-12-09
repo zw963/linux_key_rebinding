@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 # rubocop:disable Metrics/ClassLength
@@ -98,7 +97,7 @@ module RuboCop
     # @private
     # Builds Ruby code which implements a pattern
     class Compiler
-      RSYM    = %r{:(?:[\w+@_*/?!<>=~|%^-]+|\[\]=?)}
+      RSYM    = %r{:(?:[\w+@*/?!<>=~|%^-]+|\[\]=?)}
       ID_CHAR = /[a-zA-Z_]/
       META    = /\(|\)|\{|\}|\[|\]|\$\.\.\.|\$|!|\^|\.\.\./
       NUMBER  = /-?\d+(?:\.\d+)?/
@@ -171,15 +170,15 @@ module RuboCop
         # but we don't know how expensive it is
         # to be safe, cache the node in a temp variable and then use the
         # temp variable as 'cur_node'
-        init = "temp#{@temps += 1} = #{cur_node}"
-        cur_node = "temp#{@temps}"
-        terms = compile_seq_terms(tokens, cur_node)
+        with_temp_node(cur_node) do |init, temp_node|
+          terms = compile_seq_terms(tokens, temp_node)
 
-        join_terms(init, terms, ' && ')
+          join_terms(init, terms, ' && ')
+        end
       end
 
       def compile_seq_terms(tokens, cur_node)
-        terms, size =
+        ret, size =
           compile_seq_terms_with_size(tokens, cur_node) do |token, terms, index|
             case token
             when '...'.freeze
@@ -189,7 +188,7 @@ module RuboCop
             end
           end
 
-        terms << "(#{cur_node}.children.size == #{size})"
+        ret << "(#{cur_node}.children.size == #{size})"
       end
 
       def compile_seq_terms_with_size(tokens, cur_node)
@@ -255,43 +254,60 @@ module RuboCop
       def compile_union(tokens, cur_node, seq_head)
         fail_due_to('empty union') if tokens.first == '}'
 
-        init = "temp#{@temps += 1} = #{cur_node}"
-        cur_node = "temp#{@temps}"
+        with_temp_node(cur_node) do |init, temp_node|
+          terms = union_terms(tokens, temp_node, seq_head)
+          join_terms(init, terms, ' || ')
+        end
+      end
 
-        terms = []
+      def union_terms(tokens, temp_node, seq_head)
         # we need to ensure that each branch of the {} contains the same
         # number of captures (since only one branch of the {} can actually
         # match, the same variables are used to hold the captures for each
         # branch)
-        captures_before = @captures
-        terms << compile_expr(tokens, cur_node, seq_head)
-        captures_after = @captures
-
-        until tokens.first == '}'
-          @captures = captures_before
-          terms << compile_expr(tokens, cur_node, seq_head)
-          if @captures != captures_after
-            fail_due_to('each branch of {} must have same # of captures')
+        compile_expr_with_captures(tokens,
+                                   temp_node, seq_head) do |term, before, after|
+          terms = [term]
+          until tokens.first == '}'
+            terms << compile_expr_with_capture_check(tokens, temp_node,
+                                                     seq_head, before, after)
           end
-        end
-        tokens.shift
+          tokens.shift
 
-        join_terms(init, terms, ' || ')
+          terms
+        end
+      end
+
+      def compile_expr_with_captures(tokens, temp_node, seq_head)
+        captures_before = @captures
+        expr = compile_expr(tokens, temp_node, seq_head)
+
+        yield expr, captures_before, @captures
+      end
+
+      def compile_expr_with_capture_check(tokens, temp_node, seq_head, before,
+                                          after)
+        @captures = before
+        expr = compile_expr(tokens, temp_node, seq_head)
+        if @captures != after
+          fail_due_to('each branch of {} must have same # of captures')
+        end
+
+        expr
       end
 
       def compile_intersect(tokens, cur_node, seq_head)
         fail_due_to('empty intersection') if tokens.first == ']'
 
-        init = "temp#{@temps += 1} = #{cur_node}"
-        cur_node = "temp#{@temps}"
+        with_temp_node(cur_node) do |init, temp_node|
+          terms = []
+          until tokens.first == ']'
+            terms << compile_expr(tokens, temp_node, seq_head)
+          end
+          tokens.shift
 
-        terms = []
-        until tokens.first == ']'
-          terms << compile_expr(tokens, cur_node, seq_head)
+          join_terms(init, terms, ' && ')
         end
-        tokens.shift
-
-        join_terms(init, terms, ' && ')
       end
 
       def compile_capture(tokens, cur_node, seq_head)
@@ -317,8 +333,9 @@ module RuboCop
           # in a temp. check if this value matches the one stored in the temp
           "(#{cur_node}#{'.type' if seq_head} == temp#{@unify[name]})"
         else
-          n = @unify[name] = (@temps += 1)
-          "(temp#{n} = #{cur_node}#{'.type' if seq_head}; true)"
+          n = @unify[name] = next_temp_value
+          # double assign to temp#{n} to avoid "assigned but unused variable"
+          "(temp#{n} = temp#{n} = #{cur_node}#{'.type' if seq_head}; true)"
         end
       end
 
@@ -425,6 +442,21 @@ module RuboCop
       def fail_due_to(message)
         raise Invalid, "Couldn't compile due to #{message}. Pattern: #{@string}"
       end
+
+      def with_temp_node(cur_node)
+        with_temp_variable do |temp_var|
+          # double assign to temp#{n} to avoid "assigned but unused variable"
+          yield "#{temp_var} = #{temp_var} = #{cur_node}", temp_var
+        end
+      end
+
+      def with_temp_variable
+        yield "temp#{next_temp_value}"
+      end
+
+      def next_temp_value
+        @temps += 1
+      end
     end
 
     # Helpers for defining methods based on a pattern string
@@ -454,20 +486,33 @@ module RuboCop
       # yield all descendants which match.
       def def_node_search(method_name, pattern_str)
         compiler = RuboCop::NodePattern::Compiler.new(pattern_str, 'node')
-        if method_name.to_s.end_with?('?')
-          on_match = 'return true'
-          prelude = ''
-        else
-          yieldval = compiler.emit_capture_list
-          yieldval = 'node' if yieldval.empty?
-          on_match = "yield(#{yieldval})"
-          prelude = "return enum_for(:#{method_name}, node0" \
-          "#{compiler.emit_trailing_params}) unless block_given?"
-        end
+        called_from = caller.first.split(':')
 
+        if method_name.to_s.end_with?('?')
+          node_search_first(method_name, compiler, called_from)
+        else
+          node_search_all(method_name, compiler, called_from)
+        end
+      end
+
+      def node_search_first(method_name, compiler, called_from)
+        node_search(method_name, compiler, 'return true', '', called_from)
+      end
+
+      def node_search_all(method_name, compiler, called_from)
+        yieldval = compiler.emit_capture_list
+        yieldval = 'node' if yieldval.empty?
+        prelude = "return enum_for(:#{method_name}, node0" \
+                  "#{compiler.emit_trailing_params}) unless block_given?"
+
+        node_search(method_name, compiler, "yield(#{yieldval})", prelude,
+                    called_from)
+      end
+
+      def node_search(method_name, compiler, on_match, prelude, called_from)
         src = node_search_body(method_name, compiler.emit_trailing_params,
                                prelude, compiler.match_code, on_match)
-        filename, lineno = *caller.first.split(':')
+        filename, lineno = *called_from
         class_eval(src, filename, lineno.to_i)
       end
 

@@ -183,49 +183,6 @@ rule
                     {
                       result = @builder.multi_assign(val[0], val[1], val[2])
                     }
-                | var_lhs tOP_ASGN command_call
-                    {
-                      result = @builder.op_assign(val[0], val[1], val[2])
-                    }
-                | primary_value tLBRACK2 opt_call_args rbracket tOP_ASGN command_call
-                    {
-                      result = @builder.op_assign(
-                                  @builder.index(
-                                    val[0], val[1], val[2], val[3]),
-                                  val[4], val[5])
-                    }
-                | primary_value call_op tIDENTIFIER tOP_ASGN command_call
-                    {
-                      result = @builder.op_assign(
-                                  @builder.call_method(
-                                    val[0], val[1], val[2]),
-                                  val[3], val[4])
-                    }
-                | primary_value call_op tCONSTANT tOP_ASGN command_call
-                    {
-                      result = @builder.op_assign(
-                                  @builder.call_method(
-                                    val[0], val[1], val[2]),
-                                  val[3], val[4])
-                    }
-                | primary_value tCOLON2 tCONSTANT tOP_ASGN command_call
-                    {
-                      result = @builder.op_assign(
-                                  @builder.call_method(
-                                    val[0], val[1], val[2]),
-                                  val[3], val[4])
-                    }
-                | primary_value tCOLON2 tIDENTIFIER tOP_ASGN command_call
-                    {
-                      result = @builder.op_assign(
-                                  @builder.call_method(
-                                    val[0], val[1], val[2]),
-                                  val[3], val[4])
-                    }
-                | backref tOP_ASGN command_call
-                    {
-                      @builder.op_assign(val[0], val[1], val[2])
-                    }
                 | lhs tEQL mrhs
                     {
                       result = @builder.assign(val[0], val[1],
@@ -237,14 +194,63 @@ rule
                     }
                 | expr
 
-    command_asgn: lhs tEQL command_call
+    command_asgn: lhs tEQL command_rhs
                     {
                       result = @builder.assign(val[0], val[1], val[2])
                     }
-                | lhs tEQL command_asgn
+                | var_lhs tOP_ASGN command_rhs
                     {
-                      result = @builder.assign(val[0], val[1], val[2])
+                      result = @builder.op_assign(val[0], val[1], val[2])
                     }
+                | primary_value tLBRACK2 opt_call_args rbracket tOP_ASGN command_rhs
+                    {
+                      result = @builder.op_assign(
+                                  @builder.index(
+                                    val[0], val[1], val[2], val[3]),
+                                  val[4], val[5])
+                    }
+                | primary_value call_op tIDENTIFIER tOP_ASGN command_rhs
+                    {
+                      result = @builder.op_assign(
+                                  @builder.call_method(
+                                    val[0], val[1], val[2]),
+                                  val[3], val[4])
+                    }
+                | primary_value call_op tCONSTANT tOP_ASGN command_rhs
+                    {
+                      result = @builder.op_assign(
+                                  @builder.call_method(
+                                    val[0], val[1], val[2]),
+                                  val[3], val[4])
+                    }
+                | primary_value tCOLON2 tCONSTANT tOP_ASGN command_rhs
+                    {
+                      const  = @builder.const_op_assignable(
+                                  @builder.const_fetch(val[0], val[1], val[2]))
+                      result = @builder.op_assign(const, val[3], val[4])
+                    }
+                | primary_value tCOLON2 tIDENTIFIER tOP_ASGN command_rhs
+                    {
+                      result = @builder.op_assign(
+                                  @builder.call_method(
+                                    val[0], val[1], val[2]),
+                                  val[3], val[4])
+                    }
+                | backref tOP_ASGN command_rhs
+                    {
+                      @builder.op_assign(val[0], val[1], val[2])
+                    }
+
+     command_rhs: command_call =tOP_ASGN
+                | command_call kRESCUE_MOD stmt
+                    {
+                      rescue_body = @builder.rescue_body(val[1],
+                                        nil, nil, nil,
+                                        nil, val[2])
+
+                      result = @builder.begin_body(val[0], [ rescue_body ])
+                    }
+                | command_asgn
 
             expr: command_call
                 | expr kAND expr
@@ -277,15 +283,9 @@ rule
                                   nil, val[3], nil)
                     }
 
- cmd_brace_block: tLBRACE_ARG
+ cmd_brace_block: tLBRACE_ARG brace_body tRCURLY
                     {
-                      @static_env.extend_dynamic
-                    }
-                    opt_block_param compstmt tRCURLY
-                    {
-                      result = [ val[0], val[2], val[3], val[4] ]
-
-                      @static_env.unextend
+                      result = [ val[0], *val[1], val[2] ]
                     }
 
            fcall: operation
@@ -586,75 +586,55 @@ rule
                 | kWHEN     | kYIELD    | kIF           | kUNLESS | kWHILE
                 | kUNTIL
 
-             arg: lhs tEQL arg
+             arg: lhs tEQL arg_rhs
                     {
                       result = @builder.assign(val[0], val[1], val[2])
                     }
-                | lhs tEQL arg kRESCUE_MOD arg
-                    {
-                      rescue_body = @builder.rescue_body(val[3],
-                                        nil, nil, nil,
-                                        nil, val[4])
-
-                      rescue_ = @builder.begin_body(val[2], [ rescue_body ])
-
-                      result  = @builder.assign(val[0], val[1], rescue_)
-                    }
-                | var_lhs tOP_ASGN arg
+                | var_lhs tOP_ASGN arg_rhs
                     {
                       result = @builder.op_assign(val[0], val[1], val[2])
                     }
-                | var_lhs tOP_ASGN arg kRESCUE_MOD arg
-                    {
-                      rescue_body = @builder.rescue_body(val[3],
-                                        nil, nil, nil,
-                                        nil, val[4])
-
-                      rescue_ = @builder.begin_body(val[2], [ rescue_body ])
-
-                      result = @builder.op_assign(val[0], val[1], rescue_)
-                    }
-                | primary_value tLBRACK2 opt_call_args rbracket tOP_ASGN arg
+                | primary_value tLBRACK2 opt_call_args rbracket tOP_ASGN arg_rhs
                     {
                       result = @builder.op_assign(
                                   @builder.index(
                                     val[0], val[1], val[2], val[3]),
                                   val[4], val[5])
                     }
-                | primary_value call_op tIDENTIFIER tOP_ASGN arg
+                | primary_value call_op tIDENTIFIER tOP_ASGN arg_rhs
                     {
                       result = @builder.op_assign(
                                   @builder.call_method(
                                     val[0], val[1], val[2]),
                                   val[3], val[4])
                     }
-                | primary_value call_op tCONSTANT tOP_ASGN arg
+                | primary_value call_op tCONSTANT tOP_ASGN arg_rhs
                     {
                       result = @builder.op_assign(
                                   @builder.call_method(
                                     val[0], val[1], val[2]),
                                   val[3], val[4])
                     }
-                | primary_value tCOLON2 tIDENTIFIER tOP_ASGN arg
+                | primary_value tCOLON2 tIDENTIFIER tOP_ASGN arg_rhs
                     {
                       result = @builder.op_assign(
                                   @builder.call_method(
                                     val[0], val[1], val[2]),
                                   val[3], val[4])
                     }
-                | primary_value tCOLON2 tCONSTANT tOP_ASGN arg
+                | primary_value tCOLON2 tCONSTANT tOP_ASGN arg_rhs
                     {
                       const  = @builder.const_op_assignable(
                                   @builder.const_fetch(val[0], val[1], val[2]))
                       result = @builder.op_assign(const, val[3], val[4])
                     }
-                | tCOLON3 tCONSTANT tOP_ASGN arg
+                | tCOLON3 tCONSTANT tOP_ASGN arg_rhs
                     {
                       const  = @builder.const_op_assignable(
                                   @builder.const_global(val[0], val[1]))
                       result = @builder.op_assign(const, val[2], val[3])
                     }
-                | backref tOP_ASGN arg
+                | backref tOP_ASGN arg_rhs
                     {
                       result = @builder.op_assign(val[0], val[1], val[2])
                     }
@@ -804,6 +784,16 @@ rule
                       result = [ @builder.associate(nil, val[0], nil) ]
                     }
 
+         arg_rhs: arg =tOP_ASGN
+                | arg kRESCUE_MOD arg
+                    {
+                      rescue_body = @builder.rescue_body(val[1],
+                                        nil, nil, nil,
+                                        nil, val[2])
+
+                      result = @builder.begin_body(val[0], [ rescue_body ])
+                    }
+
       paren_args: tLPAREN2 opt_call_args rparen
                     {
                       result = val
@@ -945,15 +935,15 @@ rule
                       result = @lexer.cmdarg.dup
                       @lexer.cmdarg.clear
                     }
-                    expr
+                    stmt
                     {
                       @lexer.state = :expr_endarg
                     }
-                    opt_nl tRPAREN
+                    rparen
                     {
                       @lexer.cmdarg = val[1]
 
-                      result = @builder.begin(val[0], val[2], val[5])
+                      result = @builder.begin(val[0], val[2], val[4])
                     }
                 | tLPAREN_ARG
                     {
@@ -1373,7 +1363,11 @@ opt_block_args_tail:
                     }
                 | f_arg                                                      opt_block_args_tail
                     {
-                      result = val[0].concat(val[1])
+                      if val[1].empty? && val[0].size == 1
+                        result = [@builder.procarg0(val[0][0])]
+                      else
+                        result = val[0].concat(val[1])
+                      end
                     }
                 | f_block_optarg tCOMMA              f_rest_arg              opt_block_args_tail
                     {
@@ -1495,15 +1489,9 @@ opt_block_args_tail:
                       result = [ val[0], val[1], val[2] ]
                     }
 
-        do_block: kDO_BLOCK
+        do_block: kDO_BLOCK do_body kEND
                     {
-                      @static_env.extend_dynamic
-                    }
-                    opt_block_param compstmt kEND
-                    {
-                      result = [ val[0], val[2], val[3], val[4] ]
-
-                      @static_env.unextend
+                      result = [ val[0], *val[1], val[2] ]
                     }
 
       block_call: command do_block
@@ -1587,25 +1575,45 @@ opt_block_args_tail:
                       result = @builder.index(val[0], val[1], val[2], val[3])
                     }
 
-     brace_block: tLCURLY
+     brace_block: tLCURLY brace_body tRCURLY
                     {
+                      result = [ val[0], *val[1], val[2] ]
+                    }
+                | kDO do_body kEND
+                    {
+                      result = [ val[0], *val[1], val[2] ]
+                    }
+
+      brace_body:   {
                       @static_env.extend_dynamic
                     }
-                    opt_block_param compstmt tRCURLY
                     {
-                      result = [ val[0], val[2], val[3], val[4] ]
+                      result = @lexer.cmdarg.dup
+                      @lexer.cmdarg.clear
+                    }
+                    opt_block_param compstmt
+                    {
+                      result = [ val[2], val[3] ]
 
                       @static_env.unextend
+                      @lexer.cmdarg = val[1]
+                      @lexer.cmdarg.pop
                     }
-                | kDO
-                    {
+
+         do_body:   {
                       @static_env.extend_dynamic
                     }
-                 opt_block_param compstmt kEND
                     {
-                      result = [ val[0], val[2], val[3], val[4] ]
+                      result = @lexer.cmdarg.dup
+                      @lexer.cmdarg.clear
+                    }
+                    opt_block_param compstmt
+                    {
+                      result = [ val[2], val[3] ]
 
                       @static_env.unextend
+                      @lexer.cmdarg = val[1]
+                      @lexer.cmdarg.pop
                     }
 
        case_body: kWHEN args then compstmt cases
@@ -1832,11 +1840,13 @@ regexp_contents: # nothing
 
           symbol: tSYMBOL
                     {
+                      @lexer.state = :expr_endarg
                       result = @builder.symbol(val[0])
                     }
 
             dsym: tSYMBEG xstring_contents tSTRING_END
                     {
+                      @lexer.state = :expr_endarg
                       result = @builder.symbol_compose(val[0], val[1], val[2])
                     }
 
@@ -1851,18 +1861,22 @@ regexp_contents: # nothing
 
   simple_numeric: tINTEGER
                     {
+                      @lexer.state = :expr_endarg
                       result = @builder.integer(val[0])
                     }
                 | tFLOAT
                     {
+                      @lexer.state = :expr_endarg
                       result = @builder.float(val[0])
                     }
                 | tRATIONAL
                     {
+                      @lexer.state = :expr_endarg
                       result = @builder.rational(val[0])
                     }
                 | tIMAGINARY
                     {
+                      @lexer.state = :expr_endarg
                       result = @builder.complex(val[0])
                     }
 

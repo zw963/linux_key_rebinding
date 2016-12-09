@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -9,7 +8,7 @@ module RuboCop
         include PercentLiteral
 
         def on_array(node)
-          process(node, '%w', '%W', '%i')
+          process(node, '%w', '%W', '%i', '%I')
         end
 
         def on_regexp(node)
@@ -76,7 +75,7 @@ module RuboCop
         def string_source(node)
           if node.is_a?(String)
             node
-          elsif node.respond_to?(:type) && node.type == :str
+          elsif node.respond_to?(:type) && node.str_type?
             node.source
           end
         end

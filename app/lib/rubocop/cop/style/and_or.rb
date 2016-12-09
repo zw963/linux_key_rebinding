@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -60,7 +59,7 @@ module RuboCop
 
         def autocorrect(node)
           expr1, expr2 = *node
-          replacement = (node.type == :and ? '&&' : '||')
+          replacement = (node.and_type? ? '&&' : '||')
           lambda do |corrector|
             [expr1, expr2].each do |expr|
               if expr.send_type?
@@ -78,9 +77,16 @@ module RuboCop
         def correct_send(node, corrector)
           receiver, method_name, *args = *node
           return correct_not(node, receiver, corrector) if method_name == :!
+          return correct_setter(node, corrector) if setter_method?(method_name)
           return unless correctable_send?(node)
 
           corrector.replace(whitespace_before_arg(node), '('.freeze)
+          corrector.insert_after(args.last.source_range, ')'.freeze)
+        end
+
+        def correct_setter(node, corrector)
+          receiver, _method_name, *args = *node
+          corrector.insert_before(receiver.source_range, '('.freeze)
           corrector.insert_after(args.last.source_range, ')'.freeze)
         end
 
@@ -106,6 +112,10 @@ module RuboCop
           corrector.insert_after(node.source_range, ')')
         end
 
+        def setter_method?(method_name)
+          method_name.to_s.end_with?('=')
+        end
+
         def correctable_send?(node)
           _receiver, method_name, *args = *node
           # don't clobber if we already have a starting paren
@@ -117,13 +127,12 @@ module RuboCop
         end
 
         def whitespace_before_arg(node)
-          sb = node.source_range.source_buffer
           begin_paren = node.loc.selector.end_pos
           end_paren = begin_paren
           # Increment position of parenthesis, unless message is a predicate
           # method followed by a non-whitespace char (e.g. is_a?String).
-          end_paren += 1 unless node.source =~ /\?[!\S]/
-          Parser::Source::Range.new(sb, begin_paren, end_paren)
+          end_paren += 1 unless node.source =~ /\?\S/
+          range_between(begin_paren, end_paren)
         end
       end
     end

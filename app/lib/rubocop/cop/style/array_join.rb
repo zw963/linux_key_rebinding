@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -12,18 +11,14 @@ module RuboCop
       class ArrayJoin < Cop
         MSG = 'Favor `Array#join` over `Array#*`.'.freeze
 
-        def on_send(node)
-          receiver_node, method_name, *arg_nodes = *node
-          return unless receiver_node && receiver_node.type == :array &&
-                        method_name == :* && arg_nodes[0].type == :str
+        def_node_matcher :join_candidate?, '(send $array :* $str)'
 
-          add_offense(node, :selector)
+        def on_send(node)
+          join_candidate?(node) { add_offense(node, :selector) }
         end
 
         def autocorrect(node)
-          receiver_node, _method_name, *arg_nodes = *node
-          array = receiver_node.source
-          join_arg = arg_nodes[0].source
+          array, join_arg = join_candidate?(node).map(&:source)
 
           lambda do |corrector|
             corrector.replace(node.source_range, "#{array}.join(#{join_arg})")

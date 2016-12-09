@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -33,13 +32,11 @@ module RuboCop
 
         # Dummy implementation of method in ConfigurableEnforcedStyle that is
         # called from StringHelp.
-        def opposite_style_detected
-        end
+        def opposite_style_detected; end
 
         # Dummy implementation of method in ConfigurableEnforcedStyle that is
         # called from StringHelp.
-        def correct_style_detected
-        end
+        def correct_style_detected; end
       end
     end
   end

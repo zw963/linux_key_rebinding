@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 require 'set'
@@ -30,14 +29,7 @@ module RuboCop
           return if processed_source.ast.nil?
 
           if force_equal_sign_alignment?
-            @asgn_tokens = processed_source.tokens.select { |t| equal_sign?(t) }
-            # we don't want to operate on equals signs which are part of an
-            #   optarg in a method definition
-            # e.g.: def method(optarg = default_val); end
-            @asgn_tokens = remove_optarg_equals(@asgn_tokens, processed_source)
-
-            # Only attempt to align the first = on each line
-            @asgn_tokens = Set.new(@asgn_tokens.uniq { |t| t.pos.line })
+            @asgn_tokens = assignment_tokens
             @asgn_lines  = @asgn_tokens.map { |t| t.pos.line }
             # Don't attempt to correct the same = more than once
             @corrected   = Set.new
@@ -51,7 +43,7 @@ module RuboCop
         def autocorrect(range)
           lambda do |corrector|
             if range.source.end_with?('=')
-              align_equal_sign(range, corrector)
+              align_equal_signs(range, corrector)
             else
               corrector.remove(range)
             end
@@ -59,6 +51,17 @@ module RuboCop
         end
 
         private
+
+        def assignment_tokens
+          tokens = processed_source.tokens.select { |t| equal_sign?(t) }
+          # we don't want to operate on equals signs which are part of an
+          #   optarg in a method definition
+          # e.g.: def method(optarg = default_val); end
+          tokens = remove_optarg_equals(tokens, processed_source)
+
+          # Only attempt to align the first = on each line
+          Set.new(tokens.uniq { |t| t.pos.line })
+        end
 
         def check_tokens(ast, t1, t2)
           return if t2.type == :tNL
@@ -100,20 +103,25 @@ module RuboCop
         end
 
         def check_other(t1, t2, ast)
+          extra_space_range(t1, t2) do |range|
+            # Unary + doesn't appear as a token and needs special handling.
+            next if ignored_range?(ast, range.begin_pos)
+            next if unary_plus_non_offense?(range)
+
+            add_offense(range, range, MSG_UNNECESSARY)
+          end
+        end
+
+        def extra_space_range(t1, t2)
           return if t1.pos.line != t2.pos.line
-          return if allow_for_alignment? && aligned_tok?(t2)
 
           start_pos = t1.pos.end_pos
           end_pos = t2.pos.begin_pos - 1
           return if end_pos <= start_pos
-          return if ignored_range?(ast, start_pos)
 
-          range = Parser::Source::Range.new(processed_source.buffer,
-                                            start_pos, end_pos)
-          # Unary + doesn't appear as a token and needs special handling.
-          return if unary_plus_non_offense?(range)
+          return if allow_for_alignment? && aligned_tok?(t2)
 
-          add_offense(range, range, MSG_UNNECESSARY)
+          yield range_between(start_pos, end_pos)
         end
 
         def aligned_tok?(token)
@@ -133,15 +141,17 @@ module RuboCop
         end
 
         # Returns an array of ranges that should not be reported. It's the
-        # extra spaces between the keys and values in a hash, since those are
-        # handled by the Style/AlignHash cop.
+        # extra spaces between the keys and values in a multiline hash,
+        # since those are handled by the Style/AlignHash cop.
         def ignored_ranges(ast)
           return [] unless ast
 
           @ignored_ranges ||= on_node(:pair, ast).map do |pair|
+            next if pair.parent.single_line?
+
             key, value = *pair
             key.source_range.end_pos...value.source_range.begin_pos
-          end
+          end.compact
         end
 
         def aligned_comments?(token)
@@ -172,22 +182,25 @@ module RuboCop
           token.type == :tEQL || token.type == :tOP_ASGN
         end
 
-        def align_equal_sign(range, corrector)
+        def align_equal_signs(range, corrector)
           lines  = contiguous_assignment_lines(range)
           tokens = @asgn_tokens.select { |t| lines.include?(t.pos.line) }
 
           columns  = tokens.map { |t| align_column(t) }
           align_to = columns.max
 
-          tokens.each do |token|
-            next unless @corrected.add?(token)
-            diff = align_to - token.pos.last_column
+          tokens.each { |token| align_equal_sign(corrector, token, align_to) }
+        end
 
-            if diff > 0
-              corrector.insert_before(token.pos, ' ' * diff)
-            elsif diff < 0
-              corrector.remove_preceding(token.pos, -diff)
-            end
+        def align_equal_sign(corrector, token, align_to)
+          return unless @corrected.add?(token)
+
+          diff = align_to - token.pos.last_column
+
+          if diff > 0
+            corrector.insert_before(token.pos, ' ' * diff)
+          elsif diff < 0
+            corrector.remove_preceding(token.pos, -diff)
           end
         end
 

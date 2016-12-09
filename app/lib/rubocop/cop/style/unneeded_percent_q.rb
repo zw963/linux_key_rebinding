@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -33,14 +32,20 @@ module RuboCop
         private
 
         def check(node)
-          src = node.source
-          return unless start_with_percent_q_variant?(src)
-          return if src.include?(SINGLE_QUOTE) && src.include?(QUOTE)
-          return if src.start_with?(PERCENT_Q) && acceptable_q?(node)
-          return if src.start_with?(PERCENT_CAPITAL_Q) &&
-                    acceptable_capital_q?(node)
+          return unless start_with_percent_q_variant?(node)
+          return if interpolated_quotes?(node) || allowed_percent_q?(node)
 
           add_offense(node, :expression)
+        end
+
+        def interpolated_quotes?(node)
+          node.source.include?(SINGLE_QUOTE) && node.source.include?(QUOTE)
+        end
+
+        def allowed_percent_q?(node)
+          node.source.start_with?(PERCENT_Q) && acceptable_q?(node) ||
+            node.source.start_with?(PERCENT_CAPITAL_Q) &&
+              acceptable_capital_q?(node)
         end
 
         def message(node)
@@ -68,7 +73,7 @@ module RuboCop
         end
 
         def start_with_percent_q_variant?(string)
-          string.start_with?(PERCENT_Q, PERCENT_CAPITAL_Q)
+          string.source.start_with?(PERCENT_Q, PERCENT_CAPITAL_Q)
         end
 
         def acceptable_q?(node)

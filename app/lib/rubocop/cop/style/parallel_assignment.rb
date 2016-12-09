@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 require 'tsort'
@@ -29,30 +28,44 @@ module RuboCop
         MSG = 'Do not use parallel assignment.'.freeze
 
         def on_masgn(node)
-          left, right = *node
-          left_elements = *left
-          right_elements = [*right].compact # edge case for one constant
+          lhs, rhs = *node
+          lhs_elements = *lhs
+          rhs_elements = [*rhs].compact # edge case for one constant
 
-          # only complain when the number of variables matches
-          return if left_elements.size != right_elements.size
-
-          # account for edge cases using one variable with a comma
-          return if left_elements.size == 1
-
-          # account for edge case of Constant::CONSTANT
-          return unless right.array_type?
-
-          # allow mass assignment as the return of a method call
-          return if right.block_type? || right.send_type?
-
-          # allow mass assignment when using splat
-          return if (left_elements + right_elements).any?(&:splat_type?)
-
-          order = find_valid_order(left_elements, right_elements)
-          # For `a, b = b, a` or similar, there is no valid order
-          return if order.nil?
+          return if allowed_lhs?(lhs) || allowed_rhs?(rhs) ||
+                    allowed_masign?(lhs_elements, rhs_elements)
 
           add_offense(node, :expression)
+        end
+
+        private
+
+        def allowed_masign?(lhs_elements, rhs_elements)
+          lhs_elements.size != rhs_elements.size ||
+            !find_valid_order(lhs_elements,
+                              add_self_to_getters(rhs_elements))
+        end
+
+        def allowed_lhs?(node)
+          elements = *node
+
+          # Account for edge cases using one variable with a comma
+          # E.g.: `foo, = *bar`
+          elements.one? || elements.any?(&:splat_type?)
+        end
+
+        def allowed_rhs?(node)
+          # Edge case for one constant
+          elements = [*node].compact
+
+          # Account for edge case of `Constant::CONSTANT`
+          !node.array_type? ||
+            return_of_method_call?(node) ||
+            elements.any?(&:splat_type?)
+        end
+
+        def return_of_method_call?(node)
+          node.block_type? || node.send_type?
         end
 
         def autocorrect(node)
@@ -61,22 +74,22 @@ module RuboCop
             left_elements = *left
             right_elements = [*right].compact
             order = find_valid_order(left_elements, right_elements)
+            correction = assignment_corrector(node, order)
 
-            assignment_corrector =
-              if modifier_statement?(node.parent)
-                ModifierCorrector.new(node, config, order)
-              elsif rescue_modifier?(node.parent)
-                RescueCorrector.new(node, config, order)
-              else
-                GenericCorrector.new(node, config, order)
-              end
-
-            corrector.replace(assignment_corrector.correction_range,
-                              assignment_corrector.correction)
+            corrector.replace(correction.correction_range,
+                              correction.correction)
           end
         end
 
-        private
+        def assignment_corrector(node, order)
+          if modifier_statement?(node.parent)
+            ModifierCorrector.new(node, config, order)
+          elsif rescue_modifier?(node.parent)
+            RescueCorrector.new(node, config, order)
+          else
+            GenericCorrector.new(node, config, order)
+          end
+        end
 
         def find_valid_order(left_elements, right_elements)
           # arrange left_elements in an order such that no corresponding right
@@ -91,6 +104,17 @@ module RuboCop
             nil
           end
         end
+
+        # Converts (send nil :something) nodes to (send (:self) :something).
+        # This makes the sorting algorithm work for expressions such as
+        # `self.a, self.b = b, a`.
+        def add_self_to_getters(right_elements)
+          right_elements.map do |e|
+            implicit_self_getter?(e) { |var| s(:send, s(:self), var) } || e
+          end
+        end
+
+        def_node_matcher :implicit_self_getter?, '(send nil $_)'
 
         # Helper class necessitated by silly design of TSort prior to Ruby 2.1
         # Newer versions have a better API, but that doesn't help us
@@ -160,7 +184,7 @@ module RuboCop
         class GenericCorrector
           include AutocorrectAlignment
 
-          attr_reader :config, :node, :correction, :correction_range
+          attr_reader :config, :node
 
           def initialize(node, config, new_elements)
             @node = node
@@ -247,12 +271,7 @@ module RuboCop
           def correction
             parent = node.parent
 
-            modifier_range =
-              Parser::Source::Range.new(parent.source_range.source_buffer,
-                                        parent.loc.keyword.begin_pos,
-                                        parent.source_range.end_pos)
-
-            "#{modifier_range.source}\n" \
+            "#{modifier_range(parent).source}\n" \
               "#{indentation(node)}" \
               "#{assignment.join("\n#{indentation(node)}")}" \
               "\n#{offset(node)}end"
@@ -260,6 +279,14 @@ module RuboCop
 
           def correction_range
             node.parent.source_range
+          end
+
+          private
+
+          def modifier_range(node)
+            Parser::Source::Range.new(node.source_range.source_buffer,
+                                      node.loc.keyword.begin_pos,
+                                      node.source_range.end_pos)
           end
         end
       end

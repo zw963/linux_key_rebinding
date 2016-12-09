@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -17,14 +16,13 @@ module RuboCop
 
         MSG = 'Freezing immutable objects is pointless.'.freeze
 
+        def_node_matcher :freezing?, '(send $_ :freeze)'
+
         def on_send(node)
-          receiver, method_name, *args = *node
-
-          return unless method_name == :freeze &&
-                        args.empty? &&
-                        immutable_literal?(receiver)
-
-          add_offense(node, :expression)
+          freezing?(node) do |receiver|
+            return unless immutable_literal?(receiver)
+            add_offense(node, :expression)
+          end
         end
 
         def autocorrect(node)

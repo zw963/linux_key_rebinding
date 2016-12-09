@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -18,13 +17,13 @@ module RuboCop
           'unwanted in the resulting symbols.'.freeze
 
         def on_array(node)
-          process(node, *%w(%i %I))
+          process(node, '%i', '%I')
         end
 
         def on_percent_literal(node)
-          if contains_colons_or_commas?(node)
-            add_offense(node, :expression, MSG)
-          end
+          return unless contains_colons_or_commas?(node)
+
+          add_offense(node, :expression, MSG)
         end
 
         private

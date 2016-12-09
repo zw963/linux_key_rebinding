@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -28,11 +27,12 @@ module RuboCop
               'number of times.'.freeze
 
         def on_block(node)
-          if offending_each_range(node)
-            send_node, = *node
-            range = send_node.receiver.source_range.join(send_node.loc.selector)
-            add_offense(node, range)
-          end
+          return unless offending_each_range(node)
+
+          send_node, = *node
+          range = send_node.receiver.source_range.join(send_node.loc.selector)
+
+          add_offense(node, range)
         end
 
         private

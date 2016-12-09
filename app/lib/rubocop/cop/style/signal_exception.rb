@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -84,11 +83,9 @@ module RuboCop
         end
 
         def check_send(method_name, node)
-          return unless node
+          return unless node && command_or_kernel_call?(method_name, node)
 
-          if command_or_kernel_call?(method_name, node)
-            add_offense(node, :selector, message(method_name))
-          end
+          add_offense(node, :selector, message(method_name))
         end
 
         def command_or_kernel_call?(name, node)

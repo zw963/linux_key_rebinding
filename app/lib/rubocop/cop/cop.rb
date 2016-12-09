@@ -1,5 +1,5 @@
-# encoding: utf-8
 # frozen_string_literal: true
+require 'uri'
 
 module RuboCop
   module Cop
@@ -23,18 +23,20 @@ module RuboCop
       end
 
       def qualified_cop_name(name, origin)
-        @cop_names ||= Set.new(map(&:cop_name))
+        return name if cop_names.include?(name)
+
         basename = File.basename(name)
         found_ns = types.map(&:capitalize).select do |ns|
-          @cop_names.include?("#{ns}/#{basename}")
+          cop_names.include?("#{ns}/#{basename}")
         end
 
         case found_ns.size
         when 0 then name # No namespace found. Deal with it later in caller.
         when 1 then cop_name_with_namespace(name, origin, basename, found_ns[0])
         else raise AmbiguousCopName,
-                   "Ambiguous cop name `#{basename}` used in" \
-                   "#{origin} needs namespace qualifier."
+                   "Ambiguous cop name `#{name}` used in #{origin} needs " \
+                   'namespace qualifier. Did you mean ' \
+                   "#{found_ns.map { |ns| "#{ns}/#{basename}" }.join(' or ')}"
         end
       end
 
@@ -44,6 +46,12 @@ module RuboCop
                "#{found_ns}"
         end
         "#{found_ns}/#{basename}"
+      end
+
+      private
+
+      def cop_names
+        @cop_names ||= Set.new(map(&:cop_name))
       end
     end
 
@@ -122,6 +130,7 @@ module RuboCop
 
         @offenses = []
         @corrections = []
+        @processed_source = nil
       end
 
       def join_force?(_force_class)
@@ -156,10 +165,9 @@ module RuboCop
       end
 
       def add_offense(node, loc, message = nil, severity = nil)
-        location = loc.is_a?(Symbol) ? node.loc.public_send(loc) : loc
+        location = find_location(node, loc)
 
-        # Don't include the same location twice for one cop.
-        return if @offenses.any? { |o| o.location == location }
+        return if duplicate_location?(location)
 
         severity = custom_severity || severity || default_severity
 
@@ -170,6 +178,15 @@ module RuboCop
 
         @offenses << Offense.new(severity, location, message, name, status)
         yield if block_given? && status != :disabled
+      end
+
+      def find_location(node, loc)
+        # Location can be provided as a symbol, e.g.: `:keyword`
+        loc.is_a?(Symbol) ? node.loc.public_send(loc) : loc
+      end
+
+      def duplicate_location?(location)
+        @offenses.any? { |o| o.location == location }
       end
 
       def correct(node)
@@ -217,7 +234,12 @@ module RuboCop
 
       def style_guide_url
         url = cop_config['StyleGuide']
-        url.nil? || url.empty? ? nil : url
+        return nil if url.nil? || url.empty?
+
+        base_url = config.for_all_cops['StyleGuideBaseURL']
+        return url if base_url.nil? || base_url.empty?
+
+        URI.join(base_url, url).to_s
       end
 
       def reference_url

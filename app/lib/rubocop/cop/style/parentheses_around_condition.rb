@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -29,7 +28,9 @@ module RuboCop
         def process_control_op(node)
           cond, _body = *node
 
-          return unless cond.type == :begin
+          return unless cond.begin_type?
+          # handle `if () ...`
+          return if empty_condition?(cond)
           # handle `if (something rescue something_else) ...`
           return if modifier_op?(cond.children.first)
           # check if there's any whitespace between the keyword and the cond
@@ -42,7 +43,7 @@ module RuboCop
 
         def modifier_op?(node)
           return false if ternary?(node)
-          return true if node.type == :rescue
+          return true if node.rescue_type?
 
           [:if, :while, :until].include?(node.type) &&
             node.loc.end.nil?

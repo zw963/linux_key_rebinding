@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 require 'yaml'
@@ -34,6 +33,8 @@ module RuboCop
         path = File.absolute_path(path)
         hash = load_yaml_configuration(path)
 
+        add_missing_namespaces(path, hash)
+
         resolve_inheritance_from_gems(hash, hash.delete('inherit_gem'))
         resolve_inheritance(path, hash)
         resolve_requires(path, hash)
@@ -45,10 +46,18 @@ module RuboCop
           warn("#{path} - #{deprecation_message}")
         end
 
-        config.add_missing_namespaces
         config.validate
         config.make_excludes_absolute
         config
+      end
+
+      def add_missing_namespaces(path, hash)
+        hash.keys.each do |k|
+          q = Cop::Cop.qualified_cop_name(k, path)
+          next if q == k
+
+          hash[q] = hash.delete(k)
+        end
       end
 
       # Return a recursive merge of two hashes. That is, a normal hash merge,
@@ -66,7 +75,7 @@ module RuboCop
 
       def base_configs(path, inherit_from)
         configs = Array(inherit_from).compact.map do |f|
-          if f =~ /\A#{URI.regexp(%w(http https))}\z/
+          if f =~ /\A#{URI::Parser.new.make_regexp(%w(http https))}\z/
             f = RemoteConfig.new(f, File.dirname(path)).file
           else
             f = File.expand_path(f, File.dirname(path))
@@ -139,8 +148,8 @@ module RuboCop
       end
 
       def load_yaml_configuration(absolute_path)
-        yaml_code = IO.read(absolute_path, encoding: 'UTF-8')
-        hash = yaml_safe_load(yaml_code) || {}
+        yaml_code = IO.read(absolute_path, encoding: Encoding::UTF_8)
+        hash = yaml_safe_load(yaml_code, absolute_path) || {}
 
         puts "configuration from #{absolute_path}" if debug?
 
@@ -151,15 +160,16 @@ module RuboCop
         hash
       end
 
-      def yaml_safe_load(yaml_code)
+      def yaml_safe_load(yaml_code, filename)
         if YAML.respond_to?(:safe_load) # Ruby 2.1+
           if defined?(SafeYAML) && SafeYAML.respond_to?(:load)
-            SafeYAML.load(yaml_code, nil, whitelisted_tags: %w(!ruby/regexp))
+            SafeYAML.load(yaml_code, filename,
+                          whitelisted_tags: %w(!ruby/regexp))
           else
-            YAML.safe_load(yaml_code, [Regexp])
+            YAML.safe_load(yaml_code, [Regexp], [], false, filename)
           end
         else
-          YAML.load(yaml_code)
+          YAML.load(yaml_code, filename)
         end
       end
 
@@ -188,5 +198,8 @@ module RuboCop
         dirs_to_search
       end
     end
+
+    # Initializing class ivars
+    clear_options
   end
 end

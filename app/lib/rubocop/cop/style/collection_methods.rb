@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -23,7 +22,7 @@ module RuboCop
 
         def on_send(node)
           _receiver, _method_name, *args = *node
-          return unless args.size == 1 && args.first.type == :block_pass
+          return unless args.one? && args.first.block_pass_type?
 
           check_method_node(node)
         end

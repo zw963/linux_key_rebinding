@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -41,9 +40,7 @@ module RuboCop
       end
 
       def range_between_tokens(t1, t2)
-        Parser::Source::Range.new(processed_source.buffer,
-                                  t1.pos.end_pos,
-                                  t2.pos.begin_pos)
+        range_between(t1.pos.end_pos, t2.pos.begin_pos)
       end
 
       # Wraps info about the brackets. Makes it easy to check whether a token

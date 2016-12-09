@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -47,12 +46,18 @@ module RuboCop
         def literal_type(node)
           literal = integer_part(node)
 
-          if literal =~ OCTAL_ZERO_ONLY_REGEX && octal_zero_only?
-            return :octal_zero_only
-          elsif literal =~ OCTAL_REGEX && !octal_zero_only?
-            return :octal
-          end
+          octal_literal_type(literal) || hex_bin_dec_literal_type(literal)
+        end
 
+        def octal_literal_type(literal)
+          if literal =~ OCTAL_ZERO_ONLY_REGEX && octal_zero_only?
+            :octal_zero_only
+          elsif literal =~ OCTAL_REGEX && !octal_zero_only?
+            :octal
+          end
+        end
+
+        def hex_bin_dec_literal_type(literal)
           case literal
           when HEX_REGEX
             :hex

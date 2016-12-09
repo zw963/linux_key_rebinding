@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -8,10 +7,10 @@ module RuboCop
       class CaseEquality < Cop
         MSG = 'Avoid the use of the case equality operator `===`.'.freeze
 
-        def on_send(node)
-          _receiver, method_name, *_args = *node
+        def_node_matcher :case_equality?, '(send _ :=== _)'
 
-          add_offense(node, :selector) if method_name == :===
+        def on_send(node)
+          case_equality?(node) { add_offense(node, :selector) }
         end
       end
     end

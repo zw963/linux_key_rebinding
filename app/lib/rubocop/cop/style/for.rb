@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -26,21 +25,25 @@ module RuboCop
           return if block_length(node).zero?
 
           method, _args, _body = *node
-          return unless method.type == :send
+          return unless method.send_type?
 
           _receiver, method_name, *args = *method
           return unless method_name == :each && args.empty?
 
           if style == :for
-            end_pos = method.source_range.end_pos
-            range = Parser::Source::Range.new(processed_source.buffer,
-                                              end_pos - EACH_LENGTH,
-                                              end_pos)
-            add_offense(range, range, 'Prefer `for` over `each`.') do
-              opposite_style_detected
-            end
+            incorrect_style_detected(method)
           else
             correct_style_detected
+          end
+        end
+
+        private
+
+        def incorrect_style_detected(method)
+          end_pos = method.source_range.end_pos
+          range = range_between(end_pos - EACH_LENGTH, end_pos)
+          add_offense(range, range, 'Prefer `for` over `each`.') do
+            opposite_style_detected
           end
         end
       end

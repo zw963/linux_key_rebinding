@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 require 'pathname'
@@ -23,10 +22,10 @@ module RuboCop
       end
 
       def file_finished(file, offenses)
-        unless offenses.empty?
-          path = Pathname.new(file).relative_path_from(Pathname.new(Dir.pwd))
-          @offense_counts[path] = offenses.size
-        end
+        return if offenses.empty?
+
+        path = Pathname.new(file).relative_path_from(Pathname.new(Dir.pwd))
+        @offense_counts[path] = offenses.size
       end
 
       def finished(_inspected_files)

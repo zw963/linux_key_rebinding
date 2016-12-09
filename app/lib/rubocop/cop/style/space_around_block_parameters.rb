@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -92,8 +91,7 @@ module RuboCop
         def check_no_space(space_begin_pos, space_end_pos, msg)
           return if space_begin_pos >= space_end_pos
 
-          range = Parser::Source::Range.new(processed_source.buffer,
-                                            space_begin_pos, space_end_pos)
+          range = range_between(space_begin_pos, space_end_pos)
           add_offense(range, range, "#{msg} block parameter detected.")
         end
 

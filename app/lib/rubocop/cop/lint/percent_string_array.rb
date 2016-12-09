@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -18,13 +17,13 @@ module RuboCop
           'unwanted in the resulting strings.'.freeze
 
         def on_array(node)
-          process(node, *%w(%w %W))
+          process(node, '%w', '%W')
         end
 
         def on_percent_literal(node)
-          if contains_quotes_or_commas?(node)
-            add_offense(node, :expression, MSG)
-          end
+          return unless contains_quotes_or_commas?(node)
+
+          add_offense(node, :expression, MSG)
         end
 
         private
@@ -33,10 +32,10 @@ module RuboCop
           patterns = [/,$/, /^'.*'$/, /^".*"$/]
 
           node.children.any? do |child|
-            literal = child.children.first
+            literal = scrub_string(child.children.first.to_s)
 
             # To avoid likely false positives (e.g. a single ' or ")
-            next if literal.to_s.gsub(/[^\p{Alnum}]/, '').empty?
+            next if literal.gsub(/[^\p{Alnum}]/, '').empty?
 
             patterns.any? { |pat| literal =~ pat }
           end
@@ -52,6 +51,17 @@ module RuboCop
 
               corrector.remove_leading(range, 1) if /^['"]/ =~ range.source
             end
+          end
+        end
+
+        def scrub_string(string)
+          if string.respond_to?(:scrub)
+            string.scrub
+          else
+            string
+              .encode('UTF-16BE', 'UTF-8',
+                      invalid: :replace, undef: :replace, replace: '?')
+              .encode('UTF-8')
           end
         end
       end

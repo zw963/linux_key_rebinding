@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -47,12 +46,11 @@ module RuboCop
 
         def annotation_range(comment, margin, length)
           start = comment.loc.expression.begin_pos + margin.length
-          source_buffer = comment.loc.expression.source_buffer
-          Parser::Source::Range.new(source_buffer, start, start + length)
+          range_between(start, start + length)
         end
 
         def concat_length(*args)
-          args.reduce(0) { |a, e| a + e.to_s.length }
+          args.reduce(0) { |acc, elem| acc + elem.to_s.length }
         end
 
         def correct_annotation?(first_word, colon, space, note)

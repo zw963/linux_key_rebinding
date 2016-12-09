@@ -3533,10 +3533,9 @@ def _reduce_34(val, _values, result)
 end
 
 def _reduce_35(val, _values, result)
-                      result = @builder.op_assign(
-                                  @builder.call_method(
-                                    val[0], val[1], val[2]),
-                                  val[3], val[4])
+                      const  = @builder.const_op_assignable(
+                                  @builder.const_fetch(val[0], val[1], val[2]))
+                      result = @builder.op_assign(const, val[3], val[4])
                     
     result
 end
@@ -5255,7 +5254,11 @@ def _reduce_369(val, _values, result)
 end
 
 def _reduce_370(val, _values, result)
-                      result = val[0].concat(val[1])
+                      if val[1].empty? && val[0].size == 1
+                        result = [@builder.procarg0(val[0][0])]
+                      else
+                        result = val[0].concat(val[1])
+                      end
                     
     result
 end

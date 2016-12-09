@@ -213,10 +213,9 @@ rule
                     }
                 | primary_value tCOLON2 tCONSTANT tOP_ASGN command_call
                     {
-                      result = @builder.op_assign(
-                                  @builder.call_method(
-                                    val[0], val[1], val[2]),
-                                  val[3], val[4])
+                      const  = @builder.const_op_assignable(
+                                  @builder.const_fetch(val[0], val[1], val[2]))
+                      result = @builder.op_assign(const, val[3], val[4])
                     }
                 | primary_value tCOLON2 tIDENTIFIER tOP_ASGN command_call
                     {
@@ -1394,7 +1393,11 @@ opt_block_args_tail:
                     }
                 | f_arg                                                      opt_block_args_tail
                     {
-                      result = val[0].concat(val[1])
+                      if val[1].empty? && val[0].size == 1
+                        result = [@builder.procarg0(val[0][0])]
+                      else
+                        result = val[0].concat(val[1])
+                      end
                     }
                 | f_block_optarg tCOMMA              f_rest_arg              opt_block_args_tail
                     {

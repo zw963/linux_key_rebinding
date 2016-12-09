@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -46,21 +45,28 @@ module RuboCop
         private
 
         def check_slash_literal(node)
-          return if style == :slashes && !contains_disallowed_slash?(node)
-          return if style == :mixed &&
-                    node.single_line? &&
-                    !contains_disallowed_slash?(node)
+          return if allowed_slash_literal?(node)
 
           add_offense(node, :expression, MSG_USE_PERCENT_R)
         end
 
         def check_percent_r_literal(node)
-          return if style == :slashes && contains_disallowed_slash?(node)
-          return if style == :percent_r
-          return if style == :mixed && node.multiline?
-          return if style == :mixed && contains_disallowed_slash?(node)
+          return if allowed_percent_r_literal?(node)
 
           add_offense(node, :expression, MSG_USE_SLASHES)
+        end
+
+        def allowed_slash_literal?(node)
+          style == :slashes && !contains_disallowed_slash?(node) ||
+            style == :mixed && node.single_line? &&
+              !contains_disallowed_slash?(node)
+        end
+
+        def allowed_percent_r_literal?(node)
+          style == :slashes && contains_disallowed_slash?(node) ||
+            style == :percent_r ||
+            style == :mixed && node.multiline? ||
+            style == :mixed && contains_disallowed_slash?(node)
         end
 
         def contains_disallowed_slash?(node)
@@ -76,8 +82,7 @@ module RuboCop
         end
 
         def node_body(node)
-          string_parts = node.children.select { |child| child.type == :str }
-          string_parts.map(&:source).join
+          node.each_child_node(:str).map(&:source).join
         end
 
         def slash_literal?(node)

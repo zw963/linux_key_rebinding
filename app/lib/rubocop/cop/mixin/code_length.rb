@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -15,7 +14,7 @@ module RuboCop
         cop_config['CountComments']
       end
 
-      def check_code_length(node, *_)
+      def check_code_length(node)
         length = code_length(node)
         return unless length > max_length
 

@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -17,6 +16,9 @@ module RuboCop
       # an offense is reported.
       #
       class Copyright < Cop
+        AUTOCORRECT_EMPTY_WARNING = 'An AutocorrectNotice must be defined in' \
+                                    'your RuboCop config'.freeze
+
         def message
           "Include a copyright notice matching /#{notice}/" \
           'before any code.'
@@ -69,18 +71,15 @@ module RuboCop
         end
 
         def autocorrect(token)
-          raise Warning, 'An AutocorrectNotice must be defined in ' \
-            'your RuboCop config' if autocorrect_notice.empty?
+          raise Warning, AUTOCORRECT_EMPTY_WARNING if autocorrect_notice.empty?
           regex = Regexp.new(notice)
-          raise Warning, "AutocorrectNotice '#{autocorrect_notice}' must " \
-            "match Notice /#{notice}/" unless autocorrect_notice =~ regex
+          unless autocorrect_notice =~ regex
+            raise Warning, "AutocorrectNotice '#{autocorrect_notice}' must " \
+                           "match Notice /#{notice}/"
+          end
 
           lambda do |corrector|
-            range = if token.nil?
-                      Parser::Source::Range.new('', 0, 0)
-                    else
-                      token.pos
-                    end
+            range = token.nil? ? range_between(0, 0) : token.pos
             corrector.insert_before(range, "#{autocorrect_notice}\n")
           end
         end

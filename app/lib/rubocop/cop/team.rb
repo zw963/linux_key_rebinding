@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -83,7 +82,7 @@ module RuboCop
           @options[:stdin] = new_source
         else
           filename = buffer.name
-          File.open(filename, 'wb') { |f| f.write(new_source) }
+          File.open(filename, 'w') { |f| f.write(new_source) }
         end
         @updated_source_file = true
       end

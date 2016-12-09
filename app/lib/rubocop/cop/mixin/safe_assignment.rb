@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -9,6 +8,7 @@ module RuboCop
     module SafeAssignment
       extend NodePattern::Macros
 
+      def_node_matcher :empty_condition?, '(begin)'
       def_node_matcher :safe_assignment?,
                        '(begin {equals_asgn? asgn_method_call?})'
 

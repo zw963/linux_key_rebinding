@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -28,23 +27,34 @@ module RuboCop
       class ModuleFunction < Cop
         include ConfigurableEnforcedStyle
 
-        MODULE_FUNCTION_MSG = 'Use `module_function` instead of `extend self`.'
-                              .freeze
-        EXTEND_SELF_MSG = 'Use `extend self` instead of `module_function`.'
-                          .freeze
+        MODULE_FUNCTION_MSG =
+          'Use `module_function` instead of `extend self`.'.freeze
+        EXTEND_SELF_MSG =
+          'Use `extend self` instead of `module_function`.'.freeze
 
-        MODULE_FUNCTION_NODE = s(:send, nil, :module_function)
-        EXTEND_SELF_NODE = s(:send, nil, :extend, s(:self))
+        def_node_matcher :module_function_node?, '(send nil :module_function)'
+        def_node_matcher :extend_self_node?, '(send nil :extend self)'
 
         def on_module(node)
           _name, body = *node
-          return unless body && body.type == :begin
+          return unless body && body.begin_type?
 
-          body.children.each do |body_node|
-            if style == :module_function && body_node == EXTEND_SELF_NODE
-              add_offense(body_node, :expression, MODULE_FUNCTION_MSG)
-            elsif style == :extend_self && body_node == MODULE_FUNCTION_NODE
-              add_offense(body_node, :expression, EXTEND_SELF_MSG)
+          each_wrong_style(body.children) do |child_node, msg|
+            add_offense(child_node, :expression, msg)
+          end
+        end
+
+        private
+
+        def each_wrong_style(nodes)
+          case style
+          when :module_function
+            nodes.each do |node|
+              yield node, MODULE_FUNCTION_MSG if extend_self_node?(node)
+            end
+          when :extend_self
+            nodes.each do |node|
+              yield node, EXTEND_SELF_MSG if module_function_node?(node)
             end
           end
         end

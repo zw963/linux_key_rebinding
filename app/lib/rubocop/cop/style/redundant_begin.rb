@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -31,7 +30,7 @@ module RuboCop
         MSG = 'Redundant `begin` block detected.'.freeze
 
         def on_method_def(_node, _method_name, _args, body)
-          return unless body && body.type == :kwbegin
+          return unless body && body.kwbegin_type?
 
           add_offense(body, :begin)
         end

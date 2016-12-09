@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -48,30 +47,43 @@ module RuboCop
         def message_for_useless_assignment(assignment)
           variable = assignment.variable
 
-          message = format(MSG, variable.name)
+          format(MSG, variable.name) +
+            message_specification(assignment, variable).to_s
+        end
 
+        def message_specification(assignment, variable)
           if assignment.multiple_assignment?
-            message << " Use `_` or `_#{variable.name}` as a variable name " \
-                       "to indicate that it won't be used."
+            multiple_assignment_message(variable.name)
           elsif assignment.operator_assignment?
-            return_value_node = return_value_node_of_scope(variable.scope)
-            if assignment.meta_assignment_node.equal?(return_value_node)
-              non_assignment_operator = assignment.operator.sub(/=$/, '')
-              message << " Use just operator `#{non_assignment_operator}`."
-            end
+            operator_assignment_message(variable.scope, assignment)
           else
-            similar_name = find_similar_name(variable.name, variable.scope)
-            message << " Did you mean `#{similar_name}`?" if similar_name
+            similar_name_message(variable)
           end
+        end
 
-          message
+        def multiple_assignment_message(variable_name)
+          " Use `_` or `_#{variable_name}` as a variable name to indicate " \
+            "that it won't be used."
+        end
+
+        def operator_assignment_message(scope, assignment)
+          return_value_node = return_value_node_of_scope(scope)
+          return unless assignment.meta_assignment_node
+                                  .equal?(return_value_node)
+
+          " Use just operator `#{assignment.operator.sub(/=$/, '')}`."
+        end
+
+        def similar_name_message(variable)
+          similar_name = find_similar_name(variable.name, variable.scope)
+          " Did you mean `#{similar_name}`?" if similar_name
         end
 
         # TODO: More precise handling (rescue, ensure, nested begin, etc.)
         def return_value_node_of_scope(scope)
           body_node = scope.body_node
 
-          if body_node.type == :begin
+          if body_node.begin_type?
             body_node.children.last
           else
             body_node

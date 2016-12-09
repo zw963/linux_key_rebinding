@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -71,32 +70,21 @@ module RuboCop
           }
         }.freeze
 
-        TARGET = s(:send, nil, :lambda)
+        def_node_matcher :lambda_node?, '(block $(send nil :lambda) ...)'
 
         def on_block(node)
-          # We're looking for
-          # (block
-          #   (send nil :lambda)
-          #   ...)
-          block_method, _args, = *node
+          lambda_node?(node) do |block_method|
+            selector = block_method.source
 
-          return unless block_method == TARGET
+            return unless offending_selector?(node, selector)
 
-          check(node)
-        end
-
-        private
-
-        def check(node)
-          block_method, _args, = *node
-
-          selector = block_method.source
-
-          if offending_selector?(node, selector)
-            add_offense(node, block_method.source_range,
+            add_offense(node,
+                        block_method.source_range,
                         message(node, selector))
           end
         end
+
+        private
 
         def offending_selector?(node, selector)
           lines = node.multiline? ? :multiline : :single_line
@@ -166,23 +154,36 @@ module RuboCop
 
         def needs_whitespace?(block_method, args, node)
           selector_end = block_method.loc.selector.end.end_pos
-          args_begin   = args.loc.begin && args.loc.begin.begin_pos
-          args_end     = args.loc.end && args.loc.end.end_pos
           block_begin  = node.loc.begin.begin_pos
-          (block_begin == args_end && selector_end == args_begin) ||
+
+          (block_begin == end_pos(args) && selector_end == begin_pos(args)) ||
             (block_begin == selector_end)
+        end
+
+        def begin_pos(node)
+          node.loc.begin && node.loc.begin.begin_pos
+        end
+
+        def end_pos(node)
+          node.loc.end && node.loc.end.end_pos
         end
 
         def lambda_arg_string(args)
           args.children.map(&:source).join(', ')
         end
 
-        def arg_to_unparenthesized_call?(node)
-          parent = node.parent
+        def arg_to_unparenthesized_call?(arg_node)
+          parent = arg_node.parent
+
+          if parent && parent.pair_type?
+            arg_node = parent.parent
+            parent = arg_node.parent
+          end
+
           return false unless parent && parent.send_type?
           return false if parenthesized_call?(parent)
 
-          node.sibling_index > 1
+          arg_node.sibling_index > 1
         end
 
         def remove_unparenthesized_whitespaces(corrector, node)

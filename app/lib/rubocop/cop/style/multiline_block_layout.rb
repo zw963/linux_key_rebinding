@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -43,19 +42,16 @@ module RuboCop
                   'block start.'.freeze
 
         def on_block(node)
-          end_loc = node.loc.end
-          do_loc = node.loc.begin # Actually it's either do or {.
-          return if do_loc.line == end_loc.line # One-liner, no newline needed.
+          return if oneliner?(node)
 
           # A block node has three children: the block start,
           # the arguments, and the expression. We care if the block start
           # with arguments and the expression start on the same line.
           _block_start, args, last_expression = node.children
+          do_loc = node.loc.begin # Actually it's either do or {.
 
-          unless args.children.empty?
-            if do_loc.line != args.loc.last_line
-              add_offense_for_expression(node, args, ARG_MSG)
-            end
+          if args_on_different_line?(do_loc.line, args)
+            add_offense_for_expression(node, args, ARG_MSG)
           end
 
           return unless last_expression
@@ -64,11 +60,19 @@ module RuboCop
           add_offense_for_expression(node, last_expression, MSG)
         end
 
+        def oneliner?(node)
+          node.loc.begin.line == node.loc.end.line
+        end
+
+        def args_on_different_line?(do_line, args)
+          return false if args.children.empty?
+
+          do_line != args.loc.last_line
+        end
+
         def add_offense_for_expression(node, expr, msg)
           expression = expr.source_range
-          range = Parser::Source::Range.new(expression.source_buffer,
-                                            expression.begin_pos,
-                                            expression.end_pos)
+          range = range_between(expression.begin_pos, expression.end_pos)
 
           add_offense(node, range, msg)
         end
@@ -76,7 +80,7 @@ module RuboCop
         def autocorrect(node)
           lambda do |corrector|
             _method, args, block_body = *node
-            unless args.children.empty? || args.loc.last_line == node.loc.line
+            unless arguments_on_different_line?(node, args)
               autocorrect_arguments(corrector, node, args)
               expr_before_body = args.source_range.end
             end
@@ -90,18 +94,20 @@ module RuboCop
           end
         end
 
+        def arguments_on_different_line?(node, args)
+          args.children.empty? || args.loc.last_line == node.loc.line
+        end
+
         def autocorrect_arguments(corrector, node, args)
           end_pos =
             range_with_surrounding_space(args.source_range, :right, false)
             .end_pos
-          range = Parser::Source::Range.new(args.source_range.source_buffer,
-                                            node.loc.begin.end.begin_pos,
-                                            end_pos)
+          range = range_between(node.loc.begin.end.begin_pos, end_pos)
           corrector.replace(range, " |#{block_arg_string(args)}|")
         end
 
         def autocorrect_body(corrector, node, block_body)
-          first_node = if block_body.type == :begin
+          first_node = if block_body.begin_type?
                          block_body.children.first
                        else
                          block_body

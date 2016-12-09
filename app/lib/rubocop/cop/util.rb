@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 # rubocop:disable Metrics/ModuleLength
 
@@ -25,7 +24,7 @@ module RuboCop
 
       # Match literal regex characters, not including anchors, character
       # classes, alternatives, groups, repetitions, references, etc
-      LITERAL_REGEX = /[\w\s\-,"'!#%&<>=;:`~]|\\[^AbBdDgGhHkpPRwWXsSzZS0-9]/
+      LITERAL_REGEX = /[\w\s\-,"'!#%&<>=;:`~]|\\[^AbBdDgGhHkpPRwWXsSzZ0-9]/
 
       module_function
 
@@ -81,10 +80,7 @@ module RuboCop
         yield sexp if Array(syms).include?(sexp.type)
         return if Array(excludes).include?(sexp.type)
 
-        sexp.children.each do |elem|
-          next unless elem.is_a?(Parser::AST::Node)
-          on_node(syms, elem, excludes, &block)
-        end
+        sexp.each_child_node { |elem| on_node(syms, elem, excludes, &block) }
       end
 
       def source_range(source_buffer, line_number, column, length = 1)
@@ -117,6 +113,10 @@ module RuboCop
         else
           range.column
         end
+      end
+
+      def range_between(start_pos, end_pos)
+        Parser::Source::Range.new(processed_source.buffer, start_pos, end_pos)
       end
 
       def range_with_surrounding_comma(range, side = :both)
@@ -218,10 +218,11 @@ module RuboCop
       # If double quoted string literals are found in Ruby code, and they are
       # not the preferred style, should they be flagged?
       def double_quotes_acceptable?(string)
-        # If a string literal contains hard-to-type characters which would
-        # not appear on a "normal" keyboard, then double-quotes are acceptable
-        needs_escaping?(string) ||
-          string.codepoints.any? { |cp| cp < 32 || cp > 126 }
+        needs_escaping?(string) || hard_to_type?(string)
+      end
+
+      def hard_to_type?(string)
+        string.codepoints.any? { |cp| cp < 32 || cp > 126 }
       end
 
       def needs_escaping?(string)
@@ -233,7 +234,7 @@ module RuboCop
       end
 
       def to_string_literal(string)
-        if needs_escaping?(string)
+        if needs_escaping?(string) && compatible_external_encoding_for?(string)
           string.inspect
         else
           "'#{string.gsub('\\') { '\\\\' }}'"
@@ -246,6 +247,29 @@ module RuboCop
 
       def interpret_string_escapes(string)
         StringInterpreter.interpret(string)
+      end
+
+      def same_line?(n1, n2)
+        n1.respond_to?(:loc) &&
+          n2.respond_to?(:loc) &&
+          n1.loc.line == n2.loc.line
+      end
+
+      def line_distance(n1, n2)
+        n2.loc.line - n1.loc.line
+      end
+
+      def preceed?(n1, n2)
+        line_distance(n1, n2) == 1
+      end
+
+      def stripped_source_upto(line)
+        processed_source[0..line].map(&:strip)
+      end
+
+      def compatible_external_encoding_for?(src)
+        src = src.dup if RUBY_VERSION < '2.3'
+        src.force_encoding(Encoding.default_external).valid_encoding?
       end
     end
   end

@@ -1,4 +1,3 @@
-# encoding: utf-8
 # frozen_string_literal: true
 
 module RuboCop
@@ -36,7 +35,7 @@ module RuboCop
       # false positives.
       #
       class UniqBeforePluck < RuboCop::Cop::Cop
-        MSG = 'Use `%s` before `pluck`'.freeze
+        MSG = 'Use `%s` before `pluck`.'.freeze
         NEWLINE = "\n".freeze
         PATTERN = '[!^block (send (send %s :pluck ...) ${:uniq :distinct} ...)]'
                   .freeze
@@ -72,9 +71,8 @@ module RuboCop
         end
 
         def dot_method_with_whitespace(method, node)
-          Parser::Source::Range.new(node.loc.expression.source_buffer,
-                                    dot_method_begin_pos(method, node),
-                                    node.loc.selector.end_pos)
+          range_between(dot_method_begin_pos(method, node),
+                        node.loc.selector.end_pos)
         end
 
         def dot_method_begin_pos(method, node)
