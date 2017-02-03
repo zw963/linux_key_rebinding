@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby
 
-lib_dir = File.realpath('../lib', __dir__)
-$LOAD_PATH.unshift lib_dir
+$LOAD_PATH.unshift File.expand_path '../../lib', __FILE__
 
 require 'seeing_is_believing/binary'
 exit SeeingIsBelieving::Binary.call(ARGV, $stdin, $stdout, $stderr)
