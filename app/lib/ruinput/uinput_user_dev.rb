@@ -1,6 +1,5 @@
 # -*- coding:utf-8; mode:ruby; -*-
 
-require 'rubygems'
 require 'revdev/each_values_equal'
 
 module Ruinput

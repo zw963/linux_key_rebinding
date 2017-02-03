@@ -3,7 +3,6 @@
 $q ||= false
 $g ||= false
 
-require 'rubygems'
 require 'ruby_parser'
 require 'pp'
 

@@ -1,6 +1,5 @@
 # -*- coding:utf-8; mode:ruby; -*-
 
-require 'rubygems'
 require 'rbindkeys/version'
 require 'rbindkeys/log_utils'
 

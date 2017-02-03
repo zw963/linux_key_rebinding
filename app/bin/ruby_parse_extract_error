@@ -11,7 +11,6 @@ $q ||= ENV["QUIET"]
 $v ||= ENV["V"] || "20"
 $s ||= ENV["SPEED"] || false
 
-require 'rubygems'
 require 'ruby_parser'
 require 'fileutils'
 
