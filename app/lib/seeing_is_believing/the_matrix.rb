@@ -1,4 +1,5 @@
 require_relative 'version'
+require_relative 'safe'
 require_relative 'event_stream/producer'
 
 sib_vars     = Marshal.load ENV["SIB_VARIABLES.MARSHAL.B64"].unpack('m0').first
@@ -11,16 +12,25 @@ $SiB.record_num_lines         sib_vars.fetch(:num_lines)
 $SiB.record_max_line_captures sib_vars.fetch(:max_line_captures)
 
 STDOUT.sync = true
-stdout, stderr = STDOUT, STDERR
+stdout = SeeingIsBelieving::Safe::Stream[STDOUT]
+stderr = SeeingIsBelieving::Safe::Stream[STDERR]
+
 finish = lambda do
   $SiB.finish!
-  event_stream.close
+  SeeingIsBelieving::Safe::Stream[event_stream].close
   stdout.flush
   stderr.flush
 end
 
 real_exec      = method :exec
+real_fork      = method :fork
 real_exit_bang = method :exit!
+fork_defn      = lambda do |*args|
+  result = real_fork.call(*args)
+  $SiB.send :forking_occurred_and_you_are_the_child, event_stream unless result
+  result
+end
+
 Kernel.module_eval do
   private
 
@@ -38,9 +48,24 @@ Kernel.module_eval do
     finish.call
     real_exit_bang.call(status)
   end
+
+  define_method :fork, &fork_defn
 end
 
+Kernel.define_singleton_method  :fork, &fork_defn
+Process.define_singleton_method :fork, &fork_defn
+
+
+# Some things need to just be recorded and readded as they are called from Ruby C code
+symbol_to_s         = Symbol.instance_method(:to_s)
+exception_message   = Exception.instance_method(:message)
+# exception_backtrace = Exception.instance_method(:backtrace)
+
 at_exit do
+  # SeeingIsBelieving::Safe::Exception.define_method :backtrace, exception_backtrace
+  SeeingIsBelieving::Safe::Exception.define_method :message,   exception_message
+  SeeingIsBelieving::Safe::Symbol.define_method    :to_s,      symbol_to_s
+
   exitstatus = ($! ? $SiB.record_exception(nil, $!) : 0)
   finish.call
   real_exit_bang.call(exitstatus) # clears exceptions so they don't print to stderr and change the processes actual exit status (we recorded what it should be)

@@ -1,38 +1,29 @@
 require 'seeing_is_believing/event_stream/events'
+require 'seeing_is_believing/safe'
 require 'thread'
 
 class SeeingIsBelieving
   module EventStream
     class Producer
-
       module NullQueue
         extend self
         def <<(*)   end
         def shift() end
+        # TODO: this one doesn't have clear, but we can call that on the real one.
+        # find a way to test this situation?
       end
 
       attr_accessor :max_line_captures, :filename
 
       def initialize(resultstream)
+        resultstream           = Safe::Stream[resultstream]
         self.filename          = nil
         self.max_line_captures = Float::INFINITY
         self.recorded_results  = []
-        self.queue             = Queue.new
-        self.producer_thread   = Thread.new do
-          begin
-            resultstream.sync = true
-            loop do
-              to_publish = queue.shift
-              break if to_publish == :break
-              resultstream << (to_publish << "\n")
-            end
-          rescue IOError, Errno::EPIPE
-            queue.clear
-          ensure
-            self.queue = NullQueue
-            resultstream.flush rescue nil
-          end
-        end
+        self.queue             = Safe::Queue[Queue.new]
+        self.producer_thread   = Safe::Thread[
+          build_producer_thread(resultstream)
+        ]
       end
 
       attr_reader :version
@@ -54,7 +45,7 @@ class SeeingIsBelieving
       StackErrors = [SystemStackError]
       StackErrors << Java::JavaLang::StackOverflowError if defined?(RUBY_PLATFORM) && RUBY_PLATFORM == 'java'
       def record_result(type, line_number, value)
-        counts = recorded_results[line_number] ||= Hash.new(0)
+        counts = recorded_results[line_number] ||= Safe::Hash.new(0)
         count  = counts[type]
         recorded_results[line_number][type] = count.next
         if count < max_line_captures
@@ -82,21 +73,24 @@ class SeeingIsBelieving
 
       # records the exception, returns the exitstatus for that exception
       def record_exception(line_number, exception)
-        return exception.status if exception.kind_of? SystemExit
+        return exception.status if SystemExit === exception
+        exception = Safe::Exception[exception]
         if !line_number && filename
           begin line_number = exception.backtrace.grep(/#{filename}/).first[/:\d+/][1..-1].to_i
           rescue NoMethodError
           end
         end
         line_number ||= -1
-        queue << [
+        queue << Safe::Array[[
           "exception",
-          line_number,
+          Safe::Fixnum[line_number],
           to_string_token(exception.class.name),
           to_string_token(exception.message),
-          exception.backtrace.size,
-          *exception.backtrace.map { |line| to_string_token line }
-        ].join(" ")
+          Safe::Fixnum[
+            Safe::Array[exception.backtrace].size
+          ],
+          *Safe::Array[exception.backtrace].map { |line| to_string_token line }
+        ]].join(" ")
         1 # exit status
       end
 
@@ -124,8 +118,40 @@ class SeeingIsBelieving
 
       # for a consideration of many different ways of doing this, see 5633064
       def to_string_token(string)
-        [Marshal.dump(string.to_s)].pack('m0')
+        Safe::Array[[Safe::Marshal.dump(Safe::String[string].to_s)]].pack('m0')
       end
+
+      def build_producer_thread(resultstream)
+        ::Thread.new {
+          Safe::Thread.current.abort_on_exception = true
+          begin
+            resultstream.sync = true
+            loop do
+              to_publish = queue.shift
+              break if Safe::Symbol[:break] == to_publish
+              resultstream << (to_publish << "\n")
+            end
+          rescue IOError, Errno::EPIPE
+            queue.clear
+          ensure
+            self.queue = NullQueue
+            resultstream.flush rescue nil
+          end
+        }
+      end
+
+      def forking_occurred_and_you_are_the_child(resultstream)
+        # clear the queue b/c we don't want to report the same lines 2x,
+        # parent process can report them
+        queue << :fork
+        loop { break if queue.shift == :fork }
+
+        # recreate the thread since forking in Ruby kills threads
+        @producer_thread = Safe::Thread[
+          build_producer_thread(resultstream)
+        ]
+      end
+
     end
   end
 end

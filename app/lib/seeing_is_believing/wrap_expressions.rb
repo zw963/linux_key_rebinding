@@ -98,11 +98,17 @@ class SeeingIsBelieving
       case ast.type
       when :args, :redo, :retry, :alias, :undef, :null_node
         # no op
-      when :defs, :class, :module
+      when :defs, :module
         add_to_wrappings ast
         add_children ast, true
       when :rescue, :ensure, :return, :break, :next, :splat, :kwsplat
         add_children ast
+      when :class
+        name,      * = ast.children
+        namespace, * = name.children
+        add_to_wrappings ast
+        wrap_recursive namespace
+        add_children ast, true
       when :if
         if ast.location.kind_of? Parser::Source::Map::Ternary
           add_to_wrappings ast unless ast.children.any? { |child| code.void_value? child }
@@ -196,8 +202,14 @@ class SeeingIsBelieving
           add_to_wrappings ast
         end
         add_children ast
-      when :str, :dstr, :xstr, :regexp
+      when :str
         add_to_wrappings ast
+
+      when :dstr, :regexp
+        add_to_wrappings ast
+        ast.children
+           .select { |child| child.type == :begin }
+           .each { |child| add_children child }
 
       when :hash
         # method arguments might not have braces around them
