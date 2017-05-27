@@ -5,8 +5,6 @@ module RuboCop
     module Style
       # This cop checks for uses if the keyword *not* instead of !.
       class Not < Cop
-        include IfNode
-
         MSG = 'Use `!` instead of `not`.'.freeze
 
         OPPOSITE_METHODS = {
@@ -28,11 +26,10 @@ module RuboCop
 
         def autocorrect(node)
           range = range_with_surrounding_space(node.loc.selector, :right)
-          child = node.children.first
 
-          if opposite_method?(child)
-            correct_opposite_method(range, child)
-          elsif requires_parens?(child)
+          if opposite_method?(node.receiver)
+            correct_opposite_method(range, node.receiver)
+          elsif requires_parens?(node.receiver)
             correct_with_parens(range, node)
           else
             correct_without_parens(range)
@@ -45,7 +42,7 @@ module RuboCop
 
         def requires_parens?(child)
           child.and_type? || child.or_type? || child.binary_operation? ||
-            ternary?(child)
+            child.if_type? && child.ternary?
         end
 
         def correct_opposite_method(range, child)

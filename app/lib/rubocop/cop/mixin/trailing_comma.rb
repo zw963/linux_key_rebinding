@@ -9,7 +9,7 @@ module RuboCop
 
       MSG = '%s comma after the last %s'.freeze
 
-      def parameter_name
+      def style_parameter_name
         'EnforcedStyleForMultiline'
       end
 
@@ -95,8 +95,7 @@ module RuboCop
           # For each argument, if it is a multi-line hash without braces,
           # then promote the hash elements to method arguments
           # for the purpose of determining multi-line-ness.
-          if a.hash_type? && a.loc.first_line != a.loc.last_line &&
-             !brackets?(a)
+          if a.hash_type? && a.multiline? && !a.braces?
             a.children
           else
             a

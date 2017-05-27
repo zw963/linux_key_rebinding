@@ -8,15 +8,27 @@ module RuboCop
       #
       # @example
       #
-      #  def something
-      #    x = Something.new
-      #    x.attr = 5
-      #  end
+      #   # bad
+      #
+      #   def something
+      #     x = Something.new
+      #     x.attr = 5
+      #   end
+      #
+      # @example
+      #
+      #   # good
+      #
+      #   def something
+      #     x = Something.new
+      #     x.attr = 5
+      #     x
+      #   end
       class UselessSetterCall < Cop
         include OnMethodDef
 
         MSG = 'Useless setter call to local variable `%s`.'.freeze
-        ASSIGNMENT_TYPES = [:lvasgn, :ivasgn, :cvasgn, :gvasgn].freeze
+        ASSIGNMENT_TYPES = %i[lvasgn ivasgn cvasgn gvasgn].freeze
 
         private
 

@@ -9,14 +9,27 @@ module RuboCop
       #
       # @example
       #
+      #   # bad
+      #
       #   if 20
       #     do_something
       #   end
+      #
+      # @example
+      #
+      #   # bad
       #
       #   if some_var && true
       #     do_something
       #   end
       #
+      # @example
+      #
+      #   # good
+      #
+      #   if some_var && some_condition
+      #     do_something
+      #   end
       class LiteralInCondition < Cop
         MSG = 'Literal `%s` appeared in a condition.'.freeze
 
@@ -40,14 +53,14 @@ module RuboCop
           check_for_literal(node)
         end
 
-        def on_case(node)
-          cond, *whens, _else = *node
-
-          if cond
-            check_case_cond(cond)
+        def on_case(case_node)
+          if case_node.condition
+            check_case(case_node)
           else
-            whens.each do |when_node|
-              check_for_literal(when_node)
+            case_node.each_when do |when_node|
+              next unless when_node.conditions.all?(&:literal?)
+
+              add_offense(when_node, :expression)
             end
           end
         end
@@ -59,28 +72,15 @@ module RuboCop
         private
 
         def check_for_literal(node)
-          cond, = *node
-
-          # if the cond node is literal we obviously have a problem
-          if cond.literal?
-            add_offense(cond, :expression)
+          if node.condition.literal?
+            add_offense(node.condition, :expression)
           else
-            # alternatively we have to consider a logical node with a
-            # literal argument
-            check_node(cond)
+            check_node(node.condition)
           end
         end
 
-        def not?(node)
-          return false unless node && node.send_type?
-
-          _receiver, method_name, *_args = *node
-
-          method_name == :!
-        end
-
         def basic_literal?(node)
-          if node && node.array_type?
+          if node.array_type?
             primitive_array?(node)
           else
             node.basic_literal?
@@ -94,34 +94,32 @@ module RuboCop
         def check_node(node)
           return unless node
 
-          if not?(node)
+          if node.keyword_bang?
             receiver, = *node
 
             handle_node(receiver)
-          elsif [:and, :or].include?(node.type)
-            *operands = *node
-            operands.each do |op|
-              handle_node(op)
-            end
+          elsif LOGICAL_OPERATOR_NODES.include?(node.type)
+            node.each_child_node { |op| handle_node(op) }
           elsif node.begin_type? && node.children.one?
-            child_node = node.children.first
-            handle_node(child_node)
+            handle_node(node.children.first)
           end
         end
 
         def handle_node(node)
           if node.literal?
             add_offense(node, :expression)
-          elsif [:send, :and, :or, :begin].include?(node.type)
+          elsif %i[send and or begin].include?(node.type)
             check_node(node)
           end
         end
 
-        def check_case_cond(node)
-          return if node.array_type? && !primitive_array?(node)
-          return if node.dstr_type?
+        def check_case(case_node)
+          condition = case_node.condition
 
-          handle_node(node)
+          return if condition.array_type? && !primitive_array?(condition)
+          return if condition.dstr_type?
+
+          handle_node(condition)
         end
       end
     end

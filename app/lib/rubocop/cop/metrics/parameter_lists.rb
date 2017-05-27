@@ -10,13 +10,14 @@ module RuboCop
       class ParameterLists < Cop
         include ConfigurableMax
 
-        MSG = 'Avoid parameter lists longer than %d parameters.'.freeze
+        MSG = 'Avoid parameter lists longer than %d parameters. [%d/%d]'.freeze
 
         def on_args(node)
           count = args_count(node)
           return unless count > max_params
 
-          add_offense(node, :expression, format(MSG, max_params)) do
+          message = format(MSG, max_params, count, max_params)
+          add_offense(node, :expression, message) do
             self.max = count
           end
         end
@@ -27,7 +28,7 @@ module RuboCop
           if count_keyword_args?
             node.children.size
           else
-            node.children.count { |a| ![:kwoptarg, :kwarg].include?(a.type) }
+            node.children.count { |a| !%i[kwoptarg kwarg].include?(a.type) }
           end
         end
 

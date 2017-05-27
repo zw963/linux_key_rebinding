@@ -14,16 +14,30 @@ module RuboCop
         on_method_def(node, method_name, args, body)
       end
 
+      # This method provides scope agnostic method node destructuring by moving
+      # the scope to the end where it can easily be ignored.
+      def method_def_node_parts(node)
+        if node.def_type?
+          method_name, args, body = *node
+        elsif node.defs_type?
+          scope, method_name, args, body = *node
+        else
+          return []
+        end
+
+        [method_name, args, body, scope]
+      end
+
       private
 
       # Returns true for constructs such as
       # private def my_method
       # which are allowed in Ruby 2.1 and later.
       def modifier_and_def_on_same_line?(send_node)
-        send_node.receiver.nil? &&
+        !send_node.receiver &&
           send_node.method_name != :def &&
-          send_node.method_args.size == 1 &&
-          [:def, :defs].include?(send_node.method_args.first.type)
+          send_node.arguments.one? &&
+          %i[def defs].include?(send_node.first_argument.type)
       end
     end
   end

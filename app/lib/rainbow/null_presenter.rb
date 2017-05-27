@@ -6,6 +6,7 @@ module Rainbow
     def background(*values); self; end
     def reset; self; end
     def bright; self; end
+    def faint; self; end
     def italic; self; end
     def underline; self; end
     def blink; self; end
@@ -21,9 +22,19 @@ module Rainbow
     def cyan; self; end
     def white; self; end
 
+    def method_missing(method_name,*args)
+      if Color::X11Named.color_names.include? method_name and args.empty? then
+        self
+      else
+        super
+      end
+    end
+
     alias_method :foreground, :color
     alias_method :fg, :color
     alias_method :bg, :background
+    alias_method :bold, :bright
+    alias_method :dark, :faint
 
   end
 

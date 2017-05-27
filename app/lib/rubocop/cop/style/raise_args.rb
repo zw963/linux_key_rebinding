@@ -23,7 +23,8 @@ module RuboCop
       #   # good
       #   raise StandardError, "message"
       #   fail "message"
-      #   raise RuntimeError.new(arg1, arg2, arg3)
+      #   raise MyCustomError.new(arg1, arg2, arg3)
+      #   raise MyKwArgError.new(key1: val1, key2: val2)
       #
       # @example
       #
@@ -35,7 +36,7 @@ module RuboCop
       #
       #   # good
       #   raise StandardError.new("message")
-      #   raise RuntimeError.new(arg1, arg2, arg3)
+      #   raise MyCustomError.new(arg1, arg2, arg3)
       #   fail "message"
       class RaiseArgs < Cop
         include ConfigurableEnforcedStyle
@@ -59,20 +60,18 @@ module RuboCop
         private
 
         def autocorrect(node)
-          _scope, method, *args = *node
-
           new_exception = if style == :compact
-                            correction_exploded_to_compact(args)
+                            correction_exploded_to_compact(node.arguments)
                           else
-                            correction_compact_to_exploded(args)
+                            correction_compact_to_exploded(node.first_argument)
                           end
-          replacement = "#{method} #{new_exception}"
+          replacement = "#{node.method_name} #{new_exception}"
 
           ->(corrector) { corrector.replace(node.source_range, replacement) }
         end
 
         def correction_compact_to_exploded(node)
-          exception_node, _new, message_node = *node.first
+          exception_node, _new, message_node = *node
 
           message = message_node && message_node.source
 
@@ -91,10 +90,8 @@ module RuboCop
         end
 
         def check_compact(node)
-          _receiver, selector, *args = *node
-
-          if args.size > 1
-            add_offense(node, :expression, message(selector)) do
+          if node.arguments.size > 1
+            add_offense(node, :expression, message(node.method_name)) do
               opposite_style_detected
             end
           else
@@ -103,24 +100,31 @@ module RuboCop
         end
 
         def check_exploded(node)
-          _receiver, selector, *args = *node
+          return correct_style_detected unless node.arguments.one?
 
-          return correct_style_detected unless args.one?
-          arg, = *args
+          first_arg = node.first_argument
 
-          return unless arg.send_type? && arg.loc.selector.is?('new')
-          _receiver, _selector, *constructor_args = *arg
+          return unless first_arg.send_type? && first_arg.method?(:new)
 
-          # Allow code like `raise Ex.new(arg1, arg2)`.
-          return unless constructor_args.size <= 1
+          return if acceptable_exploded_args?(first_arg.arguments)
 
-          # Allow code like `raise Ex.new(*args)`
-          first_arg = constructor_args.first
-          return if first_arg && first_arg.splat_type?
-
-          add_offense(node, :expression, message(selector)) do
+          add_offense(node, :expression, message(node.method_name)) do
             opposite_style_detected
           end
+        end
+
+        def acceptable_exploded_args?(args)
+          # Allow code like `raise Ex.new(arg1, arg2)`.
+          return true if args.size > 1
+
+          # Disallow zero arguments.
+          return false if args.empty?
+
+          arg = args.first
+
+          # Allow code like `raise Ex.new(kw: arg)`.
+          # Allow code like `raise Ex.new(*args)`.
+          arg.hash_type? || arg.splat_type?
         end
 
         def message(method)

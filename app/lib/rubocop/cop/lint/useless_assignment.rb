@@ -12,6 +12,24 @@ module RuboCop
       # Currently this cop has advanced logic that detects unreferenced
       # reassignments and properly handles varied cases such as branch, loop,
       # rescue, ensure, etc.
+      #
+      # @example
+      #
+      #   # bad
+      #
+      #   def some_method
+      #     some_var = 1
+      #     do_something
+      #   end
+      #
+      # @example
+      #
+      #   # good
+      #
+      #   def some_method
+      #     some_var = 1
+      #     do_something(some_var)
+      #   end
       class UselessAssignment < Cop
         include NameSimilarity
         MSG = 'Useless assignment to variable - `%s`.'.freeze
@@ -71,7 +89,8 @@ module RuboCop
           return unless assignment.meta_assignment_node
                                   .equal?(return_value_node)
 
-          " Use just operator `#{assignment.operator.sub(/=$/, '')}`."
+          " Use `#{assignment.operator.sub(/=$/, '')}` " \
+          "instead of `#{assignment.operator}`."
         end
 
         def similar_name_message(variable)

@@ -4,15 +4,6 @@ module RuboCop
   module Cop
     # FIXME
     class Team
-      # If these cops try to autocorrect the same file at the same time,
-      # bad things are liable to happen
-      INCOMPATIBLE_COPS = {
-        Style::SymbolProc => [Style::SpaceBeforeBlockBraces],
-        Style::SpaceBeforeBlockBraces => [Style::SymbolProc],
-        Style::LineEndConcatenation => [Style::UnneededInterpolation],
-        Style::UnneededInterpolation => [Style::LineEndConcatenation]
-      }.freeze
-
       DEFAULT_OPTIONS = {
         auto_correct: false,
         debug: false
@@ -52,7 +43,8 @@ module RuboCop
       end
 
       def cops
-        @cops ||= @cop_classes.select { |c| cop_enabled?(c) }.map do |cop_class|
+        only_options = @options.fetch(:only, [])
+        @cops ||= @cop_classes.enabled(@config, only_options).map do |cop_class|
           cop_class.new(@config, @options)
         end
       end
@@ -123,11 +115,6 @@ module RuboCop
         Investigation.new(offenses, commissioner.errors)
       end
 
-      def cop_enabled?(cop_class)
-        @config.cop_enabled?(cop_class) ||
-          (@options[:only] || []).include?(cop_class.cop_name)
-      end
-
       def autocorrect_all_cops(buffer, cops)
         corrector = Corrector.new(buffer)
         skip = Set.new
@@ -136,8 +123,7 @@ module RuboCop
           next if cop.corrections.empty?
           next if skip.include?(cop.class)
           corrector.corrections.concat(cop.corrections)
-          incompatible = INCOMPATIBLE_COPS[cop.class]
-          skip.merge(incompatible) if incompatible
+          skip.merge(cop.class.autocorrect_incompatible_with)
         end
 
         if !corrector.corrections.empty?
@@ -155,27 +141,32 @@ module RuboCop
 
       def process_commissioner_errors(file, file_errors)
         file_errors.each do |cop, errors|
-          errors.each do |e|
+          errors.each do |cop_error|
+            e = cop_error.error
+            line = ":#{cop_error.line}" if cop_error.line
+            column = ":#{cop_error.column}" if cop_error.column
+            location = "#{file}#{line}#{column}"
+
             if e.is_a?(Warning)
-              handle_warning(e,
-                             Rainbow("#{e.message} (from file: " \
-                             "#{file})").yellow)
+              handle_warning(e, location)
             else
-              handle_error(e,
-                           Rainbow("An error occurred while #{cop.name}" \
-                           " cop was inspecting #{file}.").red)
+              handle_error(e, location, cop)
             end
           end
         end
       end
 
-      def handle_warning(e, message)
+      def handle_warning(e, location)
+        message = Rainbow("#{e.message} (from file: #{location})").yellow
+
         @warnings << message
         warn message
         puts e.backtrace if debug?
       end
 
-      def handle_error(e, message)
+      def handle_error(e, location, cop)
+        message = Rainbow("An error occurred while #{cop.name}" \
+                           " cop was inspecting #{location}.").red
         @errors << message
         warn message
         if debug?

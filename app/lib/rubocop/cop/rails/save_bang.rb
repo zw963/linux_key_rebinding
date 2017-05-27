@@ -44,9 +44,10 @@ module RuboCop
         CREATE_CONDITIONAL_MSG = '`%s` returns a model which is always truthy.'
                                  .freeze
 
-        CREATE_PERSIST_METHODS = [:create,
-                                  :first_or_create, :find_or_create_by].freeze
-        MODIFY_PERSIST_METHODS = [:save, :update, :destroy].freeze
+        CREATE_PERSIST_METHODS = %i[create
+                                    first_or_create find_or_create_by].freeze
+        MODIFY_PERSIST_METHODS = %i[save
+                                    update update_attributes destroy].freeze
         PERSIST_METHODS = (CREATE_PERSIST_METHODS +
                            MODIFY_PERSIST_METHODS).freeze
 
@@ -106,9 +107,14 @@ module RuboCop
 
         def persisted_referenced?(assignment)
           return unless assignment.referenced?
+
           assignment.variable.references.any? do |reference|
-            reference.node.parent.method_name == :persisted?
+            call_to_persisted?(reference.node.parent)
           end
+        end
+
+        def call_to_persisted?(node)
+          node.send_type? && node.method?(:persisted?)
         end
 
         def check_used_in_conditional(node)
@@ -129,8 +135,7 @@ module RuboCop
         end
 
         def last_call_of_method?(node)
-          !node.parent.nil? &&
-            node.parent.children.count == node.sibling_index + 1
+          node.parent && node.parent.children.size == node.sibling_index + 1
         end
 
         # Ignore simple assignment or if condition
@@ -143,11 +148,11 @@ module RuboCop
 
         # Check argument signature as no arguments or one hash
         def expected_signature?(node)
-          node.method_args.empty? ||
-            (node.method_args.length == 1 &&
+          !node.arguments? ||
+            (node.arguments.one? &&
               node.method_name != :destroy &&
-              (node.method_args.first.hash_type? ||
-              !node.method_args.first.literal?))
+              (node.first_argument.hash_type? ||
+              !node.first_argument.literal?))
         end
       end
     end

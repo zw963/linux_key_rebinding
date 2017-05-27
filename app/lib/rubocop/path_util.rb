@@ -14,12 +14,28 @@ module RuboCop
       path_name.relative_path_from(Pathname.new(base_dir)).to_s
     end
 
+    def smart_path(path)
+      # Ideally, we calculate this relative to the project root.
+      base_dir = Dir.pwd
+
+      if path.start_with? base_dir
+        relative_path(path, base_dir)
+      else
+        path
+      end
+    end
+
     def match_path?(pattern, path)
       case pattern
       when String
         File.fnmatch?(pattern, path, File::FNM_PATHNAME)
       when Regexp
-        path =~ pattern
+        begin
+          path =~ pattern
+        rescue ArgumentError => e
+          return false if e.message.start_with?('invalid byte sequence')
+          raise e
+        end
       end
     end
 

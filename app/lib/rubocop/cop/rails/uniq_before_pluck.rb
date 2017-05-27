@@ -15,11 +15,11 @@ module RuboCop
       #   # good
       #   Model.uniq.pluck(:id)
       #
-      # This cop has two different enforcement modes. When the EnforcedMode
+      # This cop has two different enforcement modes. When the EnforcedStyle
       # is conservative (the default) then only calls to pluck on a constant
       # (i.e. a model class) before uniq are added as offenses.
       #
-      # When the EnforcedMode is aggressive then all calls to pluck before
+      # When the EnforcedStyle is aggressive then all calls to pluck before
       # uniq are added as offenses. This may lead to false positives as the cop
       # cannot distinguish between calls to pluck on an ActiveRecord::Relation
       # vs a call to pluck on an ActiveRecord::Associations::CollectionProxy.
@@ -35,6 +35,8 @@ module RuboCop
       # false positives.
       #
       class UniqBeforePluck < RuboCop::Cop::Cop
+        include ConfigurableEnforcedStyle
+
         MSG = 'Use `%s` before `pluck`.'.freeze
         NEWLINE = "\n".freeze
         PATTERN = '[!^block (send (send %s :pluck ...) ${:uniq :distinct} ...)]'
@@ -47,7 +49,7 @@ module RuboCop
                          format(PATTERN, '_')
 
         def on_send(node)
-          method = if mode == :conservative
+          method = if style == :conservative
                      conservative_node_match(node)
                    else
                      aggressive_node_match(node)
@@ -57,17 +59,18 @@ module RuboCop
         end
 
         def autocorrect(node)
-          send_pluck, method, *_args = *node
           lambda do |corrector|
+            method = node.method_name
+
             corrector.remove(dot_method_with_whitespace(method, node))
-            corrector.insert_before(send_pluck.loc.dot.begin, ".#{method}")
+            corrector.insert_before(node.receiver.loc.dot.begin, ".#{method}")
           end
         end
 
         private
 
-        def mode
-          @mode ||= cop_config['EnforcedMode'].to_sym
+        def style_parameter_name
+          'EnforcedStyle'
         end
 
         def dot_method_with_whitespace(method, node)

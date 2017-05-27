@@ -14,51 +14,46 @@ module RuboCop
       #
       # @example
       #
+      #   # bad
+      #
       #   if day.is? :tuesday && month == :jan
       #     ...
       #   end
+      #
+      # @example
+      #
+      #   # good
+      #
+      #   if day.is?(:tuesday) && month == :jan
       class RequireParentheses < Cop
-        include IfNode
-
         MSG = 'Use parentheses in the method call to avoid confusion about ' \
               'precedence.'.freeze
 
         def on_send(node)
-          _receiver, method_name, *args = *node
+          return if !node.arguments? || node.parenthesized?
 
-          return if parentheses?(node)
-          return if args.empty?
-
-          if ternary?(args.first)
-            check_ternary(args.first, node)
-          elsif predicate?(method_name)
-            # We're only checking predicate methods. There would be false
-            # positives otherwise.
-            check_send(args.last, node)
+          if node.first_argument.if_type? && node.first_argument.ternary?
+            check_ternary(node.first_argument, node)
+          elsif node.predicate_method?
+            check_predicate(node.last_argument, node)
           end
         end
 
         private
 
-        def check_ternary(arg, node)
-          condition, = *arg
-          return unless offense?(condition)
+        def check_ternary(ternary, node)
+          return unless ternary.condition.operator_keyword?
 
-          expr = node.source_range
-          range = range_between(expr.begin_pos, condition.source_range.end_pos)
+          range = range_between(node.source_range.begin_pos,
+                                ternary.condition.source_range.end_pos)
+
           add_offense(range, range)
         end
 
-        def check_send(arg, node)
-          add_offense(node, :expression) if offense?(arg)
-        end
+        def check_predicate(predicate, node)
+          return unless predicate.operator_keyword?
 
-        def predicate?(method_name)
-          method_name.to_s.end_with?('?')
-        end
-
-        def offense?(node)
-          [:and, :or].include?(node.type)
+          add_offense(node, :expression)
         end
       end
     end

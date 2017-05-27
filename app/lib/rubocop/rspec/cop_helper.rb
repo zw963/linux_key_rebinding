@@ -7,6 +7,8 @@ module CopHelper
   extend RSpec::SharedContext
 
   let(:ruby_version) { 2.2 }
+  let(:enabled_rails) { false }
+  let(:rails_version) { false }
 
   def inspect_source_file(cop, source)
     Tempfile.open('tmp') { |f| inspect_source(cop, source, f) }
@@ -51,6 +53,15 @@ module CopHelper
     corrector =
       RuboCop::Cop::Corrector.new(processed_source.buffer, cop.corrections)
     corrector.rewrite
+  end
+
+  def autocorrect_source_with_loop(cop, source, file = nil)
+    loop do
+      cop.instance_variable_set(:@corrections, [])
+      new_source = autocorrect_source(cop, source, file)
+      return new_source if new_source == source
+      source = new_source
+    end
   end
 
   def _investigate(cop, processed_source)

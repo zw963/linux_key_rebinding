@@ -1,60 +1,9 @@
 # frozen_string_literal: true
+
 require 'uri'
 
 module RuboCop
   module Cop
-    class AmbiguousCopName < RuboCop::Error; end
-
-    # Store for all cops with helper functions
-    class CopStore < ::Array
-      # @return [Array<String>] list of types for current cops.
-      def types
-        @types ||= map(&:cop_type).uniq!
-      end
-
-      # @return [Array<Cop>] Cops for that specific type.
-      def with_type(type)
-        CopStore.new(select { |c| c.cop_type == type })
-      end
-
-      # @return [Array<Cop>] Cops not for a specific type.
-      def without_type(type)
-        CopStore.new(reject { |c| c.cop_type == type })
-      end
-
-      def qualified_cop_name(name, origin)
-        return name if cop_names.include?(name)
-
-        basename = File.basename(name)
-        found_ns = types.map(&:capitalize).select do |ns|
-          cop_names.include?("#{ns}/#{basename}")
-        end
-
-        case found_ns.size
-        when 0 then name # No namespace found. Deal with it later in caller.
-        when 1 then cop_name_with_namespace(name, origin, basename, found_ns[0])
-        else raise AmbiguousCopName,
-                   "Ambiguous cop name `#{name}` used in #{origin} needs " \
-                   'namespace qualifier. Did you mean ' \
-                   "#{found_ns.map { |ns| "#{ns}/#{basename}" }.join(' or ')}"
-        end
-      end
-
-      def cop_name_with_namespace(name, origin, basename, found_ns)
-        if name != basename && found_ns != File.dirname(name).to_sym
-          warn "#{origin}: #{name} has the wrong namespace - should be " \
-               "#{found_ns}"
-        end
-        "#{found_ns}/#{basename}"
-      end
-
-      private
-
-      def cop_names
-        @cop_names ||= Set.new(map(&:cop_name))
-      end
-    end
-
     # A scaffold for concrete cops.
     #
     # The Cop class is meant to be extended.
@@ -75,9 +24,9 @@ module RuboCop
     #     end
     #   end
     class Cop
-      extend RuboCop::Sexp
+      extend RuboCop::AST::Sexp
       extend NodePattern::Macros
-      include RuboCop::Sexp
+      include RuboCop::AST::Sexp
       include Util
       include IgnoredNode
       include AutocorrectLogic
@@ -85,34 +34,42 @@ module RuboCop
       attr_reader :config, :offenses, :corrections
       attr_accessor :processed_source # TODO: Bad design.
 
-      @all = CopStore.new
+      @registry = Registry.new
+
+      class << self
+        attr_reader :registry
+      end
 
       def self.all
-        @all.without_type(:test)
+        registry.without_department(:Test).cops
       end
 
       def self.qualified_cop_name(name, origin)
-        @all.qualified_cop_name(name, origin)
+        registry.qualified_cop_name(name, origin)
       end
 
       def self.non_rails
-        all.without_type(:rails)
+        registry.without_department(:Rails)
       end
 
       def self.inherited(subclass)
-        @all << subclass
+        registry.enlist(subclass)
+      end
+
+      def self.badge
+        @badge ||= Badge.for(name)
       end
 
       def self.cop_name
-        @cop_name ||= name.split('::').last(2).join('/')
+        badge.to_s
       end
 
-      def self.cop_type
-        @cop_type ||= name.split('::')[-2].downcase.to_sym
+      def self.department
+        badge.department
       end
 
       def self.lint?
-        cop_type == :lint
+        department == :Lint
       end
 
       # Returns true if the cop name or the cop namespace matches any of the
@@ -121,7 +78,17 @@ module RuboCop
         return false unless given_names
 
         given_names.include?(cop_name) ||
-          given_names.include?(cop_type.to_s.capitalize)
+          given_names.include?(department.to_s)
+      end
+
+      # List of cops that should not try to autocorrect at the same
+      # time as this cop
+      #
+      # @return [Array<RuboCop::Cop::Cop>]
+      #
+      # @api public
+      def self.autocorrect_incompatible_with
+        []
       end
 
       def initialize(config = nil, options = nil)
@@ -141,25 +108,6 @@ module RuboCop
         @cop_config ||= @config.for_cop(self)
       end
 
-      def debug?
-        @options[:debug]
-      end
-
-      def display_cop_names?
-        debug? || @options[:display_cop_names] ||
-          @config.for_all_cops['DisplayCopNames']
-      end
-
-      def display_style_guide?
-        (style_guide_url || reference_url) &&
-          (@options[:display_style_guide] ||
-            config.for_all_cops['DisplayStyleGuide'])
-      end
-
-      def extra_details?
-        @options[:extra_details] || config.for_all_cops['ExtraDetails']
-      end
-
       def message(_node = nil)
         self.class::MSG
       end
@@ -172,7 +120,7 @@ module RuboCop
         severity = custom_severity || severity || default_severity
 
         message ||= message(node)
-        message = annotate_message(message)
+        message = annotate(message)
 
         status = enabled_line?(location.line) ? correct(node) : :disabled
 
@@ -213,6 +161,10 @@ module RuboCop
         @config.target_ruby_version
       end
 
+      def target_rails_version
+        @config.target_rails_version
+      end
+
       def parse(source, path = nil)
         ProcessedSource.new(source, target_ruby_version, path)
       end
@@ -232,36 +184,12 @@ module RuboCop
         !relevant_file?(file)
       end
 
-      def style_guide_url
-        url = cop_config['StyleGuide']
-        return nil if url.nil? || url.empty?
-
-        base_url = config.for_all_cops['StyleGuideBaseURL']
-        return url if base_url.nil? || base_url.empty?
-
-        URI.join(base_url, url).to_s
-      end
-
-      def reference_url
-        url = cop_config['Reference']
-        url.nil? || url.empty? ? nil : url
-      end
-
-      def details
-        details = cop_config && cop_config['Details']
-        details.nil? || details.empty? ? nil : details
-      end
-
       private
 
-      def annotate_message(message)
-        message = "#{name}: #{message}" if display_cop_names?
-        message += " #{details}" if extra_details?
-        if display_style_guide?
-          links = [style_guide_url, reference_url].compact.join(', ')
-          message = "#{message} (#{links})"
-        end
-        message
+      def annotate(message)
+        RuboCop::Cop::MessageAnnotator.new(
+          config, cop_config, @options
+        ).annotate(message, name)
       end
 
       def file_name_matches_any?(file, parameter, default_result)

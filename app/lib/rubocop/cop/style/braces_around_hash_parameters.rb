@@ -5,48 +5,81 @@ module RuboCop
     module Style
       # This cop checks for braces around the last parameter in a method call
       # if the last parameter is a hash.
+      # It supports 3 styles:
+      #
+      # * The `braces` style enforces braces around all method
+      # parameters that are hashes.
+      #
+      # @example
+      #   # bad
+      #   some_method(x, y, a: 1, b: 2)
+      #
+      #   # good
+      #   some_method(x, y, {a: 1, b: 2})
+      #
+      # * The `no_braces` style checks that the last parameter doesn't
+      # have braces around it.
+      #
+      # @example
+      #   # bad
+      #   some_method(x, y, {a: 1, b: 2})
+      #
+      #   # good
+      #   some_method(x, y, a: 1, b: 2)
+      #
+      # * The `context_dependent` style checks that the last parameter
+      # doesn't have braces around it, but requires braces if the
+      # second to last parameter is also a hash literal.
+      #
+      # @example
+      #   # bad
+      #   some_method(x, y, {a: 1, b: 2})
+      #   some_method(x, y, {a: 1, b: 2}, a: 1, b: 2)
+      #
+      #   # good
+      #   some_method(x, y, a: 1, b: 2)
+      #   some_method(x, y, {a: 1, b: 2}, {a: 1, b: 2})
       class BracesAroundHashParameters < Cop
         include ConfigurableEnforcedStyle
 
         MSG = '%s curly braces around a hash parameter.'.freeze
 
         def on_send(node)
-          _receiver, method_name, *args = *node
+          return if node.assignment_method? || node.operator_method?
 
-          # Discard attr writer methods.
-          return if node.asgn_method_call?
-          # Discard operator methods.
-          return if operator?(method_name)
+          return unless node.arguments? && node.last_argument.hash_type? &&
+                        !node.last_argument.empty?
 
-          # We care only for the last argument.
-          arg = args.last
-
-          check(arg, args) if non_empty_hash?(arg)
+          check(node.last_argument, node.arguments)
         end
 
         private
 
         def check(arg, args)
-          if style == :braces && !braces?(arg)
-            add_offense(arg.parent, arg.source_range, format(MSG, 'Missing'))
-          elsif style == :no_braces && braces?(arg)
-            add_offense(arg.parent, arg.source_range,
-                        format(MSG, 'Redundant'))
+          if style == :braces && !arg.braces?
+            add_arg_offense(arg, :missing)
+          elsif style == :no_braces && arg.braces?
+            add_arg_offense(arg, :redundant)
           elsif style == :context_dependent
             check_context_dependent(arg, args)
           end
         end
 
         def check_context_dependent(arg, args)
-          braces_around_second_from_end = args.length > 1 && args[-2].hash_type?
-          if braces?(arg)
+          braces_around_second_from_end = args.size > 1 && args[-2].hash_type?
+
+          if arg.braces?
             unless braces_around_second_from_end
-              add_offense(arg.parent, arg.source_range,
-                          format(MSG, 'Redundant'))
+              add_arg_offense(arg, :redundant)
             end
           elsif braces_around_second_from_end
-            add_offense(arg.parent, arg.source_range, format(MSG, 'Missing'))
+            add_arg_offense(arg, :missing)
           end
+        end
+
+        def add_arg_offense(arg, type)
+          add_offense(arg.parent, arg.source_range,
+                      format(MSG, type.to_s.capitalize))
         end
 
         # We let AutocorrectUnlessChangingAST#autocorrect work with the send
@@ -54,13 +87,13 @@ module RuboCop
         # the AST has changed, a braceless hash would not be parsed as a hash
         # otherwise.
         def autocorrect(send_node)
-          _receiver, _method_name, *args = *send_node
-          node = args.last
+          hash_node = send_node.last_argument
+
           lambda do |corrector|
-            if braces?(node)
-              remove_braces_with_whitespace(corrector, node)
+            if hash_node.braces?
+              remove_braces_with_whitespace(corrector, hash_node)
             else
-              add_braces(corrector, node)
+              add_braces(corrector, hash_node)
             end
           end
         end
@@ -98,14 +131,6 @@ module RuboCop
         def add_braces(corrector, node)
           corrector.insert_before(node.source_range, '{')
           corrector.insert_after(node.source_range, '}')
-        end
-
-        def non_empty_hash?(arg)
-          arg && arg.hash_type? && !arg.children.empty?
-        end
-
-        def braces?(arg)
-          arg.loc.begin
         end
       end
     end

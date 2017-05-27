@@ -12,13 +12,22 @@ module Rainbow
       color = values.size == 1 ? values.first : values
 
       case color
-      when Fixnum
+      # NOTE: Properly handle versions before/after Ruby 2.4.0.
+      # Ruby 2.4+ unifies Fixnum & Bignum into Integer.
+      # However previous versions would still use Fixnum.
+      # To avoid missing `Fixnum` input, call `0.class` which would
+      # return either `Integer` or `Fixnum`.
+      when 0.class
         Indexed.new(ground, color)
       when Symbol
         if Named.color_names.include?(color)
           Named.new(ground, color)
-        else X11Named.color_names.include?(color)
+        elsif X11Named.color_names.include?(color)
           X11Named.new(ground, color)
+        else
+          fail ArgumentError,
+            "Unknown color name, valid names: " +
+            (Named.color_names + X11Named.color_names).join(', ')
         end
       when Array
         RGB.new(ground, *color)

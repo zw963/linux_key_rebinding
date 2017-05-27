@@ -33,13 +33,21 @@ module RuboCop
         path = File.absolute_path(path)
         hash = load_yaml_configuration(path)
 
+        # Resolve requires first in case they define additional cops
+        resolve_requires(path, hash)
+
         add_missing_namespaces(path, hash)
+        target_ruby_version_to_f!(hash)
 
         resolve_inheritance_from_gems(hash, hash.delete('inherit_gem'))
         resolve_inheritance(path, hash)
-        resolve_requires(path, hash)
 
         hash.delete('inherit_from')
+
+        create_config(hash, path)
+      end
+
+      def create_config(hash, path)
         config = Config.new(hash, path)
 
         config.deprecation_check do |deprecation_message|
@@ -75,7 +83,7 @@ module RuboCop
 
       def base_configs(path, inherit_from)
         configs = Array(inherit_from).compact.map do |f|
-          if f =~ /\A#{URI::Parser.new.make_regexp(%w(http https))}\z/
+          if f =~ /\A#{URI::Parser.new.make_regexp(%w[http https])}\z/
             f = RemoteConfig.new(f, File.dirname(path)).file
           else
             f = File.expand_path(f, File.dirname(path))
@@ -123,23 +131,54 @@ module RuboCop
       # Merges the given configuration with the default one. If
       # AllCops:DisabledByDefault is true, it changes the Enabled params so
       # that only cops from user configuration are enabled.
+      # If AllCops::EnabledByDefault is true, it changes the Enabled params
+      # so that only cops explicitly disabled in user configuration are
+      # disabled.
       def merge_with_default(config, config_file)
-        configs =
-          if config.for_all_cops['DisabledByDefault']
-            disabled_default = transform(default_configuration) do |params|
-              params.merge('Enabled' => false) # Overwrite with false.
-            end
-            enabled_user_config = transform(config) do |params|
-              { 'Enabled' => true }.merge(params) # Set true if not set.
-            end
-            [disabled_default, enabled_user_config]
-          else
-            [default_configuration, config]
+        default_configuration = self.default_configuration
+
+        disabled_by_default = config.for_all_cops['DisabledByDefault']
+        enabled_by_default = config.for_all_cops['EnabledByDefault']
+
+        if disabled_by_default || enabled_by_default
+          default_configuration = transform(default_configuration) do |params|
+            params.merge('Enabled' => !disabled_by_default)
           end
-        Config.new(merge(configs.first, configs.last), config_file)
+        end
+
+        if disabled_by_default
+          config = handle_disabled_by_default(config, default_configuration)
+        end
+
+        Config.new(merge(default_configuration, config), config_file)
+      end
+
+      def target_ruby_version_to_f!(hash)
+        version = 'TargetRubyVersion'
+        return unless hash['AllCops'] && hash['AllCops'][version]
+
+        hash['AllCops'][version] = hash['AllCops'][version].to_f
       end
 
       private
+
+      def handle_disabled_by_default(config, new_default_configuration)
+        department_config = config.to_hash.reject { |cop| cop.include?('/') }
+        department_config.each do |dept, dept_params|
+          next unless dept_params['Enabled']
+
+          new_default_configuration.each do |cop, params|
+            next unless cop.start_with?(dept + '/')
+
+            # Retain original default configuration for cops in the department.
+            params['Enabled'] = default_configuration[cop]['Enabled']
+          end
+        end
+
+        transform(config) do |params|
+          { 'Enabled' => true }.merge(params) # Set true if not set.
+        end
+      end
 
       # Returns a new hash where the parameters of the given config hash have
       # been replaced by parameters returned by the given block.
@@ -164,12 +203,12 @@ module RuboCop
         if YAML.respond_to?(:safe_load) # Ruby 2.1+
           if defined?(SafeYAML) && SafeYAML.respond_to?(:load)
             SafeYAML.load(yaml_code, filename,
-                          whitelisted_tags: %w(!ruby/regexp))
+                          whitelisted_tags: %w[!ruby/regexp])
           else
-            YAML.safe_load(yaml_code, [Regexp], [], false, filename)
+            YAML.safe_load(yaml_code, [Regexp, Symbol], [], false, filename)
           end
         else
-          YAML.load(yaml_code, filename)
+          YAML.load(yaml_code, filename) # rubocop:disable Security/YAMLLoad
         end
       end
 

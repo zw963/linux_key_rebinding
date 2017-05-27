@@ -4,17 +4,19 @@ module RuboCop
   module Cop
     module Metrics
       # This cop checks for excessive nesting of conditional and looping
-      # constructs. Despite the cop's name, blocks are not considered as an
-      # extra level of nesting.
+      # constructs.
+      #
+      # You can configure if blocks are considered using the `CountBlocks`
+      # option. When set to `false` (the default) blocks are not counted
+      # towards the nesting level. Set to `true` to count blocks as well.
       #
       # The maximum level of nesting allowed is configurable.
       class BlockNesting < Cop
         include ConfigurableMax
-        include IfNode
 
-        NESTING_BLOCKS = [
-          :case, :if, :while, :while_post,
-          :until, :until_post, :for, :resbody
+        NESTING_BLOCKS = %i[
+          case if while while_post
+          until until_post for resbody
         ].freeze
 
         def investigate(processed_source)
@@ -26,8 +28,8 @@ module RuboCop
         private
 
         def check_nesting_level(node, max, current_level)
-          if NESTING_BLOCKS.include?(node.type)
-            current_level += 1 unless elsif?(node)
+          if consider_node?(node)
+            current_level += 1 unless node.if_type? && node.elsif?
             if current_level > max
               self.max = current_level
               unless part_of_ignored_node?(node)
@@ -43,8 +45,18 @@ module RuboCop
           end
         end
 
+        def consider_node?(node)
+          return true if NESTING_BLOCKS.include?(node.type)
+
+          count_blocks? && node.block_type?
+        end
+
         def message(max)
           "Avoid more than #{max} levels of block nesting."
+        end
+
+        def count_blocks?
+          cop_config['CountBlocks']
         end
       end
     end

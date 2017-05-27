@@ -3,13 +3,11 @@
 module RuboCop
   # This module holds the RuboCop version information.
   module Version
-    STRING = '0.46.0'.freeze
+    STRING = '0.49.0'.freeze
 
     MSG = '%s (using Parser %s, running on %s %s %s)'.freeze
 
-    module_function
-
-    def version(debug = false)
+    def self.version(debug = false)
       if debug
         format(MSG, STRING, Parser::VERSION,
                RUBY_ENGINE, RUBY_VERSION, RUBY_PLATFORM)

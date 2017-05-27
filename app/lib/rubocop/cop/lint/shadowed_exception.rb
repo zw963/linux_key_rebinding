@@ -8,7 +8,9 @@ module RuboCop
       # exception is rescued.
       #
       # @example
+      #
       #   # bad
+      #
       #   begin
       #     something
       #   rescue Exception
@@ -17,7 +19,10 @@ module RuboCop
       #     handle_standard_error
       #   end
       #
+      # @example
+      #
       #   # good
+      #
       #   begin
       #     something
       #   rescue StandardError
@@ -26,6 +31,8 @@ module RuboCop
       #     handle_exception
       #   end
       class ShadowedException < Cop
+        include RescueNode
+
         MSG = 'Do not shadow rescued Exceptions.'.freeze
 
         def on_rescue(node)
@@ -61,12 +68,6 @@ module RuboCop
                     end
 
           range_between(first_rescue.loc.expression.begin_pos, end_pos)
-        end
-
-        def rescue_modifier?(node)
-          node && node.rescue_type? &&
-            (node.parent.nil? || !(node.parent.kwbegin_type? ||
-             node.parent.ensure_type?))
         end
 
         def contains_multiple_levels_of_exceptions?(group)
@@ -111,7 +112,7 @@ module RuboCop
           end
         end
 
-        # @param [RuboCop::Node] rescue_group is a node of array_type
+        # @param [RuboCop::AST::Node] rescue_group is a node of array_type
         def rescued_exceptions(rescue_group)
           klasses = *rescue_group
           klasses.map do |klass|

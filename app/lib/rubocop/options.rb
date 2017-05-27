@@ -6,7 +6,7 @@ require 'shellwords'
 module RuboCop
   # This class handles command line options.
   class Options
-    EXITING_OPTIONS = [:version, :verbose_version, :show_cops].freeze
+    EXITING_OPTIONS = %i[version verbose_version show_cops].freeze
     DEFAULT_MAXIMUM_EXCLUSION_ITEMS = 15
 
     def initialize
@@ -23,8 +23,16 @@ module RuboCop
 
       @validator.validate_compatibility
 
-      if @options[:stdin] && !args.one?
-        raise ArgumentError, '-s/--stdin requires exactly one path.'
+      if @options[:stdin]
+        # The parser has put the file name given after --stdin into
+        # @options[:stdin]. The args array should be empty.
+        if args.any?
+          raise ArgumentError, '-s/--stdin requires exactly one path.'
+        end
+        # We want the STDIN contents in @options[:stdin] and the file name in
+        # args to simplify the rest of the processing.
+        args = [@options[:stdin]]
+        @options[:stdin] = $stdin.binmode.read
       end
 
       [@options, args]
@@ -58,6 +66,8 @@ module RuboCop
         add_severity_option(opts)
         add_flags_with_optional_args(opts)
         add_boolean_flags(opts)
+
+        option(opts, '-s', '--stdin FILE')
       end
     end
 
@@ -142,11 +152,11 @@ module RuboCop
       end
       option(opts, '-a', '--auto-correct')
 
-      option(opts, '-n', '--[no-]color') { |c| @options[:color] = c }
+      option(opts, '--[no-]color') { |c| @options[:color] = c }
 
       option(opts, '-v', '--version')
       option(opts, '-V', '--verbose-version')
-      option(opts, '-s', '--stdin') { @options[:stdin] = $stdin.binmode.read }
+      option(opts, '-P', '--parallel')
     end
 
     def add_list_options(opts)
@@ -179,13 +189,14 @@ module RuboCop
     def self.validate_cop_list(names)
       return unless names
 
-      namespaces = Cop::Cop.all.types.map { |t| t.to_s.capitalize }
-      names.each do |name|
-        next if Cop::Cop.all.any? { |c| c.cop_name == name }
-        next if namespaces.include?(name)
-        next if %w(Syntax Lint/Syntax).include?(name)
+      departments = Cop::Cop.registry.departments.map(&:to_s)
 
-        raise ArgumentError, "Unrecognized cop or namespace: #{name}."
+      names.each do |name|
+        next if Cop::Cop.registry.names.include?(name)
+        next if departments.include?(name)
+        next if %w[Syntax Lint/Syntax].include?(name)
+
+        raise ArgumentError, "Unrecognized cop or department: #{name}."
       end
     end
 
@@ -207,23 +218,45 @@ module RuboCop
         raise ArgumentError, '--no-offense-counts can only be used together ' \
                              'with --auto-gen-config.'
       end
+      validate_parallel
+
       return if incompatible_options.size <= 1
       raise ArgumentError, 'Incompatible cli options: ' \
                            "#{incompatible_options.inspect}"
     end
 
+    def validate_parallel
+      return unless @options.key?(:parallel)
+
+      if @options[:cache] == 'false'
+        raise ArgumentError, '-P/--parallel uses caching to speed up ' \
+                             'execution, so combining with --cache false is ' \
+                             'not allowed.'
+      end
+
+      combos = {
+        auto_gen_config: '-P/--parallel uses caching to speed up execution, ' \
+                         'while --auto-gen-config needs a non-cached run, ' \
+                         'so they cannot be combined.',
+        fail_fast: '-P/--parallel can not be combined with -F/--fail-fast.',
+        auto_correct: '-P/--parallel can not be combined with --auto-correct.'
+      }
+
+      combos.each { |key, msg| raise ArgumentError, msg if @options.key?(key) }
+    end
+
     def only_includes_unneeded_disable?
       @options.key?(:only) &&
-        (@options[:only] & %w(Lint/UnneededDisable UnneededDisable)).any?
+        (@options[:only] & %w[Lint/UnneededDisable UnneededDisable]).any?
     end
 
     def except_syntax?
       @options.key?(:except) &&
-        (@options[:except] & %w(Lint/Syntax Syntax)).any?
+        (@options[:except] & %w[Lint/Syntax Syntax]).any?
     end
 
     def boolean_or_empty_cache?
-      !@options.key?(:cache) || %w(true false).include?(@options[:cache])
+      !@options.key?(:cache) || %w[true false].include?(@options[:cache])
     end
 
     def no_offense_counts_without_auto_gen_config?
@@ -313,8 +346,10 @@ module RuboCop
       no_color:              'Force color output on or off.',
       version:               'Display version.',
       verbose_version:       'Display verbose version.',
-      stdin:                ['Pipe source from STDIN.',
-                             'This is useful for editor integration.']
+      parallel:             ['Use available CPUs to execute inspection in',
+                             'parallel.'],
+      stdin:                ['Pipe source from STDIN, using FILE in offense',
+                             'reports. This is useful for editor integration.']
     }.freeze
   end
 end

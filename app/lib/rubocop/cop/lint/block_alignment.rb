@@ -6,8 +6,8 @@ module RuboCop
       # This cop checks whether the end keywords are aligned properly for do
       # end blocks.
       #
-      # Three modes are supported through the `AlignWith` configuration
-      # parameter:
+      # Three modes are supported through the `EnforcedStyleAlignWith`
+      # configuration parameter:
       #
       # `start_of_block` : the `end` shall be aligned with the
       # start of the line where the `do` appeared.
@@ -20,18 +20,40 @@ module RuboCop
       #
       # @example
       #
-      #   # either
+      #   # bad
+      #
+      #   foo.bar
+      #      .each do
+      #        baz
+      #          end
+      #
+      # @example
+      #
+      #   # EnforcedStyleAlignWith: either (default)
+      #
+      #   # good
+      #
       #   variable = lambda do |i|
       #     i
       #   end
       #
-      #   # start_of_block
+      # @example
+      #
+      #   # EnforcedStyleAlignWith: start_of_block
+      #
+      #   # good
+      #
       #   foo.bar
       #     .each do
       #        baz
       #      end
       #
-      #   # start_of_line
+      # @example
+      #
+      #   # EnforcedStyleAlignWith: start_of_line
+      #
+      #   # good
+      #
       #   foo.bar
       #     .each do
       #        baz
@@ -54,8 +76,8 @@ module RuboCop
           check_block_alignment(start_for_block_node(node), node)
         end
 
-        def parameter_name
-          'AlignWith'
+        def style_parameter_name
+          'EnforcedStyleAlignWith'
         end
 
         private
@@ -93,10 +115,19 @@ module RuboCop
             compute_do_source_line_column(block_node, end_loc)
           return unless do_source_line_column
 
-          offense(block_node, start_loc, end_loc, do_source_line_column)
+          register_offense(
+            block_node,
+            start_loc,
+            end_loc,
+            do_source_line_column
+          )
         end
 
-        def offense(block_node, start_loc, end_loc, do_source_line_column)
+        def register_offense(block_node,
+                             start_loc,
+                             end_loc,
+                             do_source_line_column)
+
           error_source_line_column = if style == :start_of_block
                                        do_source_line_column
                                      else

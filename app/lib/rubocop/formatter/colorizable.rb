@@ -22,15 +22,15 @@ module RuboCop
         rainbow.wrap(string).color(*args)
       end
 
-      [
-        :black,
-        :red,
-        :green,
-        :yellow,
-        :blue,
-        :magenta,
-        :cyan,
-        :white
+      %i[
+        black
+        red
+        green
+        yellow
+        blue
+        magenta
+        cyan
+        white
       ].each do |color|
         define_method(color) do |string|
           colorize(string, color)

@@ -13,11 +13,12 @@ module RuboCop
   class Config
     include PathUtil
 
-    COMMON_PARAMS = %w(Exclude Include Severity
-                       AutoCorrect StyleGuide Details).freeze
+    COMMON_PARAMS = %w[Exclude Include Severity
+                       AutoCorrect StyleGuide Details].freeze
     # 2.1 is the oldest officially supported Ruby version.
     DEFAULT_RUBY_VERSION = 2.1
     KNOWN_RUBIES = [1.9, 2.0, 2.1, 2.2, 2.3, 2.4].freeze
+    DEFAULT_RAILS_VERSION = 5.0
     OBSOLETE_COPS = {
       'Style/TrailingComma' =>
         'The `Style/TrailingComma` cop no longer exists. Please use ' \
@@ -27,25 +28,95 @@ module RuboCop
         'The `Rails/DefaultScope` cop no longer exists.',
       'Style/SingleSpaceBeforeFirstArg' =>
         'The `Style/SingleSpaceBeforeFirstArg` cop has been renamed to ' \
-        '`Style/SpaceBeforeFirstArg. ',
+        '`Layout/SpaceBeforeFirstArg`.',
       'Lint/SpaceBeforeFirstArg' =>
         'The `Lint/SpaceBeforeFirstArg` cop has been removed, since it was a ' \
-        'duplicate of `Style/SpaceBeforeFirstArg`. Please use ' \
-        '`Style/SpaceBeforeFirstArg` instead.',
+        'duplicate of `Layout/SpaceBeforeFirstArg`. Please use ' \
+        '`Layout/SpaceBeforeFirstArg` instead.',
+      'Layout/SpaceAfterControlKeyword' =>
+        'The `Layout/SpaceAfterControlKeyword` cop has been removed. Please ' \
+        'use `Layout/SpaceAroundKeyword` instead.',
+      'Layout/SpaceBeforeModifierKeyword' =>
+        'The `Layout/SpaceBeforeModifierKeyword` cop has been removed. ' \
+        'Please use `Layout/SpaceAroundKeyword` instead.',
       'Style/SpaceAfterControlKeyword' =>
         'The `Style/SpaceAfterControlKeyword` cop has been removed. Please ' \
-        'use `Style/SpaceAroundKeyword` instead.',
+        'use `Layout/SpaceAroundKeyword` instead.',
       'Style/SpaceBeforeModifierKeyword' =>
         'The `Style/SpaceBeforeModifierKeyword` cop has been removed. Please ' \
-        'use `Style/SpaceAroundKeyword` instead.'
+        'use `Layout/SpaceAroundKeyword` instead.',
+      'Style/MethodCallParentheses' =>
+        'The `Style/MethodCallParentheses` cop has been renamed to ' \
+          '`Style/MethodCallWithoutArgsParentheses`.',
+      'Lint/Eval' =>
+        'The `Lint/Eval` cop has been renamed to `Security/Eval`.',
+      'Style/DeprecatedHashMethods' =>
+        'The `Style/DeprecatedHashMethods` cop has been renamed to ' \
+          '`Style/PreferredHashMethods`.'
     }.freeze
+
+    OBSOLETE_PARAMETERS = [
+      {
+        cop: 'Layout/SpaceAroundOperators',
+        parameter: 'MultiSpaceAllowedForOperators',
+        alternative: 'If your intention was to allow extra spaces ' \
+                     'for alignment, please use AllowForAlignment: ' \
+                     'true instead.'
+      },
+      {
+        cop: 'Style/SpaceAroundOperators',
+        parameter: 'MultiSpaceAllowedForOperators',
+        alternative: 'If your intention was to allow extra spaces ' \
+                     'for alignment, please use AllowForAlignment: ' \
+                     'true instead.'
+      },
+      {
+        cop: 'AllCops',
+        parameter: 'RunRailsCops',
+        alternative: "Use the following configuration instead:\n" \
+                     "Rails:\n  Enabled: true"
+      },
+      {
+        cop: 'Layout/CaseIndentation',
+        parameter: 'IndentWhenRelativeTo',
+        alternative: '`IndentWhenRelativeTo` has been renamed to ' \
+                     '`EnforcedStyle`'
+      },
+      {
+        cop: 'Lint/BlockAlignment',
+        parameter: 'AlignWith',
+        alternative: '`AlignWith` has been renamed to ' \
+                     '`EnforcedStyleAlignWith`'
+      },
+      {
+        cop: 'Lint/EndAlignment',
+        parameter: 'AlignWith',
+        alternative: '`AlignWith` has been renamed to ' \
+                     '`EnforcedStyleAlignWith`'
+      },
+      {
+        cop: 'Lint/DefEndAlignment',
+        parameter: 'AlignWith',
+        alternative: '`AlignWith` has been renamed to ' \
+                     '`EnforcedStyleAlignWith`'
+      },
+      {
+        cop: 'Rails/UniqBeforePluck',
+        parameter: 'EnforcedMode',
+        alternative: '`EnforcedMode` has been renamed to ' \
+                     '`EnforcedStyle`'
+      }
+    ].freeze
 
     attr_reader :loaded_path
 
     def initialize(hash = {}, loaded_path = nil)
       @loaded_path = loaded_path
       @for_cop = Hash.new do |h, cop|
-        h[cop] = self[Cop::Cop.qualified_cop_name(cop, loaded_path)] || {}
+        qualified_cop_name = Cop::Cop.qualified_cop_name(cop, loaded_path)
+        cop_options = self[qualified_cop_name] || {}
+        cop_options['Enabled'] = enable_cop?(qualified_cop_name, cop_options)
+        h[cop] = cop_options
       end
       @hash = hash
     end
@@ -123,7 +194,7 @@ module RuboCop
     end
 
     def deprecation_check
-      %w(Exclude Include).each do |key|
+      %w[Exclude Include].each do |key|
         plural = "#{key}s"
         next unless for_all_cops[plural]
 
@@ -141,16 +212,6 @@ module RuboCop
       @for_all_cops ||= self['AllCops'] || {}
     end
 
-    def cop_enabled?(cop)
-      department = cop.cop_type.to_s.capitalize!
-
-      if (dept_config = self[department])
-        return false if dept_config['Enabled'] == false
-      end
-
-      for_cop(cop).empty? || for_cop(cop)['Enabled']
-    end
-
     def validate
       # Don't validate RuboCop's own files. Avoids infinite recursion.
       base_config_path = File.expand_path(File.join(ConfigLoader::RUBOCOP_HOME,
@@ -161,12 +222,12 @@ module RuboCop
         ConfigLoader.default_configuration.key?(key)
       end
 
-      reject_obsolete_cops
+      reject_obsolete_cops_and_parameters
       warn_about_unrecognized_cops(invalid_cop_names)
-      reject_obsolete_parameters
       check_target_ruby
       validate_parameter_names(valid_cop_names)
       validate_enforced_styles(valid_cop_names)
+      reject_mutually_exclusive_defaults
     end
 
     def file_to_include?(file)
@@ -215,15 +276,14 @@ module RuboCop
       relative_path(path, base_dir_for_path_parameters)
     end
 
-    # Paths specified in .rubocop.yml and .rubocop_todo.yml files are relative
-    # to the directory where that file is. Paths in other config files are
-    # relative to the current directory. This is so that paths in
+    # Paths specified in configuration files starting with .rubocop are
+    # relative to the directory where that file is. Paths in other config files
+    # are relative to the current directory. This is so that paths in
     # config/default.yml, for example, are not relative to RuboCop's config
     # directory since that wouldn't work.
     def base_dir_for_path_parameters
-      config_files = [ConfigLoader::DOTFILE, ConfigLoader::AUTO_GENERATED_FILE]
       @base_dir_for_path_parameters ||=
-        if config_files.include?(File.basename(loaded_path)) &&
+        if File.basename(loaded_path).start_with?('.rubocop') &&
            loaded_path != File.join(Dir.home, ConfigLoader::DOTFILE)
           File.expand_path(File.dirname(loaded_path))
         else
@@ -248,6 +308,11 @@ module RuboCop
         end
     end
 
+    def target_rails_version
+      @target_rails_version ||=
+        for_all_cops.fetch('TargetRailsVersion', DEFAULT_RAILS_VERSION)
+    end
+
     private
 
     def warn_about_unrecognized_cops(invalid_cop_names)
@@ -259,7 +324,7 @@ module RuboCop
         end
 
         # There could be a custom cop with this name. If so, don't warn
-        next if Cop::Cop.all.any? { |c| c.match?([name]) }
+        next if Cop::Cop.registry.contains_cop_matching?([name])
 
         warn Rainbow("Warning: unrecognized cop #{name} found in " \
                      "#{loaded_path}").yellow
@@ -286,42 +351,52 @@ module RuboCop
 
     def validate_enforced_styles(valid_cop_names)
       valid_cop_names.each do |name|
-        next unless (style = self[name]['EnforcedStyle'])
-        valid = ConfigLoader.default_configuration[name]['SupportedStyles']
-        next if valid.include?(style)
+        styles = self[name].select { |key, _| key.start_with?('Enforced') }
 
-        msg = "invalid EnforcedStyle '#{style}' for #{name} found in " \
-              "#{loaded_path}\n" \
-              "Valid choices are: #{valid.join(', ')}"
-        raise ValidationError, msg
+        styles.each do |style_name, style|
+          supported_key = RuboCop::Cop::Util.to_supported_styles(style_name)
+          valid = ConfigLoader.default_configuration[name][supported_key]
+          next unless valid
+          next if valid.include?(style)
+
+          msg = "invalid #{style_name} '#{style}' for #{name} found in " \
+            "#{loaded_path}\n" \
+            "Valid choices are: #{valid.join(', ')}"
+          raise ValidationError, msg
+        end
       end
     end
 
-    def reject_obsolete_parameters
-      check_obsolete_parameter('Style/SpaceAroundOperators',
-                               'MultiSpaceAllowedForOperators',
-                               'If your intention was to allow extra spaces ' \
-                               'for alignment, please use AllowForAlignment: ' \
-                               'true instead.')
-      check_obsolete_parameter('AllCops', 'RunRailsCops',
-                               "Use the following configuration instead:\n" \
-                               "Rails:\n  Enabled: true")
+    def reject_obsolete_cops_and_parameters
+      messages = [
+        obsolete_cops,
+        obsolete_parameters
+      ].flatten.compact
+      return if messages.empty?
+
+      raise ValidationError, messages.join("\n")
     end
 
-    def check_obsolete_parameter(cop, parameter, alternative = nil)
+    def obsolete_parameters
+      OBSOLETE_PARAMETERS.map do |params|
+        obsolete_parameter_message(params[:cop], params[:parameter],
+                                   params[:alternative])
+      end
+    end
+
+    def obsolete_parameter_message(cop, parameter, alternative)
       return unless self[cop] && self[cop].key?(parameter)
 
-      raise ValidationError, "obsolete parameter #{parameter} (for #{cop}) " \
-                            "found in #{loaded_path}" \
-                            "#{"\n" if alternative}#{alternative}"
+      "obsolete parameter #{parameter} (for #{cop}) " \
+        "found in #{loaded_path}" \
+        "\n#{alternative}"
     end
 
-    def reject_obsolete_cops
-      OBSOLETE_COPS.each do |cop_name, message|
-        next unless key?(cop_name) || key?(cop_name.split('/').last)
-        message += "\n(obsolete configuration found in #{loaded_path}, please" \
+    def obsolete_cops
+      OBSOLETE_COPS.map do |cop_name, message|
+        next unless key?(cop_name) || key?(Cop::Badge.parse(cop_name).cop_name)
+        message + "\n(obsolete configuration found in #{loaded_path}, please" \
                    ' update it)'
-        raise ValidationError, message
       end
     end
 
@@ -341,6 +416,29 @@ module RuboCop
       msg += "\nKnown versions: #{KNOWN_RUBIES.join(', ')}"
 
       raise ValidationError, msg
+    end
+
+    def reject_mutually_exclusive_defaults
+      disabled_by_default = for_all_cops['DisabledByDefault']
+      enabled_by_default = for_all_cops['EnabledByDefault']
+      return unless disabled_by_default && enabled_by_default
+
+      msg = 'Cops cannot be both enabled by default and disabled by default'
+      raise ValidationError, msg
+    end
+
+    def enable_cop?(qualified_cop_name, cop_options)
+      cop_department, cop_name = qualified_cop_name.split('/')
+      department = cop_name.nil?
+
+      unless department
+        department_options = self[cop_department]
+        if department_options && department_options.fetch('Enabled') == false
+          return false
+        end
+      end
+
+      cop_options.fetch('Enabled', true)
     end
   end
 end

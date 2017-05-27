@@ -9,7 +9,8 @@ module RuboCop
     # Offenses are displayed at compact form - just the
     # location of the problem and the associated message.
     class SimpleTextFormatter < BaseFormatter
-      include Colorizable, PathUtil
+      include Colorizable
+      include PathUtil
 
       COLOR_FOR_SEVERITY = {
         refactor:   :yellow,
@@ -63,17 +64,6 @@ module RuboCop
         @total_correction_count += offenses.count(&:corrected?)
       end
 
-      def smart_path(path)
-        # Ideally, we calculate this relative to the project root.
-        base_dir = Dir.pwd
-
-        if path.start_with? base_dir
-          relative_path(path, base_dir)
-        else
-          path
-        end
-      end
-
       def colored_severity_code(offense)
         color = COLOR_FOR_SEVERITY[offense.severity.name]
         colorize(offense.severity.code, color)
@@ -90,7 +80,8 @@ module RuboCop
 
       # A helper class for building the report summary text.
       class Report
-        include Colorizable, TextUtil
+        include Colorizable
+        include TextUtil
 
         def initialize(file_count, offense_count, correction_count, rainbow)
           @file_count = file_count

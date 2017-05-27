@@ -61,8 +61,8 @@ module RuboCop
 
         def delegate?(body)
           receiver, = *body
-          return false unless receiver.is_a?(Node) && receiver.send_type?
-          receiver.child_nodes.empty?
+          receiver.respond_to?(:type) && receiver.send_type? &&
+            receiver.child_nodes.empty?
         end
 
         def arguments_match?(args, body)
@@ -94,7 +94,7 @@ module RuboCop
         end
 
         def private_or_protected_before(line)
-          (processed_source[0..line].map(&:strip) & %w(private protected)).any?
+          (processed_source[0..line].map(&:strip) & %w[private protected]).any?
         end
 
         def private_or_protected_inline(line)

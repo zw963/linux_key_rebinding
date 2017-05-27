@@ -7,8 +7,8 @@ module RuboCop
       include Comparable
 
       # @api private
-      COMPARISON_ATTRIBUTES = [:line, :column, :cop_name,
-                               :message, :severity].freeze
+      COMPARISON_ATTRIBUTES = %i[line column cop_name
+                                 message severity].freeze
 
       # @api public
       #
@@ -44,7 +44,7 @@ module RuboCop
       # @!attribute [r] cop_name
       #
       # @return [String]
-      #   a cop class name without namespace.
+      #   a cop class name without department.
       #   i.e. type of the violation.
       #
       # @example
@@ -72,7 +72,7 @@ module RuboCop
       # @return [Boolean]
       #   whether this offense is automatically corrected.
       def corrected
-        @status == :unsupported ? nil : @status == :corrected
+        @status == :unsupported ? false : @status == :corrected
       end
       alias corrected? corrected
 

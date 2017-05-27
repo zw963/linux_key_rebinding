@@ -3,9 +3,12 @@
 module RuboCop
   module Cop
     module Rails
-      # This cop is used to identify usages of http methods
-      # like `get`, `post`, `put`, `path` without the usage of keyword arguments
-      # in your tests and change them to use keyword arguments.
+      # This cop is used to identify usages of http methods like `get`, `post`,
+      # `put`, `patch` without the usage of keyword arguments in your tests and
+      # change them to use keyword args.  This cop only applies to Rails >= 5 .
+      # If you are not running Rails < 5 you should disable # the
+      # Rails/HttpPositionalArguments cop or set your TargetRailsVersion in your
+      # .rubocop.yml file to 4.0, etc.
       #
       # @example
       #   # bad
@@ -14,48 +17,57 @@ module RuboCop
       #   # good
       #   get :new, params: { user_id: 1 }
       class HttpPositionalArguments < Cop
+        extend TargetRailsVersion
+
         MSG = 'Use keyword arguments instead of ' \
               'positional arguments for http call: `%s`.'.freeze
-        KEYWORD_ARGS = [
-          :headers, :env, :params, :body, :flash, :as,
-          :xhr, :session, :method, :format
+        KEYWORD_ARGS = %i[
+          headers env params body flash as xhr session method
         ].freeze
-        HTTP_METHODS = [:get, :post, :put, :patch, :delete, :head].freeze
+        HTTP_METHODS = %i[get post put patch delete head].freeze
+
+        minimum_target_rails_version 5.0
+
+        def_node_matcher :http_request?, <<-END
+          (send nil {#{HTTP_METHODS.map(&:inspect).join(' ')}} !nil $_data ...)
+        END
 
         def on_send(node)
-          receiver, http_method, http_path, data = *node
-          # if the first word on the line is not an http method, then skip
-          return unless HTTP_METHODS.include?(http_method)
+          data = http_request?(node)
           # if the data is nil then we don't need to add keyword arguments
           # because there is no data to put in params or headers, so skip
           return if data.nil?
           return unless needs_conversion?(data)
-          # ensures this is the first method on the line
-          # there is an edge case here where sometimes the http method is
-          # wrapped into another method, but its just safer to skip those
-          # cases and process manually
-          return unless receiver.nil?
-          # a http_method without a path?, must be something else
-          return if http_path.nil?
+
           add_offense(node, node.loc.selector, format(MSG, node.method_name))
         end
 
         # @return [Boolean] true if the line needs to be converted
         def needs_conversion?(data)
-          # if the line has already been converted to use keyword args
-          # then skip
-          # ie. get :new, params: { user_id: 1 }  (looking for keyword arg)
-          value = data.descendants.find do |d|
-            KEYWORD_ARGS.include?(d.children.first) if d.type == :sym
+          return true unless data.hash_type?
+          children = data.child_nodes
+
+          value = children.find do |d|
+            special_keyword_arg?(d.children.first) ||
+              (format_arg?(d.children.first) && children.size == 1)
           end
+
           value.nil?
+        end
+
+        def special_keyword_arg?(node)
+          KEYWORD_ARGS.include?(node.children.first) if node.type == :sym
+        end
+
+        def format_arg?(node)
+          node.children.first == :format if node.type == :sym
         end
 
         def convert_hash_data(data, type)
           # empty hash or no hash return empty string
-          return '' if data.nil? || data.children.count < 1
+          return '' if data.nil? || data.children.empty?
           hash_data = if data.hash_type?
-                        format('{ %s }', data.children.map(&:source).join(', '))
+                        format('{ %s }', data.pairs.map(&:source).join(', '))
                       else
                         # user supplies an object,
                         # no need to surround with braces
@@ -75,14 +87,16 @@ module RuboCop
         # the data is the http parameters and environment sent in
         # the Rails 5 http call
         def autocorrect(node)
-          _receiver, http_method, http_path, *data = *node
+          http_path, *data = *node.arguments
+
           controller_action = http_path.source
           params = convert_hash_data(data.first, 'params')
-          headers = convert_hash_data(data.last, 'headers') if data.count > 1
+          headers = convert_hash_data(data.last, 'headers') if data.size > 1
           # the range of the text to replace, which is the whole line
           code_to_replace = node.loc.expression
           # what to replace with
-          new_code = format('%s %s%s%s', http_method, controller_action,
+          format = parentheses?(node) ? '%s(%s%s%s)' : '%s %s%s%s'
+          new_code = format(format, node.method_name, controller_action,
                             params, headers)
           ->(corrector) { corrector.replace(code_to_replace, new_code) }
         end

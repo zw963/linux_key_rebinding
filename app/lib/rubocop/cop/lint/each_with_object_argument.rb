@@ -11,7 +11,16 @@ module RuboCop
       #
       # @example
       #
+      #   # bad
+      #
       #   sum = numbers.each_with_object(0) { |e, a| a += e }
+      #
+      # @example
+      #
+      #   # good
+      #
+      #   num = 0
+      #   sum = numbers.each_with_object(num) { |e, a| a += e }
       class EachWithObjectArgument < Cop
         MSG = 'The argument to each_with_object can not be immutable.'.freeze
 
@@ -19,7 +28,9 @@ module RuboCop
 
         def on_send(node)
           each_with_object?(node) do |arg|
-            add_offense(node, :expression) if arg.immutable_literal?
+            return unless arg.immutable_literal?
+
+            add_offense(node, :expression)
           end
         end
       end

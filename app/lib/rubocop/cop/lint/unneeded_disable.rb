@@ -70,7 +70,8 @@ module RuboCop
           range_with_surrounding_space(range, :right, false)
         end
 
-        def each_unneeded_disable(cop_disabled_line_ranges, offenses, comments)
+        def each_unneeded_disable(cop_disabled_line_ranges, offenses, comments,
+                                  &block)
           disabled_ranges = cop_disabled_line_ranges[COP_NAME] || [0..0]
 
           cop_disabled_line_ranges.each do |cop, line_ranges|
@@ -78,16 +79,23 @@ module RuboCop
               yield comment, cop
             end
 
-            line_ranges.each do |line_range|
-              comment = comments.find { |c| c.loc.line == line_range.begin }
+            each_line_range(line_ranges, disabled_ranges, offenses, comments,
+                            cop, &block)
+          end
+        end
 
-              unless all_disabled?(comment)
-                next if ignore_offense?(disabled_ranges, line_range)
-              end
+        def each_line_range(line_ranges, disabled_ranges, offenses, comments,
+                            cop)
+          line_ranges.each_with_index do |line_range, ix|
+            comment = comments.find { |c| c.loc.line == line_range.begin }
 
-              unneeded_cop = find_unneeded(comment, offenses, cop, line_range)
-              yield comment, unneeded_cop if unneeded_cop
+            unless all_disabled?(comment)
+              next if ignore_offense?(disabled_ranges, line_range)
             end
+
+            unneeded_cop = find_unneeded(comment, offenses, cop, line_range,
+                                         line_ranges[ix + 1])
+            yield comment, unneeded_cop if unneeded_cop
           end
         end
 
@@ -99,13 +107,29 @@ module RuboCop
             # the end of the previous range, it means that the cop was
             # already disabled by an earlier comment. So it's unneeded
             # whether there are offenses or not.
-            yield comments.find { |c| c.loc.line == range.begin }
+            unneeded_comment = comments.find do |c|
+              c.loc.line == range.begin &&
+                # Comments disabling all cops don't count since it's reasonable
+                # to disable a few select cops first and then all cops further
+                # down in the code.
+                !all_disabled?(c)
+            end
+            yield unneeded_comment if unneeded_comment
           end
         end
 
-        def find_unneeded(comment, offenses, cop, line_range)
+        def find_unneeded(comment, offenses, cop, line_range, next_line_range)
           if all_disabled?(comment)
-            'all' if offenses.none? { |o| line_range.cover?(o.line) }
+            # If there's a disable all comment followed by a comment
+            # specifically disabling `cop`, we don't report the `all`
+            # comment. If the disable all comment is truly unneeded, we will
+            # detect that when examining the comments of another cop, and we
+            # get the full line range for the disable all.
+            if (next_line_range.nil? ||
+                line_range.last != next_line_range.first) &&
+               offenses.none? { |o| line_range.cover?(o.line) }
+              'all'
+            end
           else
             cop_offenses = offenses.select { |o| o.cop_name == cop }
             cop if cop_offenses.none? { |o| line_range.cover?(o.line) }
@@ -159,7 +183,7 @@ module RuboCop
 
         def cop_range(comment, cop)
           matching_range(comment.loc.expression, cop) ||
-            matching_range(comment.loc.expression, cop.split('/').last) ||
+            matching_range(comment.loc.expression, Badge.parse(cop).cop_name) ||
             raise("Couldn't find #{cop} in comment: #{comment.text}")
         end
 
@@ -199,7 +223,7 @@ module RuboCop
         end
 
         def all_cop_names
-          @all_cop_names ||= Cop.all.map(&:cop_name)
+          @all_cop_names ||= Cop.registry.names
         end
       end
     end

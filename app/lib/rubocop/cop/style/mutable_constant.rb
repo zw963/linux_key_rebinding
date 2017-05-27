@@ -37,21 +37,26 @@ module RuboCop
 
           return unless value && value.mutable_literal?
           return if FROZEN_STRING_LITERAL_TYPES.include?(value.type) &&
-                    frozen_string_literals_enabled?(processed_source)
+                    frozen_string_literals_enabled?
 
           add_offense(value, :expression)
         end
 
         def autocorrect(node)
           expr = node.source_range
+
           lambda do |corrector|
-            if node.array_type? && node.loc.begin.nil? && node.loc.end.nil?
+            if unbracketed_array?(node)
               corrector.insert_before(expr, '[')
               corrector.insert_after(expr, '].freeze')
             else
               corrector.insert_after(expr, '.freeze')
             end
           end
+        end
+
+        def unbracketed_array?(node)
+          node.array_type? && !node.square_brackets? && !node.percent_literal?
         end
 
         def_node_matcher :splat_value, <<-PATTERN

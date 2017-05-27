@@ -9,6 +9,7 @@ module Rainbow
     TERM_EFFECTS = {
       reset:     0,
       bright:    1,
+      faint:     2,
       italic:    3,
       underline: 4,
       blink:     5,
@@ -43,6 +44,16 @@ module Rainbow
     def bright
       wrap_with_sgr(TERM_EFFECTS[:bright])
     end
+
+    alias_method :bold, :bright
+
+    # Turns on faint/dark for this text (not well supported by terminal
+    # emulators).
+    def faint
+      wrap_with_sgr(TERM_EFFECTS[:faint])
+    end
+
+    alias_method :dark, :faint
 
     # Turns on italic style for this text (not well supported by terminal
     # emulators).

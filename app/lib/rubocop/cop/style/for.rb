@@ -22,16 +22,13 @@ module RuboCop
         end
 
         def on_block(node)
-          return if block_length(node).zero?
+          return if node.single_line?
 
-          method, _args, _body = *node
-          return unless method.send_type?
-
-          _receiver, method_name, *args = *method
-          return unless method_name == :each && args.empty?
+          return unless node.send_node.method?(:each) &&
+                        !node.send_node.arguments?
 
           if style == :for
-            incorrect_style_detected(method)
+            incorrect_style_detected(node.send_node)
           else
             correct_style_detected
           end

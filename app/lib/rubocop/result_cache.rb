@@ -2,14 +2,13 @@
 
 require 'digest/md5'
 require 'find'
-require 'tmpdir'
 require 'etc'
 
 module RuboCop
   # Provides functionality for caching rubocop runs.
   class ResultCache
-    NON_CHANGING = [:color, :format, :formatters, :out, :debug, :fail_level,
-                    :cache, :fail_fast, :stdin].freeze
+    NON_CHANGING = %i[color format formatters out debug fail_level
+                      cache fail_fast stdin parallel].freeze
 
     # Remove old files so that the cache doesn't grow too big. When the
     # threshold MaxFilesInCache has been exceeded, the oldest 50% of all the
@@ -44,30 +43,32 @@ module RuboCop
           puts "Removing the #{remove_count} oldest files from #{cache_root}"
         end
         sorted = files.sort_by { |path| File.mtime(path) }
-        remove_files(sorted, dirs, remove_count, verbose)
+        remove_files(sorted, dirs, remove_count)
+      rescue Errno::ENOENT
+        # This can happen if parallel RuboCop invocations try to remove the
+        # same files. No problem.
+        puts $ERROR_INFO if verbose
       end
 
-      def remove_files(files, dirs, remove_count, verbose)
+      def remove_files(files, dirs, remove_count)
         # Batch file deletions, deleting over 130,000+ files will crash
         # File.delete.
         files[0, remove_count].each_slice(10_000).each do |files_slice|
           File.delete(*files_slice)
         end
         dirs.each { |dir| Dir.rmdir(dir) if Dir["#{dir}/*"].empty? }
-      rescue Errno::ENOENT
-        # This can happen if parallel RuboCop invocations try to remove the
-        # same files. No problem.
-        puts $ERROR_INFO if verbose
       end
     end
 
     def self.cache_root(config_store)
       root = config_store.for('.').for_all_cops['CacheRootDirectory']
-      if root == '/tmp'
-        tmpdir = File.realpath(Dir.tmpdir)
-        # Include user ID in the path to make sure the user has write access.
-        root = File.join(tmpdir, Process.uid.to_s)
-      end
+      root ||= if ENV.key?('XDG_CACHE_HOME')
+                 # Include user ID in the path to make sure the user has write
+                 # access.
+                 File.join(ENV['XDG_CACHE_HOME'], Process.uid.to_s)
+               else
+                 File.join(ENV['HOME'], '.cache')
+               end
       File.join(root, 'rubocop_cache')
     end
 

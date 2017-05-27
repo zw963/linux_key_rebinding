@@ -4,42 +4,98 @@ module RuboCop
   module Cop
     module Style
       # Checks for uses of if with a negated condition. Only ifs
-      # without else are considered.
+      # without else are considered. There are three different styles:
+      #
+      #   - both
+      #   - prefix
+      #   - postfix
+      #
+      # @example
+      #
+      #   # EnforcedStyle: both
+      #   # enforces `unless` for `prefix` and `postfix` conditionals
+      #
+      #   # good
+      #
+      #   unless foo
+      #     bar
+      #   end
+      #
+      #   # bad
+      #
+      #   if !foo
+      #     bar
+      #   end
+      #
+      #   # good
+      #
+      #   bar unless foo
+      #
+      #   # bad
+      #
+      #   bar if !foo
+      #
+      # @example
+      #
+      #   # EnforcedStyle: prefix
+      #   # enforces `unless` for just `prefix` conditionals
+      #
+      #   # good
+      #
+      #   unless foo
+      #     bar
+      #   end
+      #
+      #   # bad
+      #
+      #   if !foo
+      #     bar
+      #   end
+      #
+      #   # good
+      #
+      #   bar if !foo
+      #
+      # @example
+      #
+      #   # EnforcedStyle: postfix
+      #   # enforces `unless` for just `postfix` conditionals
+      #
+      #   # good
+      #
+      #   bar unless foo
+      #
+      #   # bad
+      #
+      #   bar if !foo
+      #
+      #   # good
+      #
+      #   if !foo
+      #     bar
+      #   end
       class NegatedIf < Cop
+        include ConfigurableEnforcedStyle
         include NegativeConditional
 
         MSG = 'Favor `%s` over `%s` for negative conditions.'.freeze
 
         def on_if(node)
-          return unless node.loc.respond_to?(:keyword)
-          return if node.loc.keyword.is?('elsif')
+          return if node.elsif? || node.ternary?
+          return if style == :prefix && node.modifier_form?
+          return if style == :postfix && !node.modifier_form?
 
           check_negative_conditional(node)
         end
 
         def message(node)
-          if node.loc.keyword.is?('if')
-            format(MSG, 'unless', 'if')
-          else
-            format(MSG, 'if', 'unless')
-          end
+          format(MSG, node.inverse_keyword, node.keyword)
         end
 
         private
 
         def autocorrect(node)
-          lambda do |corrector|
-            condition, _body, _rest = *node
-            # look inside parentheses around the condition
-            condition = condition.children.first while condition.begin_type?
-            # unwrap the negated portion of the condition (a send node)
-            pos_condition, _method, = *condition
-            corrector.replace(
-              node.loc.keyword,
-              node.loc.keyword.is?('if') ? 'unless' : 'if'
-            )
-            corrector.replace(condition.source_range, pos_condition.source)
-          end
+          negative_conditional_corrector(node)
         end
       end
     end

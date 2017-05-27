@@ -1,19 +1,23 @@
 # frozen_string_literal: true
-# rubocop:disable Metrics/ModuleLength
 
+# rubocop:disable Metrics/ModuleLength
 module RuboCop
   module Cop
     # This module contains a collection of useful utility methods.
     module Util
       include PathUtil
-      extend RuboCop::Sexp
+      extend RuboCop::AST::Sexp
 
       BYTE_ORDER_MARK = 0xfeff # The Unicode codepoint
 
-      EQUALS_ASGN_NODES = [:lvasgn, :ivasgn, :cvasgn, :gvasgn,
-                           :casgn, :masgn].freeze
-      SHORTHAND_ASGN_NODES = [:op_asgn, :or_asgn, :and_asgn].freeze
+      EQUALS_ASGN_NODES = %i[lvasgn ivasgn cvasgn gvasgn
+                             casgn masgn].freeze
+      SHORTHAND_ASGN_NODES = %i[op_asgn or_asgn and_asgn].freeze
       ASGN_NODES = (EQUALS_ASGN_NODES + SHORTHAND_ASGN_NODES).freeze
+
+      MODIFIER_NODES = %i[if while until].freeze
+      CONDITIONAL_NODES = (MODIFIER_NODES + [:case]).freeze
+      LOGICAL_OPERATOR_NODES = %i[and or].freeze
 
       # http://phrogz.net/programmingruby/language.html#table_18.4
       # Backtick is added last just to help editors parse this code.
@@ -86,7 +90,7 @@ module RuboCop
       def source_range(source_buffer, line_number, column, length = 1)
         if column.is_a?(Range)
           column_index = column.begin
-          length = numeric_range_size(column)
+          length = column.size
         else
           column_index = column
         end
@@ -148,6 +152,22 @@ module RuboCop
         Parser::Source::Range.new(buffer, begin_pos, end_pos)
       end
 
+      def range_by_whole_lines(range, include_final_newline: false)
+        buffer = @processed_source.buffer
+
+        begin_pos = range.begin_pos
+        begin_offset = range.column
+        begin_of_first_line = begin_pos - begin_offset
+
+        last_line = buffer.source_line(range.last_line)
+        end_pos = range.end_pos
+        end_offset = last_line.length - range.last_column
+        end_offset += 1 if include_final_newline
+        end_of_last_line = end_pos + end_offset
+
+        Parser::Source::Range.new(buffer, begin_of_first_line, end_of_last_line)
+      end
+
       def move_pos(src, pos, step, condition, regexp)
         offset = step == -1 ? -1 : 0
         pos += step while condition && src[pos + offset] =~ regexp
@@ -172,8 +192,8 @@ module RuboCop
       end
 
       def within_node?(inner, outer)
-        o = outer.is_a?(Node) ? outer.source_range : outer
-        i = inner.is_a?(Node) ? inner.source_range : inner
+        o = outer.is_a?(AST::Node) ? outer.source_range : outer
+        i = inner.is_a?(AST::Node) ? inner.source_range : inner
         i.begin_pos >= o.begin_pos && i.end_pos <= o.end_pos
       end
 
@@ -195,14 +215,6 @@ module RuboCop
         node
       end
 
-      # Range#size is not available prior to Ruby 2.0.
-      def numeric_range_size(range)
-        size = range.end - range.begin
-        size += 1 unless range.exclude_end?
-        size = 0 if size < 0
-        size
-      end
-
       # If converting a string to Ruby string literal source code, must
       # double quotes be used?
       def double_quotes_required?(string)
@@ -213,16 +225,6 @@ module RuboCop
         # Regex matches IF there is a ' or there is a \\ in the string that is
         # not preceded/followed by another \\ (e.g. "\\x34") but not "\\\\".
         string =~ /'|(?<! \\) \\{2}* \\ (?![\\"])/x
-      end
-
-      # If double quoted string literals are found in Ruby code, and they are
-      # not the preferred style, should they be flagged?
-      def double_quotes_acceptable?(string)
-        needs_escaping?(string) || hard_to_type?(string)
-      end
-
-      def hard_to_type?(string)
-        string.codepoints.any? { |cp| cp < 32 || cp > 126 }
       end
 
       def needs_escaping?(string)
@@ -242,7 +244,32 @@ module RuboCop
       end
 
       def to_symbol_literal(string)
-        ":#{string.to_sym}"
+        if symbol_without_quote?(string)
+          ":#{string}"
+        else
+          ":#{to_string_literal(string)}"
+        end
+      end
+
+      def symbol_without_quote?(string)
+        special_gvars = %w[
+          $! $" $$ $& $' $* $+ $, $/ $; $: $. $< $= $> $? $@ $\\ $_ $` $~ $0
+          $-0 $-F $-I $-K $-W $-a $-d $-i $-l $-p $-v $-w
+        ]
+        redefinable_operators = %w(
+          | ^ & <=> == === =~ > >= < <= << >>
+          + - * / % ** ~ +@ -@ [] []= ` ! != !~
+        )
+
+        # method name
+        string =~ /\A[a-zA-Z_]\w*[!?]?\z/ ||
+          # instance / class variable
+          string =~ /\A\@\@?[a-zA-Z_]\w*\z/ ||
+          # global variable
+          string =~ /\A\$[1-9]\d*\z/ ||
+          string =~ /\A\$[a-zA-Z_]\w*\z/ ||
+          special_gvars.include?(string) ||
+          redefinable_operators.include?(string)
       end
 
       def interpret_string_escapes(string)
@@ -270,6 +297,12 @@ module RuboCop
       def compatible_external_encoding_for?(src)
         src = src.dup if RUBY_VERSION < '2.3'
         src.force_encoding(Encoding.default_external).valid_encoding?
+      end
+
+      def to_supported_styles(enforced_style)
+        enforced_style
+          .sub(/^Enforced/, 'Supported')
+          .sub('Style', 'Styles')
       end
     end
   end

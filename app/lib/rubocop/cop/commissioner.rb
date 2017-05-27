@@ -5,7 +5,9 @@ module RuboCop
     # Commissioner class is responsible for processing the AST and delegating
     # work to the specified cops.
     class Commissioner
-      include RuboCop::Node::Traversal
+      include RuboCop::AST::Traversal
+
+      CopError = Struct.new(:error, :line, :column)
 
       attr_reader :errors
 
@@ -26,19 +28,19 @@ module RuboCop
       # to continue iterating over the children of a node.
       # However, if we know that a certain node type (like `int`) never has
       # child nodes, there is no reason to pay the cost of calling `super`.
-      no_child_callbacks = Node::Traversal::NO_CHILD_NODES.map do |type|
+      no_child_callbacks = NO_CHILD_NODES.map do |type|
         :"on_#{type}"
       end
 
       callback_methods.each do |callback|
-        next unless RuboCop::Node::Traversal.method_defined?(callback)
-        class_eval <<-EOS, __FILE__, __LINE__
+        next unless method_defined?(callback)
+        class_eval <<-EOS, __FILE__, __LINE__ + 1
           def #{callback}(node)
             @callbacks[:"#{callback}"] ||= @cops.select do |cop|
               cop.respond_to?(:"#{callback}")
             end
             @callbacks[:#{callback}].each do |cop|
-              with_cop_error_handling(cop) do
+              with_cop_error_handling(cop, node) do
                 cop.send(:#{callback}, node)
               end
             end
@@ -67,6 +69,14 @@ module RuboCop
 
       def remove_irrelevant_cops(filename)
         @cops.reject! { |cop| cop.excluded_file?(filename) }
+        @cops.reject! do |cop|
+          cop.class.respond_to?(:support_target_ruby_version?) &&
+            !cop.class.support_target_ruby_version?(cop.target_ruby_version)
+        end
+        @cops.reject! do |cop|
+          cop.class.respond_to?(:support_target_rails_version?) &&
+            !cop.class.support_target_rails_version?(cop.target_rails_version)
+        end
       end
 
       def reset_callbacks
@@ -92,11 +102,16 @@ module RuboCop
         end
       end
 
-      def with_cop_error_handling(cop)
+      def with_cop_error_handling(cop, node = nil)
         yield
       rescue => e
         raise e if @options[:raise_error]
-        @errors[cop] << e
+        if node
+          line = node.loc.line
+          column = node.loc.column
+        end
+        error = CopError.new(e, line, column)
+        @errors[cop] << error
       end
     end
   end

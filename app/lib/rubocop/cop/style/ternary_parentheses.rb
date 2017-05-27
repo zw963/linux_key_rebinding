@@ -5,7 +5,8 @@ module RuboCop
     module Style
       # This cop checks for the presence of parentheses around ternary
       # conditions. It is configurable to enforce inclusion or omission of
-      # parentheses using `EnforcedStyle`.
+      # parentheses using `EnforcedStyle`. Omission is only enforced when
+      # removing the parentheses won't cause a different behavior.
       #
       # @example
       #
@@ -13,7 +14,7 @@ module RuboCop
       #
       #   @bad
       #   foo = (bar?) ? a : b
-      #   foo = (bar.baz) ? a : b
+      #   foo = (bar.baz?) ? a : b
       #   foo = (bar && baz) ? a : b
       #
       #   @good
@@ -32,7 +33,7 @@ module RuboCop
       #
       #   @good
       #   foo = (bar?) ? a : b
-      #   foo = (bar.baz) ? a : b
+      #   foo = (bar.baz?) ? a : b
       #   foo = (bar && baz) ? a : b
       #
       # @example
@@ -46,26 +47,27 @@ module RuboCop
       #
       #   @good
       #   foo = bar? ? a : b
-      #   foo = bar.baz ? a : b
+      #   foo = bar.baz? ? a : b
       #   foo = (bar && baz) ? a : b
       class TernaryParentheses < Cop
-        include IfNode
         include SafeAssignment
         include ConfigurableEnforcedStyle
+        include SurroundingSpace
 
         MSG = '%s parentheses for ternary conditions.'.freeze
         MSG_COMPLEX = '%s parentheses for ternary expressions with' \
           ' complex conditions.'.freeze
 
         def on_if(node)
-          return unless ternary?(node) && !infinite_loop? && offense?(node)
+          return unless node.ternary? && !infinite_loop? && offense?(node)
+
           add_offense(node, node.source_range, message(node))
         end
 
         private
 
         def offense?(node)
-          condition, = *node
+          condition = node.condition
 
           if safe_assignment?(condition)
             !safe_assignment_allowed?
@@ -81,20 +83,16 @@ module RuboCop
         end
 
         def autocorrect(node)
-          condition, = *node
+          condition = node.condition
 
           return nil if parenthesized?(condition) &&
                         (safe_assignment?(condition) ||
                         unsafe_autocorrect?(condition))
 
-          lambda do |corrector|
-            if parenthesized?(condition)
-              corrector.remove(condition.loc.begin)
-              corrector.remove(condition.loc.end)
-            else
-              corrector.insert_before(condition.source_range, '(')
-              corrector.insert_after(condition.source_range, ')')
-            end
+          if parenthesized?(condition)
+            correct_parenthesized(condition)
+          else
+            correct_unparenthesized(condition)
           end
         end
 
@@ -113,13 +111,13 @@ module RuboCop
         def non_complex_type?(condition)
           condition.variable? || condition.const_type? ||
             (condition.send_type? && !operator?(condition.method_name)) ||
-            condition.defined_type?
+            condition.defined_type? || condition.yield_type? ||
+            square_brackets?(condition)
         end
 
         def message(node)
           if require_parentheses_when_complex?
-            condition, = *node
-            omit = parenthesized?(condition) ? 'Only use' : 'Use'
+            omit = parenthesized?(node.condition) ? 'Only use' : 'Use'
             format(MSG_COMPLEX, omit)
           else
             verb = require_parentheses? ? 'Use' : 'Omit'
@@ -136,7 +134,7 @@ module RuboCop
         end
 
         def redundant_parentheses_enabled?
-          @config.for_cop('RedundantParentheses')['Enabled']
+          @config.for_cop('Style/RedundantParentheses').fetch('Enabled')
         end
 
         def parenthesized?(node)
@@ -164,8 +162,38 @@ module RuboCop
 
         def_node_matcher :method_call_argument, <<-PATTERN
           {(:defined? $...)
-           (send {(send ...) nil} _ $(send nil _)...)}
+           (send {_ nil} _ $(send nil _)...)}
         PATTERN
+
+        def_node_matcher :square_brackets?,
+                         '(send {(send _recv _msg) str array hash} :[] ...)'
+
+        def correct_parenthesized(condition)
+          lambda do |corrector|
+            corrector.remove(condition.loc.begin)
+            corrector.remove(condition.loc.end)
+
+            # Ruby allows no space between the question mark and parentheses.
+            # If we remove the parentheses, we need to add a space or we'll
+            # generate invalid code.
+            unless whitespace_after?(condition)
+              corrector.insert_after(condition.loc.end, ' ')
+            end
+          end
+        end
+
+        def correct_unparenthesized(condition)
+          lambda do |corrector|
+            corrector.insert_before(condition.source_range, '(')
+            corrector.insert_after(condition.source_range, ')')
+          end
+        end
+
+        def whitespace_after?(node)
+          index = index_of_last_token(node)
+          last_token, next_token = processed_source.tokens[index, 2]
+          space_between?(last_token, next_token)
+        end
       end
     end
   end

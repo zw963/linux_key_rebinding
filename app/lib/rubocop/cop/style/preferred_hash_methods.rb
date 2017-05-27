@@ -37,19 +37,15 @@ module RuboCop
         MSG = 'Use `Hash#%s` instead of `Hash#%s`.'.freeze
 
         OFFENDING_SELECTORS = {
-          short: [:has_key?, :has_value?],
-          verbose: [:key?, :value?]
+          short: %i[has_key? has_value?],
+          verbose: %i[key? value?]
         }.freeze
 
         def on_send(node)
-          _receiver, method_name, *args = *node
-          return unless args.size == 1 &&
-                        offending_selector?(method_name)
+          return unless node.arguments.one? &&
+                        offending_selector?(node.method_name)
 
-          add_offense(node, :selector,
-                      format(MSG,
-                             proper_method_name(method_name),
-                             method_name))
+          add_offense(node, :selector)
         end
 
         def autocorrect(node)
@@ -60,6 +56,10 @@ module RuboCop
         end
 
         private
+
+        def message(node)
+          format(MSG, proper_method_name(node.method_name), node.method_name)
+        end
 
         def proper_method_name(method_name)
           if style == :verbose

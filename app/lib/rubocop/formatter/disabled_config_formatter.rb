@@ -18,7 +18,7 @@ module RuboCop
       @config_to_allow_offenses = {}
       @detected_styles = {}
 
-      COPS = Cop::Cop.all.group_by(&:cop_name)
+      COPS = Cop::Cop.registry.to_h
 
       class << self
         attr_accessor :config_to_allow_offenses, :detected_styles
@@ -66,6 +66,7 @@ module RuboCop
         if @exclude_limit_option
           command += format(' --exclude-limit %d', @exclude_limit_option.to_i)
         end
+        command += ' --no-offense-counts' if @options[:no_offense_counts]
 
         command
       end
@@ -101,7 +102,7 @@ module RuboCop
 
       def cop_config_params(default_cfg, cfg)
         default_cfg.keys -
-          %w(Description StyleGuide Reference Enabled Exclude) -
+          %w[Description StyleGuide Reference Enabled Exclude] -
           cfg.keys
       end
 

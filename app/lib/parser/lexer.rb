@@ -5023,7 +5023,7 @@ self._lex_indicies = [
 	103, 103, 103, 103, 103, 103, 103, 103, 
 	103, 103, 103, 103, 103, 140, 103, 103, 
 	103, 103, 103, 109, 103, 103, 103, 103, 
-	103, 103, 103, 103, 103, 103, 103, 103, 
+	103, 103, 103, 140, 103, 103, 103, 103, 
 	103, 103, 103, 103, 103, 103, 103, 103, 
 	103, 103, 140, 103, 140, 735, 140, 140, 
 	140, 103, 103, 103, 103, 103, 103, 103, 
@@ -11018,55 +11018,55 @@ begin
 		begin
  tm = p 		end
 	when 55 then
-# line 1678 "lib/parser/lexer.rl"
+# line 1680 "lib/parser/lexer.rl"
 		begin
  heredoc_e      = p 		end
 	when 319 then
-# line 1732 "lib/parser/lexer.rl"
+# line 1734 "lib/parser/lexer.rl"
 		begin
  @escape = nil 		end
 	when 348 then
-# line 1805 "lib/parser/lexer.rl"
+# line 1807 "lib/parser/lexer.rl"
 		begin
  tm = p 		end
 	when 424 then
-# line 2023 "lib/parser/lexer.rl"
+# line 2025 "lib/parser/lexer.rl"
 		begin
  @num_base = 16; @num_digits_s = p 		end
 	when 418 then
-# line 2024 "lib/parser/lexer.rl"
+# line 2026 "lib/parser/lexer.rl"
 		begin
  @num_base = 10; @num_digits_s = p 		end
 	when 421 then
-# line 2025 "lib/parser/lexer.rl"
+# line 2027 "lib/parser/lexer.rl"
 		begin
  @num_base = 8;  @num_digits_s = p 		end
 	when 415 then
-# line 2026 "lib/parser/lexer.rl"
+# line 2028 "lib/parser/lexer.rl"
 		begin
  @num_base = 2;  @num_digits_s = p 		end
 	when 430 then
-# line 2027 "lib/parser/lexer.rl"
+# line 2029 "lib/parser/lexer.rl"
 		begin
  @num_base = 10; @num_digits_s = @ts 		end
 	when 398 then
-# line 2028 "lib/parser/lexer.rl"
+# line 2030 "lib/parser/lexer.rl"
 		begin
  @num_base = 8;  @num_digits_s = @ts 		end
 	when 410 then
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 	when 405 then
-# line 2086 "lib/parser/lexer.rl"
+# line 2088 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 	when 403 then
-# line 2087 "lib/parser/lexer.rl"
+# line 2089 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 	when 76 then
-# line 2222 "lib/parser/lexer.rl"
+# line 2224 "lib/parser/lexer.rl"
 		begin
  tm = p 		end
 	when 7 then
@@ -13276,7 +13276,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 39 then
-# line 1495 "lib/parser/lexer.rl"
+# line 1497 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -13290,7 +13290,7 @@ p = p - 1; begin  p = p - 1; 	begin
        end
 		end
 	when 223 then
-# line 1509 "lib/parser/lexer.rl"
+# line 1511 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = p - 1; 	begin
@@ -13360,7 +13360,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 227 then
-# line 1495 "lib/parser/lexer.rl"
+# line 1497 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -13374,12 +13374,12 @@ p = p - 1; begin
        end
 		end
 	when 226 then
-# line 1500 "lib/parser/lexer.rl"
+# line 1502 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
 	when 244 then
-# line 1509 "lib/parser/lexer.rl"
+# line 1511 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = p - 1; 	begin
@@ -13390,12 +13390,12 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 25 then
-# line 1500 "lib/parser/lexer.rl"
+# line 1502 "lib/parser/lexer.rl"
 		begin
  begin p = (( @te))-1; end
 		end
 	when 41 then
-# line 1509 "lib/parser/lexer.rl"
+# line 1511 "lib/parser/lexer.rl"
 		begin
  begin p = (( @te))-1; end
  begin  p = p - 1; 	begin
@@ -13456,7 +13456,7 @@ end
 end 
 			end
 	when 43 then
-# line 1545 "lib/parser/lexer.rl"
+# line 1547 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = @ts - 1
@@ -13488,7 +13488,7 @@ end
    end
 		end
 	when 250 then
-# line 1545 "lib/parser/lexer.rl"
+# line 1547 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = @ts - 1
@@ -13500,7 +13500,7 @@ p = p - 1; begin  p = @ts - 1
   end
 		end
 	when 44 then
-# line 1545 "lib/parser/lexer.rl"
+# line 1547 "lib/parser/lexer.rl"
 		begin
  begin p = (( @te))-1; end
  begin  p = @ts - 1
@@ -13542,7 +13542,7 @@ p = p - 1; begin  p = @ts - 1
 end 
 			end
 	when 260 then
-# line 1579 "lib/parser/lexer.rl"
+# line 1581 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  emit_do(true)
@@ -13554,7 +13554,7 @@ end
   end
 		end
 	when 253 then
-# line 1585 "lib/parser/lexer.rl"
+# line 1587 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = p - 1; 	begin
@@ -13585,12 +13585,12 @@ end
    end
 		end
 	when 255 then
-# line 1582 "lib/parser/lexer.rl"
+# line 1584 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
 	when 258 then
-# line 1585 "lib/parser/lexer.rl"
+# line 1587 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = p - 1; 	begin
@@ -13601,7 +13601,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 264 then
-# line 1609 "lib/parser/lexer.rl"
+# line 1611 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = p - 1; 	begin
@@ -13632,7 +13632,7 @@ p = p - 1; begin  p = p - 1; 	begin
    end
 		end
 	when 272 then
-# line 1601 "lib/parser/lexer.rl"
+# line 1603 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = @ts - 1; 	begin
@@ -13643,12 +13643,12 @@ p = p - 1; begin  p = @ts - 1; 	begin
   end
 		end
 	when 266 then
-# line 1603 "lib/parser/lexer.rl"
+# line 1605 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
 	when 270 then
-# line 1609 "lib/parser/lexer.rl"
+# line 1611 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = p - 1; 	begin
@@ -13682,7 +13682,7 @@ p = p - 1; begin  p = p - 1; 	begin
 end 
 			end
 	when 300 then
-# line 1626 "lib/parser/lexer.rl"
+# line 1628 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -13699,7 +13699,7 @@ end
        end
 		end
 	when 301 then
-# line 1646 "lib/parser/lexer.rl"
+# line 1648 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -13713,7 +13713,7 @@ end
        end
 		end
 	when 295 then
-# line 1653 "lib/parser/lexer.rl"
+# line 1655 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -13727,7 +13727,7 @@ end
        end
 		end
 	when 51 then
-# line 1660 "lib/parser/lexer.rl"
+# line 1662 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -13741,7 +13741,7 @@ end
        end
 		end
 	when 302 then
-# line 1706 "lib/parser/lexer.rl"
+# line 1708 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -13755,7 +13755,7 @@ end
        end
 		end
 	when 54 then
-# line 1720 "lib/parser/lexer.rl"
+# line 1722 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -13769,7 +13769,7 @@ end
        end
 		end
 	when 316 then
-# line 1751 "lib/parser/lexer.rl"
+# line 1753 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -13787,7 +13787,7 @@ end
        end
 		end
 	when 315 then
-# line 1761 "lib/parser/lexer.rl"
+# line 1763 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -13795,7 +13795,7 @@ end
        end
 		end
 	when 303 then
-# line 1800 "lib/parser/lexer.rl"
+# line 1802 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  emit_table(PUNCTUATION_BEGIN)
@@ -13807,7 +13807,7 @@ end
   end
 		end
 	when 48 then
-# line 1820 "lib/parser/lexer.rl"
+# line 1822 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -13839,7 +13839,7 @@ end
        end
 		end
 	when 289 then
-# line 1866 "lib/parser/lexer.rl"
+# line 1868 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = @ts - 1
@@ -13851,7 +13851,7 @@ end
   end
 		end
 	when 52 then
-# line 1879 "lib/parser/lexer.rl"
+# line 1881 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = @ts - 1; 	begin
@@ -13882,7 +13882,7 @@ end
    end
 		end
 	when 299 then
-# line 1636 "lib/parser/lexer.rl"
+# line 1638 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit(:tSTAR, '*'.freeze)
@@ -13894,7 +13894,7 @@ p = p - 1; begin  emit(:tSTAR, '*'.freeze)
   end
 		end
 	when 296 then
-# line 1660 "lib/parser/lexer.rl"
+# line 1662 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -13908,7 +13908,7 @@ p = p - 1; begin
        end
 		end
 	when 294 then
-# line 1666 "lib/parser/lexer.rl"
+# line 1668 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -13916,7 +13916,7 @@ p = p - 1; begin
        end
 		end
 	when 304 then
-# line 1720 "lib/parser/lexer.rl"
+# line 1722 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -13930,7 +13930,7 @@ p = p - 1; begin
        end
 		end
 	when 314 then
-# line 1761 "lib/parser/lexer.rl"
+# line 1763 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -13938,7 +13938,7 @@ p = p - 1; begin
        end
 		end
 	when 320 then
-# line 1767 "lib/parser/lexer.rl"
+# line 1769 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -13952,7 +13952,7 @@ p = p - 1; begin
        end
 		end
 	when 297 then
-# line 1800 "lib/parser/lexer.rl"
+# line 1802 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit_table(PUNCTUATION_BEGIN)
@@ -13988,12 +13988,12 @@ p = p - 1; begin
    end
 		end
 	when 286 then
-# line 1863 "lib/parser/lexer.rl"
+# line 1865 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
 	when 288 then
-# line 1866 "lib/parser/lexer.rl"
+# line 1868 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = @ts - 1
@@ -14005,7 +14005,7 @@ p = p - 1; begin  p = @ts - 1
   end
 		end
 	when 291 then
-# line 1879 "lib/parser/lexer.rl"
+# line 1881 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = @ts - 1; 	begin
@@ -14016,7 +14016,7 @@ p = p - 1; begin  p = @ts - 1; 	begin
   end
 		end
 	when 50 then
-# line 1666 "lib/parser/lexer.rl"
+# line 1668 "lib/parser/lexer.rl"
 		begin
  begin p = (( @te))-1; end
  begin 
@@ -14024,7 +14024,7 @@ p = p - 1; begin  p = @ts - 1; 	begin
        end
 		end
 	when 57 then
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  begin p = (( @te))-1; end
  begin 
@@ -14049,12 +14049,12 @@ p = p - 1; begin  p = @ts - 1; 	begin
        end
 		end
 	when 49 then
-# line 1863 "lib/parser/lexer.rl"
+# line 1865 "lib/parser/lexer.rl"
 		begin
  begin p = (( @te))-1; end
 		end
 	when 53 then
-# line 1879 "lib/parser/lexer.rl"
+# line 1881 "lib/parser/lexer.rl"
 		begin
  begin p = (( @te))-1; end
  begin  p = @ts - 1; 	begin
@@ -14137,7 +14137,7 @@ p = p - 1; begin  p = @ts - 1; 	begin
 end 
 			end
 	when 350 then
-# line 1899 "lib/parser/lexer.rl"
+# line 1901 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = p - 1; 	begin
@@ -14168,12 +14168,12 @@ end
    end
 		end
 	when 352 then
-# line 1887 "lib/parser/lexer.rl"
+# line 1889 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
 	when 356 then
-# line 1899 "lib/parser/lexer.rl"
+# line 1901 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = p - 1; 	begin
@@ -14184,7 +14184,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 60 then
-# line 1909 "lib/parser/lexer.rl"
+# line 1911 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = @ts - 1
@@ -14196,7 +14196,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 360 then
-# line 1914 "lib/parser/lexer.rl"
+# line 1916 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -14209,7 +14209,7 @@ p = p - 1; begin  p = p - 1; 	begin
        end
 		end
 	when 359 then
-# line 1924 "lib/parser/lexer.rl"
+# line 1926 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = p - 1; 	begin
@@ -14240,12 +14240,12 @@ p = p - 1; begin  p = p - 1; 	begin
    end
 		end
 	when 362 then
-# line 1918 "lib/parser/lexer.rl"
+# line 1920 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
 	when 361 then
-# line 1924 "lib/parser/lexer.rl"
+# line 1926 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = p - 1; 	begin
@@ -14256,7 +14256,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 59 then
-# line 1924 "lib/parser/lexer.rl"
+# line 1926 "lib/parser/lexer.rl"
 		begin
  begin p = (( @te))-1; end
  begin  p = p - 1; 	begin
@@ -14267,7 +14267,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 392 then
-# line 1935 "lib/parser/lexer.rl"
+# line 1937 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -14283,7 +14283,7 @@ p = p - 1; begin  p = p - 1; 	begin
        end
 		end
 	when 74 then
-# line 1972 "lib/parser/lexer.rl"
+# line 1974 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  emit(:kCLASS, 'class'.freeze, @ts, @ts + 5)
@@ -14296,7 +14296,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 370 then
-# line 2107 "lib/parser/lexer.rl"
+# line 2109 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -14310,7 +14310,7 @@ p = p - 1; begin  p = p - 1; 	begin
        end
 		end
 	when 62 then
-# line 2125 "lib/parser/lexer.rl"
+# line 2127 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = @ts - 1; 	begin
@@ -14323,7 +14323,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 389 then
-# line 2132 "lib/parser/lexer.rl"
+# line 2134 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  emit_table(PUNCTUATION)
@@ -14335,7 +14335,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 383 then
-# line 2159 "lib/parser/lexer.rl"
+# line 2161 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  emit_table(PUNCTUATION)
@@ -14347,7 +14347,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 376 then
-# line 2163 "lib/parser/lexer.rl"
+# line 2165 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -14369,7 +14369,7 @@ p = p - 1; begin  p = p - 1; 	begin
        end
 		end
 	when 388 then
-# line 2177 "lib/parser/lexer.rl"
+# line 2179 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  emit(:tOP_ASGN, tok(@ts, @te - 1))
@@ -14381,7 +14381,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 374 then
-# line 2181 "lib/parser/lexer.rl"
+# line 2183 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  emit(:tEH, '?'.freeze)
@@ -14393,7 +14393,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 371 then
-# line 2189 "lib/parser/lexer.rl"
+# line 2191 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  emit_table(PUNCTUATION)
@@ -14405,7 +14405,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 373 then
-# line 2202 "lib/parser/lexer.rl"
+# line 2204 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  emit(:tSEMI, ';'.freeze)
@@ -14417,7 +14417,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 438 then
-# line 2205 "lib/parser/lexer.rl"
+# line 2207 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -14426,7 +14426,7 @@ p = p - 1; begin  p = p - 1; 	begin
        end
 		end
 	when 369 then
-# line 2211 "lib/parser/lexer.rl"
+# line 2213 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -14454,7 +14454,7 @@ p = p - 1; begin  p = p - 1; 	begin
    end
 		end
 	when 448 then
-# line 1968 "lib/parser/lexer.rl"
+# line 1970 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit_table(KEYWORDS)
@@ -14466,7 +14466,7 @@ p = p - 1; begin  emit_table(KEYWORDS)
   end
 		end
 	when 446 then
-# line 1972 "lib/parser/lexer.rl"
+# line 1974 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit(:kCLASS, 'class'.freeze, @ts, @ts + 5)
@@ -14479,7 +14479,7 @@ p = p - 1; begin  emit(:kCLASS, 'class'.freeze, @ts, @ts + 5)
   end
 		end
 	when 445 then
-# line 1983 "lib/parser/lexer.rl"
+# line 1985 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit_table(KEYWORDS)
@@ -14491,7 +14491,7 @@ p = p - 1; begin  emit_table(KEYWORDS)
   end
 		end
 	when 395 then
-# line 2057 "lib/parser/lexer.rl"
+# line 2059 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -14499,7 +14499,7 @@ p = p - 1; begin
        end
 		end
 	when 435 then
-# line 2117 "lib/parser/lexer.rl"
+# line 2119 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit(:tCONSTANT)
@@ -14511,7 +14511,7 @@ p = p - 1; begin  emit(:tCONSTANT)
   end
 		end
 	when 387 then
-# line 2125 "lib/parser/lexer.rl"
+# line 2127 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = @ts - 1; 	begin
@@ -14524,7 +14524,7 @@ p = p - 1; begin  p = @ts - 1; 	begin
   end
 		end
 	when 393 then
-# line 2132 "lib/parser/lexer.rl"
+# line 2134 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit_table(PUNCTUATION)
@@ -14560,7 +14560,7 @@ p = p - 1; begin
    end
 		end
 	when 382 then
-# line 2159 "lib/parser/lexer.rl"
+# line 2161 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit_table(PUNCTUATION)
@@ -14572,7 +14572,7 @@ p = p - 1; begin  emit_table(PUNCTUATION)
   end
 		end
 	when 394 then
-# line 2189 "lib/parser/lexer.rl"
+# line 2191 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit_table(PUNCTUATION)
@@ -14584,12 +14584,12 @@ p = p - 1; begin  emit_table(PUNCTUATION)
   end
 		end
 	when 380 then
-# line 2196 "lib/parser/lexer.rl"
+# line 2198 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
 	when 386 then
-# line 2211 "lib/parser/lexer.rl"
+# line 2213 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -14597,7 +14597,7 @@ p = p - 1; begin
        end
 		end
 	when 63 then
-# line 2057 "lib/parser/lexer.rl"
+# line 2059 "lib/parser/lexer.rl"
 		begin
  begin p = (( @te))-1; end
  begin 
@@ -14605,7 +14605,7 @@ p = p - 1; begin
        end
 		end
 	when 61 then
-# line 2211 "lib/parser/lexer.rl"
+# line 2213 "lib/parser/lexer.rl"
 		begin
  begin p = (( @te))-1; end
  begin 
@@ -14872,7 +14872,7 @@ p = p - 1; begin
 end 
 			end
 	when 78 then
-# line 2223 "lib/parser/lexer.rl"
+# line 2225 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = tm - 1; 	begin
@@ -14883,7 +14883,7 @@ end
   end
 		end
 	when 453 then
-# line 2226 "lib/parser/lexer.rl"
+# line 2228 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  emit(:tNL, nil, @newline_s, @newline_s + 1)
@@ -14895,7 +14895,7 @@ end
   end
 		end
 	when 454 then
-# line 2226 "lib/parser/lexer.rl"
+# line 2228 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit(:tNL, nil, @newline_s, @newline_s + 1)
@@ -14907,7 +14907,7 @@ p = p - 1; begin  emit(:tNL, nil, @newline_s, @newline_s + 1)
   end
 		end
 	when 75 then
-# line 2226 "lib/parser/lexer.rl"
+# line 2228 "lib/parser/lexer.rl"
 		begin
  begin p = (( @te))-1; end
  begin  emit(:tNL, nil, @newline_s, @newline_s + 1)
@@ -14919,7 +14919,7 @@ p = p - 1; begin  emit(:tNL, nil, @newline_s, @newline_s + 1)
   end
 		end
 	when 457 then
-# line 2236 "lib/parser/lexer.rl"
+# line 2238 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -14933,7 +14933,7 @@ p = p - 1; begin
        end
 		end
 	when 456 then
-# line 2244 "lib/parser/lexer.rl"
+# line 2246 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -14942,7 +14942,7 @@ p = p - 1; begin
        end
 		end
 	when 89 then
-# line 2254 "lib/parser/lexer.rl"
+# line 2256 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  @eq_begin_s = @ts
@@ -14954,13 +14954,13 @@ p = p - 1; begin
   end
 		end
 	when 2 then
-# line 2258 "lib/parser/lexer.rl"
+# line 2260 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = pe - 3  end
 		end
 	when 81 then
-# line 2261 "lib/parser/lexer.rl"
+# line 2263 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = p - 1; 	begin
@@ -14991,12 +14991,12 @@ p = p - 1; begin
    end
 		end
 	when 83 then
-# line 2251 "lib/parser/lexer.rl"
+# line 2253 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
 	when 88 then
-# line 2254 "lib/parser/lexer.rl"
+# line 2256 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  @eq_begin_s = @ts
@@ -15008,7 +15008,7 @@ p = p - 1; begin  @eq_begin_s = @ts
   end
 		end
 	when 87 then
-# line 2261 "lib/parser/lexer.rl"
+# line 2263 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = p - 1; 	begin
@@ -15019,7 +15019,7 @@ p = p - 1; begin  p = p - 1; 	begin
   end
 		end
 	when 1 then
-# line 2261 "lib/parser/lexer.rl"
+# line 2263 "lib/parser/lexer.rl"
 		begin
  begin p = (( @te))-1; end
  begin  p = p - 1; 	begin
@@ -15788,7 +15788,7 @@ p = p - 1; begin  p = p - 1; 	begin
     # there are no cases when we need to skip it.
     @newline_s = p
   		end
-# line 1495 "lib/parser/lexer.rl"
+# line 1497 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -15812,7 +15812,7 @@ p = p - 1; begin  p = p - 1; 	begin
     # there are no cases when we need to skip it.
     @newline_s = p
   		end
-# line 1751 "lib/parser/lexer.rl"
+# line 1753 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -15840,7 +15840,7 @@ p = p - 1; begin  p = p - 1; 	begin
     # there are no cases when we need to skip it.
     @newline_s = p
   		end
-# line 1866 "lib/parser/lexer.rl"
+# line 1868 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = @ts - 1
@@ -15862,7 +15862,7 @@ p = p - 1; begin  p = p - 1; 	begin
     # there are no cases when we need to skip it.
     @newline_s = p
   		end
-# line 2236 "lib/parser/lexer.rl"
+# line 2238 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -15886,7 +15886,7 @@ p = p - 1; begin  p = p - 1; 	begin
     # there are no cases when we need to skip it.
     @newline_s = p
   		end
-# line 2241 "lib/parser/lexer.rl"
+# line 2243 "lib/parser/lexer.rl"
 		begin
  @te = p+1
 		end
@@ -15901,7 +15901,7 @@ p = p - 1; begin  p = p - 1; 	begin
     # there are no cases when we need to skip it.
     @newline_s = p
   		end
-# line 2254 "lib/parser/lexer.rl"
+# line 2256 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  @eq_begin_s = @ts
@@ -15923,7 +15923,7 @@ p = p - 1; begin  p = p - 1; 	begin
     # there are no cases when we need to skip it.
     @newline_s = p
   		end
-# line 2258 "lib/parser/lexer.rl"
+# line 2260 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = pe - 3  end
@@ -15932,7 +15932,7 @@ p = p - 1; begin  p = p - 1; 	begin
 # line 626 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tRATIONAL,  Rational(chars)) } 		end
-# line 2030 "lib/parser/lexer.rl"
+# line 2032 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -15970,7 +15970,7 @@ p = p - 1; begin
 # line 627 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tIMAGINARY, Complex(0, chars)) } 		end
-# line 2030 "lib/parser/lexer.rl"
+# line 2032 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -16008,7 +16008,7 @@ p = p - 1; begin
 # line 628 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tIMAGINARY, Complex(0, Rational(chars))) } 		end
-# line 2030 "lib/parser/lexer.rl"
+# line 2032 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -16046,7 +16046,7 @@ p = p - 1; begin
 # line 632 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tIMAGINARY, Complex(0, Float(chars))) } 		end
-# line 2089 "lib/parser/lexer.rl"
+# line 2091 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -16070,7 +16070,7 @@ p = p - 1; begin
 # line 636 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tRATIONAL,  Rational(chars)) } 		end
-# line 2089 "lib/parser/lexer.rl"
+# line 2091 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -16094,7 +16094,7 @@ p = p - 1; begin
 # line 637 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tIMAGINARY, Complex(0, Rational(chars))) } 		end
-# line 2089 "lib/parser/lexer.rl"
+# line 2091 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -16256,7 +16256,7 @@ p = p - 1; begin
       codepoint_s += codepoint_str.length + 1
     end
   		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -16383,7 +16383,7 @@ p = p - 1; begin
       @escape = encode_escape(@source_buffer.slice(p - 1))
     end
   		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -16501,7 +16501,7 @@ p = p - 1; begin
 
     diagnostic :fatal, :invalid_escape
   		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -16613,7 +16613,7 @@ p = p - 1; begin
 # line 698 "lib/parser/lexer.rl"
 		begin
  @escape = "\x7f" 		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -16725,7 +16725,7 @@ p = p - 1; begin
 # line 705 "lib/parser/lexer.rl"
 		begin
  @escape = encode_escape(tok(@escape_s, p).to_i(8) % 0x100) 		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -16837,7 +16837,7 @@ p = p - 1; begin
 # line 709 "lib/parser/lexer.rl"
 		begin
  @escape = encode_escape(tok(@escape_s + 1, p).to_i(16)) 		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -16949,7 +16949,7 @@ p = p - 1; begin
 # line 713 "lib/parser/lexer.rl"
 		begin
  @escape = tok(@escape_s + 1, p).to_i(16).chr(Encoding::UTF_8) 		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -17067,7 +17067,7 @@ p = p - 1; begin
 
         diagnostic :fatal, :invalid_hex_escape, nil, range(@escape_s - 1, p + 2)
       		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -17185,7 +17185,7 @@ p = p - 1; begin
 
         diagnostic :fatal, :invalid_unicode_escape, nil, range(@escape_s - 1, p)
       		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -17303,7 +17303,7 @@ p = p - 1; begin
 
           diagnostic :fatal, :unterminated_unicode, nil, range(p - 1, p)
         		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -17421,7 +17421,7 @@ p = p - 1; begin
 
       diagnostic :fatal, :escape_eof, nil, range(p - 1, p)
     		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -17654,7 +17654,7 @@ p = p - 1;		end
       @herebody_s = nil
     end
   		end
-# line 1495 "lib/parser/lexer.rl"
+# line 1497 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin 
@@ -17678,7 +17678,7 @@ p = p - 1;		end
       @herebody_s = nil
     end
   		end
-# line 1500 "lib/parser/lexer.rl"
+# line 1502 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -17693,7 +17693,7 @@ p = p - 1;		end
       @herebody_s = nil
     end
   		end
-# line 1506 "lib/parser/lexer.rl"
+# line 1508 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = p - 1; 	begin
@@ -17714,7 +17714,7 @@ p = p - 1; begin  p = p - 1; 	begin
       @herebody_s = nil
     end
   		end
-# line 1582 "lib/parser/lexer.rl"
+# line 1584 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -17729,7 +17729,7 @@ p = p - 1;		end
       @herebody_s = nil
     end
   		end
-# line 1603 "lib/parser/lexer.rl"
+# line 1605 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -17744,7 +17744,7 @@ p = p - 1;		end
       @herebody_s = nil
     end
   		end
-# line 1606 "lib/parser/lexer.rl"
+# line 1608 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = p - 1; 	begin
@@ -17765,7 +17765,7 @@ p = p - 1; begin  p = p - 1; 	begin
       @herebody_s = nil
     end
   		end
-# line 1863 "lib/parser/lexer.rl"
+# line 1865 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -17780,7 +17780,7 @@ p = p - 1;		end
       @herebody_s = nil
     end
   		end
-# line 1887 "lib/parser/lexer.rl"
+# line 1889 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -17795,7 +17795,7 @@ p = p - 1;		end
       @herebody_s = nil
     end
   		end
-# line 1890 "lib/parser/lexer.rl"
+# line 1892 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -17827,7 +17827,7 @@ p = p - 1; begin
       @herebody_s = nil
     end
   		end
-# line 1918 "lib/parser/lexer.rl"
+# line 1920 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -17842,7 +17842,7 @@ p = p - 1;		end
       @herebody_s = nil
     end
   		end
-# line 1921 "lib/parser/lexer.rl"
+# line 1923 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  	begin
@@ -17863,7 +17863,7 @@ p = p - 1; begin  	begin
       @herebody_s = nil
     end
   		end
-# line 2196 "lib/parser/lexer.rl"
+# line 2198 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -17878,7 +17878,7 @@ p = p - 1;		end
       @herebody_s = nil
     end
   		end
-# line 2199 "lib/parser/lexer.rl"
+# line 2201 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  	begin
@@ -17899,7 +17899,7 @@ p = p - 1; begin  	begin
       @herebody_s = nil
     end
   		end
-# line 2251 "lib/parser/lexer.rl"
+# line 2253 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -17948,7 +17948,7 @@ p = p - 1; begin
       current_literal.start_interp_brace
     end
   		end
-# line 1568 "lib/parser/lexer.rl"
+# line 1570 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -17972,7 +17972,7 @@ p = p - 1; begin
       current_literal.start_interp_brace
     end
   		end
-# line 1778 "lib/parser/lexer.rl"
+# line 1780 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18001,7 +18001,7 @@ p = p - 1; begin
       current_literal.start_interp_brace
     end
   		end
-# line 1943 "lib/parser/lexer.rl"
+# line 1945 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18057,7 +18057,7 @@ p = p - 1; begin
       end
     end
   		end
-# line 2163 "lib/parser/lexer.rl"
+# line 2165 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18127,7 +18127,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1503 "lib/parser/lexer.rl"
+# line 1505 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  	begin
@@ -18141,7 +18141,7 @@ p = p - 1; begin  	begin
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1582 "lib/parser/lexer.rl"
+# line 1584 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -18149,7 +18149,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1603 "lib/parser/lexer.rl"
+# line 1605 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -18157,7 +18157,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1863 "lib/parser/lexer.rl"
+# line 1865 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -18165,7 +18165,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1887 "lib/parser/lexer.rl"
+# line 1889 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -18173,7 +18173,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1918 "lib/parser/lexer.rl"
+# line 1920 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -18181,7 +18181,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 2196 "lib/parser/lexer.rl"
+# line 2198 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -18189,7 +18189,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 2251 "lib/parser/lexer.rl"
+# line 2253 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -18212,7 +18212,7 @@ p = p - 1; begin  emit(:tFID, tok(@ts, tm), @ts, tm)
 # line 1172 "lib/parser/lexer.rl"
 		begin
  tm = p 		end
-# line 1712 "lib/parser/lexer.rl"
+# line 1714 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18230,7 +18230,7 @@ p = p - 1; begin
 # line 1172 "lib/parser/lexer.rl"
 		begin
  tm = p 		end
-# line 1851 "lib/parser/lexer.rl"
+# line 1853 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = @ts - 1
@@ -18522,7 +18522,7 @@ p = p - 1; begin  emit(:tFID, tok(@ts, tm), @ts, tm)
 # line 1173 "lib/parser/lexer.rl"
 		begin
  tm = p - 2 		end
-# line 1712 "lib/parser/lexer.rl"
+# line 1714 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18540,7 +18540,7 @@ p = p - 1; begin
 # line 1173 "lib/parser/lexer.rl"
 		begin
  tm = p - 2 		end
-# line 1851 "lib/parser/lexer.rl"
+# line 1853 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = @ts - 1
@@ -18555,7 +18555,7 @@ p = p - 1; begin  p = @ts - 1
 # line 1173 "lib/parser/lexer.rl"
 		begin
  tm = p - 2 		end
-# line 2139 "lib/parser/lexer.rl"
+# line 2141 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18579,7 +18579,7 @@ p = p - 1; begin
 # line 1178 "lib/parser/lexer.rl"
 		begin
  tm = p 		end
-# line 1712 "lib/parser/lexer.rl"
+# line 1714 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18597,7 +18597,7 @@ p = p - 1; begin
 # line 1178 "lib/parser/lexer.rl"
 		begin
  tm = p 		end
-# line 1851 "lib/parser/lexer.rl"
+# line 1853 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = @ts - 1
@@ -18612,7 +18612,7 @@ p = p - 1; begin  p = @ts - 1
 # line 1179 "lib/parser/lexer.rl"
 		begin
  tm = p - 2 		end
-# line 1712 "lib/parser/lexer.rl"
+# line 1714 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18630,7 +18630,7 @@ p = p - 1; begin
 # line 1179 "lib/parser/lexer.rl"
 		begin
  tm = p - 2 		end
-# line 1851 "lib/parser/lexer.rl"
+# line 1853 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = @ts - 1
@@ -18645,7 +18645,7 @@ p = p - 1; begin  p = @ts - 1
 # line 1180 "lib/parser/lexer.rl"
 		begin
  tm = p - 2 		end
-# line 1712 "lib/parser/lexer.rl"
+# line 1714 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18663,7 +18663,7 @@ p = p - 1; begin
 # line 1180 "lib/parser/lexer.rl"
 		begin
  tm = p - 2 		end
-# line 1851 "lib/parser/lexer.rl"
+# line 1853 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = @ts - 1
@@ -18678,7 +18678,7 @@ p = p - 1; begin  p = @ts - 1
 # line 1181 "lib/parser/lexer.rl"
 		begin
  tm = p - 2 		end
-# line 1712 "lib/parser/lexer.rl"
+# line 1714 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18771,7 +18771,7 @@ end
 # line 1182 "lib/parser/lexer.rl"
 		begin
  tm = p - 3 		end
-# line 1712 "lib/parser/lexer.rl"
+# line 1714 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18789,7 +18789,7 @@ p = p - 1; begin
 # line 1182 "lib/parser/lexer.rl"
 		begin
  tm = p - 3 		end
-# line 1851 "lib/parser/lexer.rl"
+# line 1853 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  p = @ts - 1
@@ -18804,7 +18804,7 @@ p = p - 1; begin  p = @ts - 1
 # line 1187 "lib/parser/lexer.rl"
 		begin
  tm = p - 2 		end
-# line 1712 "lib/parser/lexer.rl"
+# line 1714 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18822,7 +18822,7 @@ p = p - 1; begin
 # line 1192 "lib/parser/lexer.rl"
 		begin
  tm = p - 2 		end
-# line 2121 "lib/parser/lexer.rl"
+# line 2123 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit(:tCONSTANT, tok(@ts, tm), @ts, tm)
@@ -18856,7 +18856,7 @@ p = p - 1; begin  emit(:tLBRACK, '['.freeze, @te - 1, @te)
 
     @cond.push(false); @cmdarg.push(false)
   		end
-# line 1790 "lib/parser/lexer.rl"
+# line 1792 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit(:tLBRACK, '['.freeze)
@@ -18873,7 +18873,7 @@ p = p - 1; begin  emit(:tLBRACK, '['.freeze)
 
     @cond.push(false); @cmdarg.push(false)
   		end
-# line 2185 "lib/parser/lexer.rl"
+# line 2187 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit(:tLBRACK2, '['.freeze)
@@ -18942,7 +18942,7 @@ p = p - 1; begin  emit(:tLPAREN2, '('.freeze)
 
     @paren_nest += 1
   		end
-# line 1522 "lib/parser/lexer.rl"
+# line 1524 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -18972,7 +18972,7 @@ p = p - 1; begin
 
     @paren_nest += 1
   		end
-# line 1795 "lib/parser/lexer.rl"
+# line 1797 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit(:tLPAREN, '('.freeze)
@@ -18991,7 +18991,7 @@ p = p - 1; begin  emit(:tLPAREN, '('.freeze)
 
     @paren_nest += 1
   		end
-# line 2159 "lib/parser/lexer.rl"
+# line 2161 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit_table(PUNCTUATION)
@@ -19008,7 +19008,7 @@ p = p - 1; begin  emit_table(PUNCTUATION)
 
     @paren_nest -= 1
   		end
-# line 2163 "lib/parser/lexer.rl"
+# line 2165 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -19030,7 +19030,7 @@ p = p - 1; begin
        end
 		end
 	when 56 then
-# line 1678 "lib/parser/lexer.rl"
+# line 1680 "lib/parser/lexer.rl"
 		begin
  heredoc_e      = p 		end
 # line 492 "lib/parser/lexer.rl"
@@ -19044,10 +19044,10 @@ p = p - 1; begin
     @newline_s = p
   		end
 	when 313 then
-# line 1679 "lib/parser/lexer.rl"
+# line 1681 "lib/parser/lexer.rl"
 		begin
  new_herebody_s = p 		end
-# line 1680 "lib/parser/lexer.rl"
+# line 1682 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -19076,10 +19076,10 @@ p = p - 1; begin
        end
 		end
 	when 318 then
-# line 1732 "lib/parser/lexer.rl"
+# line 1734 "lib/parser/lexer.rl"
 		begin
  @escape = nil 		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -19104,10 +19104,10 @@ p = p - 1; begin
        end
 		end
 	when 345 then
-# line 1805 "lib/parser/lexer.rl"
+# line 1807 "lib/parser/lexer.rl"
 		begin
  tm = p 		end
-# line 1806 "lib/parser/lexer.rl"
+# line 1808 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
@@ -19120,59 +19120,59 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
   end
 		end
 	when 425 then
-# line 2023 "lib/parser/lexer.rl"
+# line 2025 "lib/parser/lexer.rl"
 		begin
  @num_base = 16; @num_digits_s = p 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 	when 419 then
-# line 2024 "lib/parser/lexer.rl"
+# line 2026 "lib/parser/lexer.rl"
 		begin
  @num_base = 10; @num_digits_s = p 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 	when 422 then
-# line 2025 "lib/parser/lexer.rl"
+# line 2027 "lib/parser/lexer.rl"
 		begin
  @num_base = 8;  @num_digits_s = p 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 	when 416 then
-# line 2026 "lib/parser/lexer.rl"
+# line 2028 "lib/parser/lexer.rl"
 		begin
  @num_base = 2;  @num_digits_s = p 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 	when 431 then
-# line 2027 "lib/parser/lexer.rl"
+# line 2029 "lib/parser/lexer.rl"
 		begin
  @num_base = 10; @num_digits_s = @ts 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 	when 400 then
-# line 2028 "lib/parser/lexer.rl"
+# line 2030 "lib/parser/lexer.rl"
 		begin
  @num_base = 8;  @num_digits_s = @ts 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 	when 432 then
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
 	when 77 then
-# line 2222 "lib/parser/lexer.rl"
+# line 2224 "lib/parser/lexer.rl"
 		begin
  tm = p 		end
-# line 2223 "lib/parser/lexer.rl"
+# line 2225 "lib/parser/lexer.rl"
 		begin
  @te = p+1
  begin  p = tm - 1; 	begin
@@ -19242,7 +19242,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1495 "lib/parser/lexer.rl"
+# line 1497 "lib/parser/lexer.rl"
 		begin
  @act = 73;		end
 	when 225 then
@@ -19250,7 +19250,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1500 "lib/parser/lexer.rl"
+# line 1502 "lib/parser/lexer.rl"
 		begin
  @act = 74;		end
 	when 252 then
@@ -19258,7 +19258,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1532 "lib/parser/lexer.rl"
+# line 1534 "lib/parser/lexer.rl"
 		begin
  @act = 80;		end
 	when 45 then
@@ -19266,7 +19266,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1545 "lib/parser/lexer.rl"
+# line 1547 "lib/parser/lexer.rl"
 		begin
  @act = 81;		end
 	when 273 then
@@ -19274,7 +19274,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1597 "lib/parser/lexer.rl"
+# line 1599 "lib/parser/lexer.rl"
 		begin
  @act = 88;		end
 	when 262 then
@@ -19282,7 +19282,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1601 "lib/parser/lexer.rl"
+# line 1603 "lib/parser/lexer.rl"
 		begin
  @act = 89;		end
 	when 276 then
@@ -19290,7 +19290,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1800 "lib/parser/lexer.rl"
+# line 1802 "lib/parser/lexer.rl"
 		begin
  @act = 111;		end
 	when 344 then
@@ -19298,7 +19298,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1806 "lib/parser/lexer.rl"
+# line 1808 "lib/parser/lexer.rl"
 		begin
  @act = 112;		end
 	when 343 then
@@ -19306,7 +19306,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1812 "lib/parser/lexer.rl"
+# line 1814 "lib/parser/lexer.rl"
 		begin
  @act = 113;		end
 	when 58 then
@@ -19314,7 +19314,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1851 "lib/parser/lexer.rl"
+# line 1853 "lib/parser/lexer.rl"
 		begin
  @act = 115;		end
 	when 274 then
@@ -19330,7 +19330,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1879 "lib/parser/lexer.rl"
+# line 1881 "lib/parser/lexer.rl"
 		begin
  @act = 119;		end
 	when 447 then
@@ -19338,7 +19338,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1943 "lib/parser/lexer.rl"
+# line 1945 "lib/parser/lexer.rl"
 		begin
  @act = 132;		end
 	when 442 then
@@ -19346,7 +19346,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1968 "lib/parser/lexer.rl"
+# line 1970 "lib/parser/lexer.rl"
 		begin
  @act = 133;		end
 	when 450 then
@@ -19354,7 +19354,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1978 "lib/parser/lexer.rl"
+# line 1980 "lib/parser/lexer.rl"
 		begin
  @act = 135;		end
 	when 443 then
@@ -19362,7 +19362,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1983 "lib/parser/lexer.rl"
+# line 1985 "lib/parser/lexer.rl"
 		begin
  @act = 136;		end
 	when 444 then
@@ -19370,7 +19370,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1987 "lib/parser/lexer.rl"
+# line 1989 "lib/parser/lexer.rl"
 		begin
  @act = 137;		end
 	when 449 then
@@ -19378,7 +19378,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 1991 "lib/parser/lexer.rl"
+# line 1993 "lib/parser/lexer.rl"
 		begin
  @act = 138;		end
 	when 441 then
@@ -19386,7 +19386,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 2002 "lib/parser/lexer.rl"
+# line 2004 "lib/parser/lexer.rl"
 		begin
  @act = 139;		end
 	when 436 then
@@ -19394,7 +19394,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 2016 "lib/parser/lexer.rl"
+# line 2018 "lib/parser/lexer.rl"
 		begin
  @act = 140;		end
 	when 372 then
@@ -19402,7 +19402,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 2030 "lib/parser/lexer.rl"
+# line 2032 "lib/parser/lexer.rl"
 		begin
  @act = 141;		end
 	when 402 then
@@ -19410,7 +19410,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 2074 "lib/parser/lexer.rl"
+# line 2076 "lib/parser/lexer.rl"
 		begin
  @act = 144;		end
 	when 65 then
@@ -19418,7 +19418,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 2089 "lib/parser/lexer.rl"
+# line 2091 "lib/parser/lexer.rl"
 		begin
  @act = 145;		end
 	when 375 then
@@ -19426,7 +19426,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 2117 "lib/parser/lexer.rl"
+# line 2119 "lib/parser/lexer.rl"
 		begin
  @act = 147;		end
 	when 367 then
@@ -19442,7 +19442,7 @@ p = p - 1; begin  emit(:kRESCUE, 'rescue'.freeze, @ts, tm)
 		begin
  @te = p+1
 		end
-# line 2139 "lib/parser/lexer.rl"
+# line 2141 "lib/parser/lexer.rl"
 		begin
  @act = 152;		end
 	when 156 then
@@ -19655,7 +19655,7 @@ p = p - 1; begin
 
     @escape = encode_escape(@escape[0].ord & 0x9f)
   		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -19797,7 +19797,7 @@ p = p - 1; begin
 
     @escape = encode_escape(@escape[0].ord | 0x80)
   		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -19924,7 +19924,7 @@ p = p - 1; begin
 
     @escape = encode_escape(@escape[0].ord | 0x80)
   		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -20051,7 +20051,7 @@ p = p - 1; begin
 
     @escape = encode_escape(@escape[0].ord | 0x80)
   		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -20178,7 +20178,7 @@ p = p - 1; begin
 
     @escape = encode_escape(@escape[0].ord & 0x9f)
   		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -20311,7 +20311,7 @@ p = p - 1; begin
 
           diagnostic :fatal, :unterminated_unicode, nil, range(p - 1, p)
         		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -20447,7 +20447,7 @@ p = p - 1; begin
 
       diagnostic :fatal, :escape_eof, nil, range(p - 1, p)
     		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -20528,7 +20528,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1503 "lib/parser/lexer.rl"
+# line 1505 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin  	begin
@@ -20545,7 +20545,7 @@ p = p - 1; begin  	begin
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1582 "lib/parser/lexer.rl"
+# line 1584 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -20556,7 +20556,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1603 "lib/parser/lexer.rl"
+# line 1605 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -20567,7 +20567,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1863 "lib/parser/lexer.rl"
+# line 1865 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -20578,7 +20578,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1887 "lib/parser/lexer.rl"
+# line 1889 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -20589,7 +20589,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1918 "lib/parser/lexer.rl"
+# line 1920 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -20600,7 +20600,7 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 2196 "lib/parser/lexer.rl"
+# line 2198 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
@@ -20611,38 +20611,38 @@ p = p - 1;		end
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 2251 "lib/parser/lexer.rl"
+# line 2253 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1;		end
 	when 427 then
-# line 2027 "lib/parser/lexer.rl"
+# line 2029 "lib/parser/lexer.rl"
 		begin
  @num_base = 10; @num_digits_s = @ts 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
 	when 397 then
-# line 2028 "lib/parser/lexer.rl"
+# line 2030 "lib/parser/lexer.rl"
 		begin
  @num_base = 8;  @num_digits_s = @ts 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
 	when 409 then
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
-# line 2030 "lib/parser/lexer.rl"
+# line 2032 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -20677,13 +20677,13 @@ p = p - 1; begin
        end
 		end
 	when 404 then
-# line 2086 "lib/parser/lexer.rl"
+# line 2088 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 631 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tFLOAT,     Float(chars)) } 		end
-# line 2089 "lib/parser/lexer.rl"
+# line 2091 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -20704,13 +20704,13 @@ p = p - 1; begin
        end
 		end
 	when 401 then
-# line 2087 "lib/parser/lexer.rl"
+# line 2089 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 631 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tFLOAT,     Float(chars)) } 		end
-# line 2089 "lib/parser/lexer.rl"
+# line 2091 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -20745,7 +20745,7 @@ p = p - 1; begin
     # there are no cases when we need to skip it.
     @newline_s = p
   		end
-# line 1500 "lib/parser/lexer.rl"
+# line 1502 "lib/parser/lexer.rl"
 		begin
  @act = 74;		end
 	when 35 then
@@ -20763,7 +20763,7 @@ p = p - 1; begin
       @herebody_s = nil
     end
   		end
-# line 1495 "lib/parser/lexer.rl"
+# line 1497 "lib/parser/lexer.rl"
 		begin
  @act = 73;		end
 	when 46 then
@@ -20781,7 +20781,7 @@ p = p - 1; begin
       @herebody_s = nil
     end
   		end
-# line 1545 "lib/parser/lexer.rl"
+# line 1547 "lib/parser/lexer.rl"
 		begin
  @act = 81;		end
 	when 72 then
@@ -20792,7 +20792,7 @@ p = p - 1; begin
 # line 1131 "lib/parser/lexer.rl"
 		begin
  emit_comment(@sharp_s, p == pe ? p - 2 : p) 		end
-# line 1972 "lib/parser/lexer.rl"
+# line 1974 "lib/parser/lexer.rl"
 		begin
  @act = 134;		end
 	when 37 then
@@ -20811,10 +20811,10 @@ p = p - 1; begin
 		begin
  @te = p+1
 		end
-# line 1805 "lib/parser/lexer.rl"
+# line 1807 "lib/parser/lexer.rl"
 		begin
  tm = p 		end
-# line 1851 "lib/parser/lexer.rl"
+# line 1853 "lib/parser/lexer.rl"
 		begin
  @act = 115;		end
 	when 346 then
@@ -20822,7 +20822,7 @@ p = p - 1; begin
 		begin
  @te = p+1
 		end
-# line 1805 "lib/parser/lexer.rl"
+# line 1807 "lib/parser/lexer.rl"
 		begin
  tm = p 		end
 # line 1216 "lib/parser/lexer.rl"
@@ -20833,10 +20833,10 @@ p = p - 1; begin
 		begin
  @te = p+1
 		end
-# line 2027 "lib/parser/lexer.rl"
+# line 2029 "lib/parser/lexer.rl"
 		begin
  @num_base = 10; @num_digits_s = @ts 		end
-# line 2030 "lib/parser/lexer.rl"
+# line 2032 "lib/parser/lexer.rl"
 		begin
  @act = 141;		end
 	when 109 then
@@ -20972,7 +20972,7 @@ p = p - 1; begin
 
     @escape = encode_escape(@escape[0].ord | 0x80)
   		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -21114,7 +21114,7 @@ p = p - 1; begin
 
     @escape = encode_escape(@escape[0].ord | 0x80)
   		end
-# line 1734 "lib/parser/lexer.rl"
+# line 1736 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -21139,16 +21139,16 @@ p = p - 1; begin
        end
 		end
 	when 423 then
-# line 2023 "lib/parser/lexer.rl"
+# line 2025 "lib/parser/lexer.rl"
 		begin
  @num_base = 16; @num_digits_s = p 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
-# line 2030 "lib/parser/lexer.rl"
+# line 2032 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -21183,16 +21183,16 @@ p = p - 1; begin
        end
 		end
 	when 417 then
-# line 2024 "lib/parser/lexer.rl"
+# line 2026 "lib/parser/lexer.rl"
 		begin
  @num_base = 10; @num_digits_s = p 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
-# line 2030 "lib/parser/lexer.rl"
+# line 2032 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -21227,16 +21227,16 @@ p = p - 1; begin
        end
 		end
 	when 420 then
-# line 2025 "lib/parser/lexer.rl"
+# line 2027 "lib/parser/lexer.rl"
 		begin
  @num_base = 8;  @num_digits_s = p 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
-# line 2030 "lib/parser/lexer.rl"
+# line 2032 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -21271,16 +21271,16 @@ p = p - 1; begin
        end
 		end
 	when 414 then
-# line 2026 "lib/parser/lexer.rl"
+# line 2028 "lib/parser/lexer.rl"
 		begin
  @num_base = 2;  @num_digits_s = p 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
-# line 2030 "lib/parser/lexer.rl"
+# line 2032 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -21315,16 +21315,16 @@ p = p - 1; begin
        end
 		end
 	when 426 then
-# line 2027 "lib/parser/lexer.rl"
+# line 2029 "lib/parser/lexer.rl"
 		begin
  @num_base = 10; @num_digits_s = @ts 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
-# line 2030 "lib/parser/lexer.rl"
+# line 2032 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -21359,16 +21359,16 @@ p = p - 1; begin
        end
 		end
 	when 396 then
-# line 2028 "lib/parser/lexer.rl"
+# line 2030 "lib/parser/lexer.rl"
 		begin
  @num_base = 8;  @num_digits_s = @ts 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
-# line 2030 "lib/parser/lexer.rl"
+# line 2032 "lib/parser/lexer.rl"
 		begin
  @te = p
 p = p - 1; begin 
@@ -21428,13 +21428,13 @@ p = p - 1; begin
 		begin
  @te = p+1
 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
-# line 2062 "lib/parser/lexer.rl"
+# line 2064 "lib/parser/lexer.rl"
 		begin
  @act = 143;		end
 	when 429 then
@@ -21442,16 +21442,16 @@ p = p - 1; begin
 		begin
  @te = p+1
 		end
-# line 2027 "lib/parser/lexer.rl"
+# line 2029 "lib/parser/lexer.rl"
 		begin
  @num_base = 10; @num_digits_s = @ts 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
-# line 2062 "lib/parser/lexer.rl"
+# line 2064 "lib/parser/lexer.rl"
 		begin
  @act = 143;		end
 	when 399 then
@@ -21459,16 +21459,16 @@ p = p - 1; begin
 		begin
  @te = p+1
 		end
-# line 2028 "lib/parser/lexer.rl"
+# line 2030 "lib/parser/lexer.rl"
 		begin
  @num_base = 8;  @num_digits_s = @ts 		end
-# line 2029 "lib/parser/lexer.rl"
+# line 2031 "lib/parser/lexer.rl"
 		begin
  @num_suffix_s = p 		end
 # line 625 "lib/parser/lexer.rl"
 		begin
  @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } 		end
-# line 2062 "lib/parser/lexer.rl"
+# line 2064 "lib/parser/lexer.rl"
 		begin
  @act = 143;		end
 # line 21474 "lib/parser/lexer.rb"
@@ -21709,7 +21709,7 @@ end
   end
 
   
-# line 2266 "lib/parser/lexer.rl"
+# line 2268 "lib/parser/lexer.rl"
 
   # %
 end

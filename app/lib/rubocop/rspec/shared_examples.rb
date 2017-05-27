@@ -22,7 +22,7 @@ shared_examples_for 'mimics MRI 2.1' do |grep_mri_warning|
         offense_by_mri = offenses_by_mri[index]
         # Exclude column attribute since MRI does not
         # output column number.
-        [:severity, :line, :cop_name].each do |a|
+        %i[severity line cop_name].each do |a|
           expect(offense_by_cop.send(a)).to eq(offense_by_mri.send(a))
         end
       end
@@ -50,7 +50,7 @@ shared_examples_for 'misaligned' do |prefix, alignment_base, arg, end_kw, name|
     # style. In other cases, it won't match any style at all
     expect(cop.config_to_allow_offenses).to(
       eq('Enabled' => false).or(
-        satisfy { |h| other_styles.include?(h['AlignWith']) }
+        satisfy { |h| other_styles.include?(h['EnforcedStyleAlignWith']) }
       )
     )
   end
@@ -81,14 +81,6 @@ shared_examples_for 'debugger' do |name, src|
     expect(cop.messages)
       .to eq(src.map { |s| "Remove debugger entry point `#{s}`." })
     expect(cop.highlights).to eq(src)
-  end
-
-  it "can autocorrect a #{name} call" do
-    lines = src.is_a?(String) ? src : src.join("\n")
-    new_source = autocorrect_source(cop, ['def a',
-                                          "  #{lines}",
-                                          'end'].join("\n"))
-    expect(new_source).to eq("def a\nend")
   end
 end
 

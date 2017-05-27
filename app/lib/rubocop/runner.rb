@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'parallel'
+
 module RuboCop
   # This class handles the processing of files, which includes dealing with
   # formatters and letting cops inspect the files.
@@ -33,6 +35,7 @@ module RuboCop
       if @options[:list_target_files]
         list_files(target_files)
       else
+        warm_cache(target_files) if @options[:parallel]
         inspect_files(target_files)
       end
     end
@@ -42,6 +45,13 @@ module RuboCop
     end
 
     private
+
+    # Warms up the RuboCop cache by forking a suitable number of rubocop
+    # instances that each inspects its alotted group of files.
+    def warm_cache(target_files)
+      puts 'Running parallel inspection'
+      Parallel.each(target_files, &method(:file_offenses))
+    end
 
     def find_target_files(paths)
       target_finder = TargetFinder.new(@config_store, @options)
@@ -116,9 +126,9 @@ module RuboCop
     end
 
     def add_unneeded_disables(file, offenses, source)
-      if check_for_unneded_disables?(source)
+      if check_for_unneeded_disables?(source)
         config = @config_store.for(file)
-        if config.cop_enabled?(Cop::Lint::UnneededDisable)
+        if config.for_cop(Cop::Lint::UnneededDisable).fetch('Enabled')
           cop = Cop::Lint::UnneededDisable.new(config, @options)
           if cop.relevant_file?(file)
             cop.check(offenses, source.disabled_line_ranges, source.comments)
@@ -132,7 +142,7 @@ module RuboCop
       offenses.sort.reject(&:disabled?).freeze
     end
 
-    def check_for_unneded_disables?(source)
+    def check_for_unneeded_disables?(source)
       !source.disabled_line_ranges.empty? && !filtered_run?
     end
 
@@ -142,7 +152,12 @@ module RuboCop
 
     def autocorrect_unneeded_disables(source, cop)
       cop.processed_source = source
-      Cop::Team.new([], nil, @options).autocorrect(source.buffer, [cop])
+
+      Cop::Team.new(
+        RuboCop::Cop::Registry.new,
+        nil,
+        @options
+      ).autocorrect(source.buffer, [cop])
     end
 
     def file_started(file)
@@ -256,7 +271,7 @@ module RuboCop
       @mobilized_cop_classes[config.object_id] ||= begin
         cop_classes = Cop::Cop.all
 
-        [:only, :except].each do |opt|
+        %i[only except].each do |opt|
           OptionsValidator.validate_cop_list(@options[opt])
         end
 
@@ -268,7 +283,7 @@ module RuboCop
 
         cop_classes.reject! { |c| c.match?(@options[:except]) }
 
-        cop_classes
+        Cop::Registry.new(cop_classes)
       end
     end
 

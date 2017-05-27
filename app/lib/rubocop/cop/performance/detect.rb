@@ -45,7 +45,7 @@ module RuboCop
             receiver, _args, body = *receiver if receiver.block_type?
             return if accept_first_call?(receiver, body)
 
-            offense(node, receiver, second_method)
+            register_offense(node, receiver, second_method)
           end
         end
 
@@ -79,7 +79,7 @@ module RuboCop
           lazy?(caller)
         end
 
-        def offense(node, receiver, second_method)
+        def register_offense(node, receiver, second_method)
           _caller, first_method, _args = *receiver
           range = receiver.loc.selector.join(node.loc.selector)
 
@@ -96,7 +96,8 @@ module RuboCop
         end
 
         def lazy?(node)
-          return false if node.nil?
+          return false unless node
+
           receiver, method, _args = *node
           method == :lazy && !receiver.nil?
         end

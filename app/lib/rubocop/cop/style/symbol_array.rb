@@ -9,50 +9,74 @@ module RuboCop
       # Alternatively, it checks for symbol arrays using the %i() syntax on
       # projects which do not want to use that syntax, perhaps because they
       # support a version of Ruby lower than 2.0.
+      #
+      # Configuration option: MinSize
+      # If set, arrays with fewer elements than this value will not trigger the
+      # cop. For example, a `MinSize of `3` will not enforce a style on an array
+      # of 2 or fewer elements.
+      #
+      # @example
+      #   EnforcedStyle: percent (default)
+      #
+      #   # good
+      #   %i[foo bar baz]
+      #
+      #   # bad
+      #   [:foo, :bar, :baz]
+      #
+      # @example
+      #   EnforcedStyle: brackets
+      #
+      #   # good
+      #   [:foo, :bar, :baz]
+      #
+      #   # bad
+      #   %i[foo bar baz]
       class SymbolArray < Cop
-        include ConfigurableEnforcedStyle
+        include ArrayMinSize
         include ArraySyntax
+        include ConfigurableEnforcedStyle
+        include PercentLiteral
+        extend TargetRubyVersion
+
+        minimum_target_ruby_version 2.0
 
         PERCENT_MSG = 'Use `%i` or `%I` for an array of symbols.'.freeze
         ARRAY_MSG = 'Use `[]` for an array of symbols.'.freeze
 
+        class << self
+          attr_accessor :largest_brackets
+        end
+
         def on_array(node)
           if bracketed_array_of?(:sym, node)
             check_bracketed_array(node)
-          elsif percent_array?(node)
+          elsif node.percent_literal?(:symbol)
             check_percent_array(node)
           end
         end
 
-        def validate_config
-          return unless style == :percent && target_ruby_version < 2.0
-
-          raise ValidationError, 'The default `percent` style for the ' \
-                                '`Style/SymbolArray` cop is only compatible' \
-                                ' with Ruby 2.0 and up, but the target Ruby' \
-                                " version for your project is 1.9.\nPlease " \
-                                'either disable this cop, configure it to ' \
-                                'use `array` style, or adjust the ' \
-                                '`TargetRubyVersion` parameter in your ' \
-                                'configuration.'
+        def autocorrect(node)
+          if style == :percent
+            correct_percent(node, 'i')
+          else
+            correct_bracketed(node)
+          end
         end
 
         private
 
-        def percent_array?(node)
-          node.loc.begin && node.loc.begin.source =~ /\A%[iI]/
-        end
-
         def check_bracketed_array(node)
-          return if comments_in_array?(node)
-          return if symbols_contain_spaces?(node)
+          return if comments_in_array?(node) ||
+                    symbols_contain_spaces?(node) ||
+                    below_array_length?(node)
 
-          style_detected(:brackets)
+          array_style_detected(:brackets, node.values.size)
           add_offense(node, :expression, PERCENT_MSG) if style == :percent
         end
 
         def check_percent_array(node)
-          style_detected(:percent)
+          array_style_detected(:percent, node.values.size)
           add_offense(node, :expression, ARRAY_MSG) if style == :brackets
         end
 
@@ -72,33 +96,12 @@ module RuboCop
           end
         end
 
-        def autocorrect(node)
-          syms = node.children.map { |c| c.children[0].to_s }
-          corrected = if style == :percent
-                        percent_replacement(syms)
-                      else
-                        bracket_replacement(syms)
-                      end
+        def correct_bracketed(node)
+          syms = node.children.map { |c| to_symbol_literal(c.children[0].to_s) }
 
           lambda do |corrector|
-            corrector.replace(node.source_range, corrected)
+            corrector.replace(node.source_range, "[#{syms.join(', ')}]")
           end
-        end
-
-        def percent_replacement(syms)
-          escape = syms.any? { |s| needs_escaping?(s) }
-          syms = syms.map { |s| escape_string(s) } if escape
-          syms = syms.map { |s| s.gsub(/\)/, '\\)') }
-          if escape
-            "%I(#{syms.join(' ')})"
-          else
-            "%i(#{syms.join(' ')})"
-          end
-        end
-
-        def bracket_replacement(syms)
-          syms = syms.map { |s| to_symbol_literal(s) }
-          "[#{syms.join(', ')}]"
         end
       end
     end

@@ -12,8 +12,7 @@ module RuboCop
       #   'abc'.match(/bc\Z/)
       #
       #   @good
-      #   'abc' =~ /ab/
-      #   'abc' =~ /\w*\Z/
+      #   'abc'.end_with?('bc')
       class EndWith < Cop
         MSG = 'Use `String#end_with?` instead of a regex match anchored to ' \
               'the end of the string.'.freeze
@@ -32,7 +31,9 @@ module RuboCop
         end
 
         def on_send(node)
-          add_offense(node, :expression, MSG) if redundant_regex?(node)
+          return unless redundant_regex?(node)
+
+          add_offense(node, :expression)
         end
 
         def autocorrect(node)

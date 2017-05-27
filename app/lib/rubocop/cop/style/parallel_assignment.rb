@@ -23,7 +23,7 @@ module RuboCop
       #   b = 2
       #   c = 3
       class ParallelAssignment < Cop
-        include IfNode
+        include RescueNode
 
         MSG = 'Do not use parallel assignment.'.freeze
 
@@ -82,9 +82,10 @@ module RuboCop
         end
 
         def assignment_corrector(node, order)
+          _assignment, modifier = *node.parent
           if modifier_statement?(node.parent)
             ModifierCorrector.new(node, config, order)
-          elsif rescue_modifier?(node.parent)
+          elsif rescue_modifier?(modifier)
             RescueCorrector.new(node, config, order)
           else
             GenericCorrector.new(node, config, order)
@@ -141,17 +142,22 @@ module RuboCop
 
             @assignments.each do |other|
               _other_lhs, other_rhs = *other
-              if ((var = var_name(my_lhs)) && uses_var?(other_rhs, var)) ||
-                 (my_lhs.asgn_method_call? && accesses?(other_rhs, my_lhs))
-                yield other
-              end
+
+              next unless dependency?(my_lhs, other_rhs)
+
+              yield other
             end
+          end
+
+          def dependency?(lhs, rhs)
+            uses_var?(rhs, var_name(lhs)) ||
+              lhs.send_type? && lhs.assignment_method? && accesses?(rhs, lhs)
           end
 
           # `lhs` is an assignment method call like `obj.attr=` or `ary[idx]=`.
           # Does `rhs` access the same value which is assigned by `lhs`?
           def accesses?(rhs, lhs)
-            if lhs.method_name == :[]=
+            if lhs.method?(:[]=)
               matching_calls(rhs, lhs.receiver, :[]).any? do |args|
                 args == lhs.method_args
               end
@@ -163,21 +169,7 @@ module RuboCop
         end
 
         def modifier_statement?(node)
-          node &&
-            ((node.if_type? && modifier_if?(node)) ||
-            ((node.while_type? || node.until_type?) && modifier_while?(node)))
-        end
-
-        def modifier_while?(node)
-          node.loc.respond_to?(:keyword) &&
-            %w(while until).include?(node.loc.keyword.source) &&
-            node.modifier_form?
-        end
-
-        def rescue_modifier?(node)
-          node && node.rescue_type? &&
-            (node.parent.nil? || !(node.parent.kwbegin_type? ||
-            node.parent.ensure_type?))
+          node && %i[if while until].include?(node.type) && node.modifier_form?
         end
 
         # An internal class for correcting parallel assignment

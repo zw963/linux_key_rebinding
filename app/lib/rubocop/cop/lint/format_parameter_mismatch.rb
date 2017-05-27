@@ -9,8 +9,15 @@ module RuboCop
       #
       # @example
       #
+      #   # bad
+      #
       #   format('A value: %s and another: %i', a_value)
       #
+      # @example
+      #
+      #   # good
+      #
+      #   format('A value: %s and another: %i', a_value, another)
       class FormatParameterMismatch < Cop
         # http://rubular.com/r/CvpbxkcTzy
         MSG = "Number of arguments (%i) to `%s` doesn't match the number of " \
@@ -22,11 +29,13 @@ module RuboCop
         SHOVEL = '<<'.freeze
         PERCENT = '%'.freeze
         PERCENT_PERCENT = '%%'.freeze
-        STRING_TYPES = [:str, :dstr].freeze
+        STRING_TYPES = %i[str dstr].freeze
         NAMED_INTERPOLATION = /%(?:<\w+>|\{\w+\})/
 
         def on_send(node)
-          add_offense(node, :selector) if offending_node?(node)
+          return unless offending_node?(node)
+
+          add_offense(node, :selector)
         end
 
         private
@@ -34,12 +43,20 @@ module RuboCop
         def offending_node?(node)
           return false unless called_on_string?(node)
           return false unless method_with_format_args?(node)
-          return false if named_mode?(node) || node_with_splat_args?(node)
+          return false if named_mode?(node) || splat_args?(node)
 
           num_of_format_args, num_of_expected_fields = count_matches(node)
 
-          num_of_format_args != :unknown &&
-            num_of_expected_fields != num_of_format_args
+          return false if num_of_format_args == :unknown
+          matched_arguments_count?(num_of_expected_fields, num_of_format_args)
+        end
+
+        def matched_arguments_count?(expected, passed)
+          if passed < 0
+            expected < passed.abs
+          else
+            expected != passed
+          end
         end
 
         def called_on_string?(node)
@@ -67,29 +84,25 @@ module RuboCop
           !relevant_node.source.scan(NAMED_FIELD_REGEX).empty?
         end
 
-        def node_with_splat_args?(node)
+        def splat_args?(node)
           return false if percent?(node)
 
-          _receiver_node, _method_name, *args = *node
-
-          args.butfirst.any?(&:splat_type?)
+          node.arguments.butfirst.any?(&:splat_type?)
         end
 
         def heredoc?(node)
-          _receiver, _name, args = *node
-
-          args.source[0, 2] == SHOVEL
+          node.first_argument.source[0, 2] == SHOVEL
         end
 
         def count_matches(node)
           receiver_node, _method_name, *args = *node
 
           if (sprintf?(node) || format?(node)) && !heredoc?(node)
-            number_of_args_for_format = (args.size - 1)
+            number_of_args_for_format = arguments_count(args) - 1
             number_of_expected_fields = expected_fields_count(args.first)
           elsif percent?(node) && args.first.array_type?
             number_of_expected_fields = expected_fields_count(receiver_node)
-            number_of_args_for_format = args.first.child_nodes.size
+            number_of_args_for_format = arguments_count(args.first.child_nodes)
           else
             number_of_args_for_format = number_of_expected_fields = :unknown
           end
@@ -116,8 +129,18 @@ module RuboCop
           node
             .source
             .scan(FIELD_REGEX)
-            .select { |x| x.first != PERCENT_PERCENT }
+            .reject { |x| x.first == PERCENT_PERCENT }
             .reduce(0) { |acc, elem| acc + (elem[2] =~ /\*/ ? 2 : 1) }
+        end
+
+        def arguments_count(args)
+          if args.empty?
+            0
+          elsif args.last.type == :splat
+            -(args.count - 1)
+          else
+            args.count
+          end
         end
 
         def format?(node)
@@ -129,13 +152,13 @@ module RuboCop
         end
 
         def percent?(node)
-          receiver_node, method_name, *arg_nodes = *node
+          receiver = node.receiver
 
-          percent = method_name == :% &&
-                    (STRING_TYPES.include?(receiver_node.type) ||
-                     arg_nodes[0].array_type?)
+          percent = node.method_name == :% &&
+                    (STRING_TYPES.include?(receiver.type) ||
+                     node.first_argument.array_type?)
 
-          if percent && STRING_TYPES.include?(receiver_node.type)
+          if percent && STRING_TYPES.include?(receiver.type)
             return false if heredoc?(node)
           end
 
@@ -143,10 +166,14 @@ module RuboCop
         end
 
         def message(node)
-          _receiver, method_name, *_args = *node
           num_args_for_format, num_expected_fields = count_matches(node)
 
-          method_name = 'String#%' if PERCENT == method_name.to_s
+          method_name = if node.method_name.to_s == PERCENT
+                          'String#%'
+                        else
+                          node.method_name
+                        end
+
           format(MSG, num_args_for_format, method_name, num_expected_fields)
         end
       end

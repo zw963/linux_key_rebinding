@@ -12,8 +12,7 @@ module RuboCop
       #   'abc'.match(/\Aab/)
       #
       #   @good
-      #   'abc' =~ /ab/
-      #   'abc' =~ /\A\w*/
+      #   'abc'.start_with?('ab')
       class StartWith < Cop
         MSG = 'Use `String#start_with?` instead of a regex match anchored to ' \
               'the beginning of the string.'.freeze
@@ -35,7 +34,9 @@ module RuboCop
         end
 
         def on_send(node)
-          add_offense(node, :expression, MSG) if redundant_regex?(node)
+          return unless redundant_regex?(node)
+
+          add_offense(node, :expression)
         end
 
         def autocorrect(node)

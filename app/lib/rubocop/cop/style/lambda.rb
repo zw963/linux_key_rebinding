@@ -73,15 +73,15 @@ module RuboCop
         def_node_matcher :lambda_node?, '(block $(send nil :lambda) ...)'
 
         def on_block(node)
-          lambda_node?(node) do |block_method|
-            selector = block_method.source
+          return unless node.lambda?
 
-            return unless offending_selector?(node, selector)
+          selector = node.send_node.source
 
-            add_offense(node,
-                        block_method.source_range,
-                        message(node, selector))
-          end
+          return unless offending_selector?(node, selector)
+
+          add_offense(node,
+                      node.send_node.source_range,
+                      message(node, selector))
         end
 
         private
@@ -189,13 +189,13 @@ module RuboCop
         def remove_unparenthesized_whitespaces(corrector, node)
           block_method, args = *node
           return unless unparenthesized_literal_args?(args)
-          # First, remove leading whitespaces (beetween arrow and args)
+          # First, remove leading whitespaces (between arrow and args)
           corrector.remove_preceding(
             args.source_range,
             args.source_range.begin_pos - block_method.source_range.end_pos
           )
 
-          # Then, remove trailing whitespaces (beetween args and 'do')
+          # Then, remove trailing whitespaces (between args and 'do')
           delta = node.loc.begin.begin_pos - args.source_range.end_pos - 1
           corrector.remove_preceding(node.loc.begin, delta)
         end

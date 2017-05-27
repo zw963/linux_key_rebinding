@@ -13,62 +13,81 @@ module RuboCop
       class FormatString < Cop
         include ConfigurableEnforcedStyle
 
+        MSG = 'Favor `%s` over `%s`.'.freeze
+
+        def_node_matcher :formatter, <<-PATTERN
+        {
+          (send nil ${:sprintf :format} _ _ ...)
+          (send {str dstr} $:% ... )
+          (send !nil $:% {array hash})
+        }
+        PATTERN
+
         def on_send(node)
-          add_offense(node, :selector) if offending_node?(node)
+          formatter(node) do |selector|
+            detected_style = selector == :% ? :percent : selector
+
+            return if detected_style == style
+
+            add_offense(node, :selector, message(detected_style))
+          end
+        end
+
+        def message(detected_style)
+          format(MSG, method_name(style), method_name(detected_style))
+        end
+
+        def method_name(style_name)
+          style_name == :percent ? 'String#%' : style_name
+        end
+
+        def autocorrect(node)
+          lambda do |corrector|
+            _receiver, detected_method = *node
+
+            case detected_method
+            when :%
+              autocorrect_from_percent(corrector, node)
+            when :format, :sprintf
+              case style
+              when :percent
+                autocorrect_to_percent(corrector, node)
+              when :format, :sprintf
+                corrector.replace(node.loc.selector, style.to_s)
+              end
+            end
+          end
         end
 
         private
 
-        def offending_node?(node)
-          case style
-          when :format
-            sprintf?(node) || percent?(node)
-          when :sprintf
-            format?(node) || percent?(node)
-          when :percent
-            format?(node) || sprintf?(node)
-          end
+        def autocorrect_from_percent(corrector, node)
+          receiver, _method, args = *node
+          format = receiver.source
+          args = if args.array_type? || args.hash_type?
+                   args.children.map(&:source).join(', ')
+                 else
+                   args.source
+                 end
+          corrected = "#{style}(#{format}, #{args})"
+          corrector.replace(node.loc.expression, corrected)
         end
 
-        def format_method?(name, node)
-          receiver, method_name, *args = *node
-
-          # commands have no explicit receiver
-          return false unless !receiver && method_name == name
-
-          # we do an argument count check to reduce false positives
-          args.size >= 2
-        end
-
-        def format?(node)
-          format_method?(:format, node)
-        end
-
-        def sprintf?(node)
-          format_method?(:sprintf, node)
-        end
-
-        def percent?(node)
-          receiver_node, method_name, *arg_nodes = *node
-
-          method_name == :% &&
-            ([:str, :dstr].include?(receiver_node.type) ||
-             arg_nodes.first.array_type?)
-        end
-
-        def message(node)
-          _receiver_node, method_name, *_arg_nodes = *node
-
-          preferred =
-            if style == :percent
-              'String#%'
-            else
-              style
-            end
-
-          method_name = 'String#%' if method_name == :%
-
-          "Favor `#{preferred}` over `#{method_name}`."
+        def autocorrect_to_percent(corrector, node)
+          _nil, _method, format, *args = *node
+          format = format.source
+          args   = if args.one?
+                     arg = args.first
+                     if arg.hash_type?
+                       "{ #{arg.source} }"
+                     else
+                       arg.source
+                     end
+                   else
+                     "[#{args.map(&:source).join(', ')}]"
+                   end
+          corrected = "#{format} % #{args}"
+          corrector.replace(node.loc.expression, corrected)
         end
       end
     end

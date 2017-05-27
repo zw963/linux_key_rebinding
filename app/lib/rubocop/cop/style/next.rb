@@ -8,7 +8,7 @@ module RuboCop
       # @example
       #   # bad
       #   [1, 2].each do |a|
-      #     if a == 1 do
+      #     if a == 1
       #       puts a
       #     end
       #   end
@@ -19,17 +19,11 @@ module RuboCop
       #     puts a
       #   end
       class Next < Cop
-        include IfNode
         include ConfigurableEnforcedStyle
         include MinBodyLength
 
         MSG = 'Use `next` to skip iteration.'.freeze
-        EXIT_TYPES = [:break, :return].freeze
-        EACH_ = 'each_'.freeze
-        ENUMERATORS = [:collect, :collect_concat, :detect, :downto, :each,
-                       :find, :find_all, :find_index, :inject, :loop, :map!,
-                       :map, :reduce, :reject, :reject!, :reverse_each, :select,
-                       :select!, :times, :upto].freeze
+        EXIT_TYPES = %i[break return].freeze
 
         def investigate(_processed_source)
           # When correcting nested offenses, we need to keep track of how much
@@ -38,39 +32,26 @@ module RuboCop
         end
 
         def on_block(node)
-          block_owner, _, body = *node
-          return unless block_owner.send_type?
-          return unless body && ends_with_condition?(body)
+          return unless node.send_node.send_type? &&
+                        node.send_node.enumerator_method?
 
-          _, method_name = *block_owner
-          return unless enumerator?(method_name)
-
-          offense_node = offense_node(body)
-          add_offense(offense_node, offense_location(offense_node), MSG)
+          check(node)
         end
 
         def on_while(node)
-          _, body = *node
-          return unless body && ends_with_condition?(body)
-
-          offense_node = offense_node(body)
-          add_offense(offense_node, offense_location(offense_node), MSG)
+          check(node)
         end
         alias on_until on_while
-
-        def on_for(node)
-          _, _, body = *node
-          return unless body && ends_with_condition?(body)
-
-          offense_node = offense_node(body)
-          add_offense(offense_node, offense_location(offense_node), MSG)
-        end
+        alias on_for on_while
 
         private
 
-        def enumerator?(method_name)
-          ENUMERATORS.include?(method_name) ||
-            method_name.to_s.start_with?(EACH_)
+        def check(node)
+          return unless node.body && ends_with_condition?(node.body)
+
+          offending_node = offense_node(node.body)
+
+          add_offense(offending_node, offense_location(offending_node))
         end
 
         def ends_with_condition?(body)
@@ -80,23 +61,33 @@ module RuboCop
         end
 
         def simple_if_without_break?(node)
-          return false unless node
           return false unless if_without_else?(node)
-          return false if style == :skip_modifier_ifs && modifier_if?(node)
-          return false if !modifier_if?(node) && !min_body_length?(node)
+          return false if if_else_children?(node)
+          return false if allowed_modifier_if?(node)
 
           !exit_body_type?(node)
         end
 
+        def allowed_modifier_if?(node)
+          if node.modifier_form?
+            style == :skip_modifier_ifs
+          else
+            !min_body_length?(node)
+          end
+        end
+
+        def if_else_children?(node)
+          node.each_child_node(:if).any?(&:else?)
+        end
+
         def if_without_else?(node)
-          node.if_type? && !ternary?(node) && !if_else?(node)
+          node && node.if_type? && !node.ternary? && !node.else?
         end
 
         def exit_body_type?(node)
-          _conditional, if_body, _else_body = *node
-          return false unless if_body
+          return false unless node.if_branch
 
-          EXIT_TYPES.include?(if_body.type)
+          EXIT_TYPES.include?(node.if_branch.type)
         end
 
         def offense_node(body)
@@ -112,7 +103,7 @@ module RuboCop
 
         def autocorrect(node)
           lambda do |corrector|
-            if modifier_if?(node)
+            if node.modifier_form?
               autocorrect_modifier(corrector, node)
             else
               autocorrect_block(corrector, node)

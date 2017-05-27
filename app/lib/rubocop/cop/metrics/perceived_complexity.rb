@@ -28,11 +28,10 @@ module RuboCop
       #   end                             # 7 complexity points
       class PerceivedComplexity < Cop
         include MethodComplexity
-        include IfNode
 
         MSG = 'Perceived complexity for %s is too high. [%d/%d]'.freeze
-        COUNTED_NODES = [:if, :case, :while, :until,
-                         :for, :rescue, :and, :or].freeze
+        COUNTED_NODES = %i[if case while until
+                           for rescue and or].freeze
 
         private
 
@@ -51,7 +50,7 @@ module RuboCop
               (0.8 + 0.2 * whens.length).round
             end
           when :if
-            if_else?(node) && !elsif?(node) ? 2 : 1
+            node.else? && !node.elsif? ? 2 : 1
           else
             1
           end

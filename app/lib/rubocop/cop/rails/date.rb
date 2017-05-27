@@ -25,7 +25,7 @@ module RuboCop
       #   Time.zone.today
       #   Time.zone.today - 1.day
       #
-      #   # acceptable
+      #   # flexible
       #   Date.current
       #   Date.yesterday
       #
@@ -43,7 +43,7 @@ module RuboCop
         MSG_SEND = 'Do not use `%s` on Date objects, because they ' \
                    'know nothing about the time zone in use.'.freeze
 
-        BAD_DAYS = [:today, :current, :yesterday, :tomorrow].freeze
+        BAD_DAYS = %i[today current yesterday tomorrow].freeze
 
         def on_const(node)
           mod, klass = *node.children
@@ -54,23 +54,18 @@ module RuboCop
         end
 
         def on_send(node)
-          receiver, method_name, *args = *node
-          return unless receiver && bad_methods.include?(method_name)
+          return unless node.receiver && bad_methods.include?(node.method_name)
 
-          chain = extract_method_chain(node)
-          return if safe_chain?(chain)
+          return if safe_chain?(node) || safe_to_time?(node)
 
-          return if method_name == :to_time && args.length == 1
-
-          add_offense(node, :selector,
-                      format(MSG_SEND,
-                             method_name))
+          add_offense(node, :selector, format(MSG_SEND, node.method_name))
         end
 
         private
 
         def check_date_node(node)
           chain = extract_method_chain(node)
+
           return if (chain & bad_days).empty?
 
           method_name = (chain & bad_days).join('.')
@@ -82,17 +77,7 @@ module RuboCop
         end
 
         def extract_method_chain(node)
-          chain = []
-          while !node.nil? && node.send_type?
-            chain << extract_method(node)
-            node = node.parent
-          end
-          chain
-        end
-
-        def extract_method(node)
-          _receiver, method_name, *_args = *node
-          method_name
+          [node, *node.each_ancestor(:send)].map(&:method_name)
         end
 
         # checks that parent node of send_type
@@ -100,17 +85,29 @@ module RuboCop
         def method_send?(node)
           return false unless node.parent && node.parent.send_type?
 
-          receiver, _method_name, *_args = *node.parent
-
-          receiver == node
+          node.parent.receiver == node
         end
 
-        def safe_chain?(chain)
+        def safe_chain?(node)
+          chain = extract_method_chain(node)
+
           (chain & bad_methods).empty? || !(chain & good_methods).empty?
         end
 
+        def safe_to_time?(node)
+          return unless node.method?(:to_time)
+
+          if node.receiver.str_type?
+            zone_regexp = /[+-][\d:]+\z/
+
+            node.receiver.str_content.match(zone_regexp)
+          else
+            node.arguments.one?
+          end
+        end
+
         def good_days
-          style == :strict ? [] : [:current, :yesterday, :tomorrow]
+          style == :strict ? [] : %i[current yesterday tomorrow]
         end
 
         def bad_days
@@ -118,7 +115,7 @@ module RuboCop
         end
 
         def bad_methods
-          style == :strict ? [:to_time, :to_time_in_current_zone] : [:to_time]
+          style == :strict ? %i[to_time to_time_in_current_zone] : [:to_time]
         end
 
         def good_methods

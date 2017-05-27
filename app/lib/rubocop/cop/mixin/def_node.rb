@@ -2,11 +2,11 @@
 
 module RuboCop
   module Cop
-    # Common functionality for checking if nodes.
+    # Common functionality for checking def nodes.
     module DefNode
       extend NodePattern::Macros
 
-      NON_PUBLIC_MODIFIERS = %w(private protected).freeze
+      NON_PUBLIC_MODIFIERS = %w[private protected].freeze
 
       def non_public?(node)
         non_public_modifier?(node.parent) ||

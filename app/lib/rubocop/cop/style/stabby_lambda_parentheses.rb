@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 module RuboCop
   module Cop
     module Style
@@ -87,7 +88,7 @@ module RuboCop
 
         def lambda_node?(node)
           receiver, call = *node
-          receiver.nil? && call == :lambda
+          !receiver && call == :lambda
         end
 
         def arrow_form?(node)

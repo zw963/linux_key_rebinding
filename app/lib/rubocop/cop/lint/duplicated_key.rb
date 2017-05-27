@@ -8,20 +8,28 @@ module RuboCop
       # This cop mirrors a warning in Ruby 2.2.
       #
       # @example
+      #
+      #   # bad
+      #
       #   hash = { food: 'apple', food: 'orange' }
+      #
+      # @example
+      #
+      #   # good
+      #
+      #   hash = { food: 'apple', other_food: 'orange' }
       class DuplicatedKey < Cop
+        include Duplication
+
         MSG = 'Duplicated key in hash literal.'.freeze
 
         def on_hash(node)
-          keys = []
+          keys = node.keys.select(&:recursive_basic_literal?)
 
-          hash_pairs = *node
-          hash_pairs.each do |pair|
-            key, _value = *pair
-            if keys.include?(key) && key.recursive_basic_literal?
-              add_offense(key, :expression)
-            end
-            keys << key
+          return unless duplicates?(keys)
+
+          consecutive_duplicates(keys).each do |key|
+            add_offense(key, :expression)
           end
         end
       end
