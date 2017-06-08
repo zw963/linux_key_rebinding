@@ -1,0 +1,8 @@
+#!/bin/sh
+
+export RUBYOPT=
+export RUBYLIB=
+ROOT=$(dirname `(readlink -e $0)`)
+name=$(basename $0)
+
+$ROOT/ruby-2.1.6 $ROOT/../app/bin/$name "$@"
