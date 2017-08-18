@@ -1,6 +1,13 @@
 #!/usr/bin/env ruby
 # -*- coding: utf-8 -*-
 
+# 默认常用命令列表:
+
+# 1. prepend_file '文件名', '字符串' 或
+#    prepend_file '文件名' do
+#       ... 这里代码块的返回值必须是一个字符串, 将会被插入文件中.
+#    end
+
 require 'thor'
 
 $script_path = ARGV.shift
@@ -43,7 +50,7 @@ Class.new(Thor) do
     end
   end
 
-  desc 'add line', 'add a line into one file, if file not exist, will create it.'
+  desc 'add line', 'add a line into one file, if file not exist, create it before add this line.'
   def add_line(content, new_content=content, path=$current_task_file)
     fail 'need task file name' if path.nil?
     file = File.open(path)
@@ -66,9 +73,6 @@ Class.new(Thor) do
     touch path
     append_file path, "#{new_content.chomp}\n"
   end
-
-  # desc 'add line', 'add a line in file, if file not exist, create it before add this line.'
-  # alias :add_line! :add_line
 
   desc 'before line', 'add a line before current line'
   def before_line(line, str, file=$current_task_file)
