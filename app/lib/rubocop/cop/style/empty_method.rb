@@ -6,37 +6,42 @@ module RuboCop
       # This cop checks for the formatting of empty method definitions.
       # By default it enforces empty method definitions to go on a single
       # line (compact style), but it can be configured to enforce the `end`
-      # to go on its own line (expanded style.)
+      # to go on its own line (expanded style).
       #
       # Note: A method definition is not considered empty if it contains
       #       comments.
       #
       # @example
       #
-      #   EnforcedStyle: compact (default)
+      #   # EnforcedStyle: compact (default)
       #
       #   @bad
       #   def foo(bar)
       #   end
+      #
       #   def self.foo(bar)
       #   end
       #
       #   @good
       #   def foo(bar); end
+      #
       #   def foo(bar)
       #     # baz
       #   end
+      #
       #   def self.foo(bar); end
       #
-      #   EnforcedStyle: expanded
+      #   # EnforcedStyle: expanded
       #
       #   @bad
       #   def foo(bar); end
+      #
       #   def self.foo(bar); end
       #
       #   @good
       #   def foo(bar)
       #   end
+      #
       #   def self.foo(bar)
       #   end
       class EmptyMethod < Cop
@@ -70,9 +75,10 @@ module RuboCop
         def corrected(node)
           method_name, args, _body, scope = method_def_node_parts(node)
 
-          arguments = args.source unless args.children.empty?
-          joint = compact_style? ? '; ' : "\n"
-          scope = scope ? 'self.' : ''
+          arguments = !args.children.empty? ? args.source : ''
+          indent    = ' ' * node.loc.column
+          joint     = compact_style? ? '; ' : "\n#{indent}"
+          scope     = scope ? 'self.' : ''
 
           ["def #{scope}#{method_name}#{arguments}", 'end'].join(joint)
         end
