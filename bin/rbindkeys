@@ -14,7 +14,7 @@ basename=$(basename $0)
 export LD_LIBRARY_PATH=$LIB
 export LIBPATH=$LD_LIBRARY_PATH
 
-rbindkeys="$ROOT/bin/ruby-2.1.6 $ROOT/app/bin/rbindkeys.rb"
+rbindkeys="$ROOT/bin/ruby-2.2.2 $ROOT/app/bin/rbindkeys.rb"
 
 function help () {
     echo '         ***** rbindkeys shell wrapper *****         '
