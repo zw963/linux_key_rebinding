@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+require 'ripper-tags'
+
+trap(:INT) { abort }
+
+begin
+  trap(:PIPE) { abort }
+rescue ArgumentError
+  # SIGPIPE is unsupported on Windows
+end
+
+program_name = File.basename($0)
+
+begin
+  RipperTags.process_args(ARGV)
+rescue Errno::ENOENT, OptionParser::InvalidOption => err
+  abort "#{program_name}: #{err.message}"
+rescue RipperTags::BrokenPipe
+  abort
+end

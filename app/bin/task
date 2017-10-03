@@ -1,0 +1,105 @@
+#!/usr/bin/env ruby
+# -*- coding: utf-8 -*-
+
+# 默认常用命令列表:
+
+# 1. prepend_file '文件名', '字符串' 或
+#    prepend_file '文件名' do
+#       ... 这里代码块的返回值必须是一个字符串, 将会被插入文件中.
+#    end
+
+require 'thor'
+
+$script_path = ARGV.shift
+
+Class.new(Thor) do
+  include Thor::Actions
+  include FileUtils
+
+  desc 'set config', 'set rails config'
+  def set_config(option, value, path=$current_task_file)
+    fail 'need task file name' if path.nil?
+    file = File.open(path)
+
+    pattern = /^(\s*)(#\s*)?(#{Regexp.escape(option)}\s*=\s*).*$/
+    value = "'#{value}'" if value.is_a? String
+    value = ":#{value}" if value.is_a? Symbol
+    value = 'nil' if value.nil?
+
+    if file.grep(pattern).any?
+      file.close
+      gsub_file path, pattern, "\\1\\3#{value}"
+    else
+      file.rewind
+      last_config_position = file.grep(/config\./).last
+      indent = last_config_position[/^[ \t]*/]
+      file.close
+      insert_into_file path, "#{indent}#{option} = #{value}\n", after: last_config_position
+    end
+  end
+
+  desc 'comment line', 'comment a exist line'
+  def comment_line(content, comment_symbol='#', path=$current_task_file)
+    fail 'need task file name' if path.nil?
+    file = File.open(path)
+    pattern = /^(\s*)(#{Regexp.escape(content)})$/
+
+    if file.grep(pattern).any?
+      file.close
+      gsub_file path, pattern, "\\1#{comment_symbol} \\2"
+    end
+  end
+
+  desc 'add line', 'add a line into one file, if file not exist, create it before add this line.'
+  def add_line(content, new_content=content, path=$current_task_file)
+    fail 'need task file name' if path.nil?
+    file = File.open(path)
+    return if content != new_content && file.read.match(/#{new_content}/m)
+
+    pattern = /^(\s*)(#\s*)?(#{Regexp.escape(content)})$/
+    file.rewind
+    if file.grep(pattern).any?
+      file.close
+      gsub_file path, pattern, "\\1#{new_content.chomp}"
+    else
+      file.rewind
+      last_line = file.each_line.to_a.last
+      file.close
+      indent = last_line[/^[ \t]*/]
+      ret = last_line.match(/\n/) ? '' : "\n"
+      append_file path, "#{ret}#{indent}#{new_content.chomp}\n"
+    end
+  rescue Errno::ENOENT
+    touch path
+    append_file path, "#{new_content.chomp}\n"
+  end
+
+  desc 'before line', 'add a line before current line'
+  def before_line(line, str, file=$current_task_file)
+    fail 'need task file name' if file.nil?
+    insert_into_file file, "#{str.chomp}\n", :before => line
+  end
+
+  desc 'after line', 'add a line after current line'
+  def after_line(line, str, file=$current_task_file)
+    fail 'need task file name' if file.nil?
+    insert_into_file file, "\n#{str.chomp}", :after => line
+  end
+
+  desc 'replace line', 'replace current line with new content'
+  def replace_line(line, str, file=$current_task_file)
+    fail 'need task file name' if file.nil?
+    regexp = Regexp.new(Regexp.escape(line))
+    gsub_file file, regexp, str
+  end
+
+  desc 'add directory', 'add a directory, with .keep in it.'
+  def add_directory(dir)
+    empty_directory dir
+    touch "#{dir}/.keep"
+  end
+
+  def self.source_root
+    File.dirname($script_path)
+  end
+end.new.apply($script_path)
