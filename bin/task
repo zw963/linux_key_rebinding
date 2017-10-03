@@ -6,7 +6,7 @@ ROOT=$(dirname `(readlink -e $0)`)
 name=$(basename $0)
 
 if [ "$*" ]; then
-    $ROOT/ruby-2.2.2 $ROOT/../app/bin/$name "$@"
+    $ROOT/ruby-2.3.1 $ROOT/../app/bin/$name "$@"
 else
     echo 'Need task file as only argument.'
 fi

@@ -11,7 +11,7 @@ exclude_lists='--exclude=*.elc --exclude=*.class --exclude=.git --exclude=.svn -
 --exclude=RCS --exclude=CVS --exclude=EIFGEN --exclude=vendor --exclude=.#*.rb'
 
 ROOT=$(dirname `(readlink -e $0)`)
-rippertags="$ROOT/ruby-2.2.2 $ROOT/../app/bin/ripper-tags"
+rippertags="$ROOT/ruby-2.3.1 $ROOT/../app/bin/ripper-tags"
 
 if [ $(basename $0) == 'ripper-tags' ]; then
     $rippertags "$@"

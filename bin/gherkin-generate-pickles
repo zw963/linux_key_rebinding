@@ -5,4 +5,4 @@ export RUBYOPT=
 export RUBYLIB=$ROOT
 
 basename=$(basename $0)
-$ROOT/ruby-2.2.2 $ROOT/../app/bin/$basename "$@"
+$ROOT/ruby-2.3.1 $ROOT/../app/bin/$basename "$@"
