@@ -22,9 +22,9 @@ Class.new(Thor) do
     file = File.open(path)
 
     pattern = /^(\s*)(#\s*)?(#{Regexp.escape(option)}\s*=\s*).*$/
-    value = "'#{value}'" if value.is_a? String
-    value = ":#{value}" if value.is_a? Symbol
-    value = 'nil' if value.nil?
+    # value = "'#{value}'" if value.is_a? String
+    # value = ":#{value}" if value.is_a? Symbol
+    # value = 'nil' if value.nil?
 
     if file.grep(pattern).any?
       file.close
