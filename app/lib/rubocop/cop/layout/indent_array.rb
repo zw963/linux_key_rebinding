@@ -19,29 +19,73 @@ module RuboCop
       # This default style is called 'special_inside_parentheses'. Alternative
       # styles are 'consistent' and 'align_brackets'. Here are examples:
       #
-      #     # special_inside_parentheses
-      #     array = [
-      #       :value
-      #     ]
-      #     but_in_a_method_call([
-      #                            :its_like_this
-      #                          ])
-      #     # consistent
-      #     array = [
-      #       :value
-      #     ]
-      #     and_in_a_method_call([
-      #       :no_difference
-      #     ])
-      #     # align_brackets
-      #     and_now_for_something = [
-      #                               :completely_different
-      #                             ]
+      # @example EnforcedStyle: special_inside_parentheses (default)
+      #   # The `special_inside_parentheses` style enforces that the first
+      #   # element in an array literal where the opening bracket and first
+      #   # element are on seprate lines is indented one step (two spaces) more
+      #   # than the position inside the opening parenthesis.
       #
+      #   #bad
+      #   array = [
+      #     :value
+      #   ]
+      #   and_in_a_method_call([
+      #     :no_difference
+      #                        ])
+      #
+      #   #good
+      #   array = [
+      #     :value
+      #   ]
+      #   but_in_a_method_call([
+      #                          :its_like_this
+      #                        ])
+      #
+      # @example EnforcedStyle: consistent
+      #   # The `consistent` style enforces that the first element in an array
+      #   # literal where the opening bracket and the first element are on
+      #   # seprate lines is indented the same as an array literal which is not
+      #   # defined inside a method call.
+      #
+      #   #bad
+      #   # consistent
+      #   array = [
+      #     :value
+      #   ]
+      #   but_in_a_method_call([
+      #                          :its_like_this
+      #   ])
+      #
+      #   #good
+      #   array = [
+      #     :value
+      #   ]
+      #   and_in_a_method_call([
+      #     :no_difference
+      #   ])
+      #
+      # @example EnforcedStyle: align_brackets
+      #   # The `align_brackets` style enforces that the opening and closing
+      #   # brackets are indented to the same position.
+      #
+      #   #bad
+      #   # align_brackets
+      #   and_now_for_something = [
+      #                             :completely_different
+      #   ]
+      #
+      #   #good
+      #   # align_brackets
+      #   and_now_for_something = [
+      #                             :completely_different
+      #                           ]
       class IndentArray < Cop
-        include AutocorrectAlignment
+        include Alignment
         include ConfigurableEnforcedStyle
         include ArrayHashIndentation
+
+        MSG = 'Use %<configured_indentation_width>d spaces for indentation ' \
+              'in an array, relative to %<base_description>s.'.freeze
 
         def on_array(node)
           check(node, nil) if node.loc.begin
@@ -51,6 +95,10 @@ module RuboCop
           each_argument_node(node, :array) do |array_node, left_parenthesis|
             check(array_node, left_parenthesis)
           end
+        end
+
+        def autocorrect(node)
+          AlignmentCorrector.correct(processed_source, node, @column_delta)
         end
 
         private
@@ -90,7 +138,7 @@ module RuboCop
                   'Indent the right bracket the same as the start of the line' \
                   ' where the left bracket is.'
                 end
-          add_offense(right_bracket, right_bracket, msg)
+          add_offense(right_bracket, location: right_bracket, message: msg)
         end
 
         # Returns the description of what the correct indentation is based on.
@@ -105,8 +153,11 @@ module RuboCop
         end
 
         def message(base_description)
-          format('Use %d spaces for indentation in an array, relative to %s.',
-                 configured_indentation_width, base_description)
+          format(
+            MSG,
+            configured_indentation_width: configured_indentation_width,
+            base_description: base_description
+          )
         end
       end
     end

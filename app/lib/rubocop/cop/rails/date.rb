@@ -20,27 +20,37 @@ module RuboCop
       # When EnforcedStyle is 'flexible' then only 'Date.today' is prohibited
       # and only 'to_time' is reported as warning.
       #
-      # @example
-      #   # no offense
+      # @example EnforcedStyle: strict
+      #   # bad
+      #   Date.current
+      #   Date.yesterday
+      #   Date.today
+      #   date.to_time
+      #   date.to_time_in_current_zone
+      #
+      #   # good
       #   Time.zone.today
       #   Time.zone.today - 1.day
       #
-      #   # flexible
-      #   Date.current
-      #   Date.yesterday
-      #
-      #   # always reports offense
+      # @example EnforcedStyle: flexible (default)
+      #   # bad
       #   Date.today
       #   date.to_time
       #
-      #   # reports offense only when style is 'strict'
+      #   # good
+      #   Time.zone.today
+      #   Time.zone.today - 1.day
+      #   Date.current
+      #   Date.yesterday
       #   date.to_time_in_current_zone
+      #
       class Date < Cop
         include ConfigurableEnforcedStyle
 
-        MSG = 'Do not use `%s` without zone. Use `%s` instead.'.freeze
+        MSG = 'Do not use `Date.%<day>s` without zone. Use ' \
+              '`Time.zone.%<day>s` instead.'.freeze
 
-        MSG_SEND = 'Do not use `%s` on Date objects, because they ' \
+        MSG_SEND = 'Do not use `%<method>s` on Date objects, because they ' \
                    'know nothing about the time zone in use.'.freeze
 
         BAD_DAYS = %i[today current yesterday tomorrow].freeze
@@ -58,7 +68,8 @@ module RuboCop
 
           return if safe_chain?(node) || safe_to_time?(node)
 
-          add_offense(node, :selector, format(MSG_SEND, node.method_name))
+          add_offense(node, location: :selector,
+                            message: format(MSG_SEND, method: node.method_name))
         end
 
         private
@@ -70,10 +81,8 @@ module RuboCop
 
           method_name = (chain & bad_days).join('.')
 
-          add_offense(node, :selector,
-                      format(MSG,
-                             "Date.#{method_name}",
-                             "Time.zone.#{method_name}"))
+          add_offense(node, location: :selector,
+                            message: format(MSG, day: method_name.to_s))
         end
 
         def extract_method_chain(node)
@@ -98,7 +107,7 @@ module RuboCop
           return unless node.method?(:to_time)
 
           if node.receiver.str_type?
-            zone_regexp = /[+-][\d:]+\z/
+            zone_regexp = /([+-][\d:]+|\dZ)\z/
 
             node.receiver.str_content.match(zone_regexp)
           else

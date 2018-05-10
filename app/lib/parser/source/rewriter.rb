@@ -1,18 +1,23 @@
+# frozen_string_literal: true
+
 module Parser
   module Source
 
     ##
-    # {Rewriter} performs the heavy lifting in the source rewriting process.
-    # It schedules code updates to be performed in the correct order and
-    # verifies that no two updates _clobber_ each other, that is, attempt to
-    # modify the same section of code. (However, if two updates modify the
-    # same section in exactly the same way, they are merged.)
+    # {Rewriter} is deprecated. Use {TreeRewriter} instead.
     #
-    # If it is detected that one update clobbers another one, an `:error` and
-    # a `:note` diagnostics describing both updates are generated and passed to
-    # the diagnostic engine. After that, an exception is raised.
+    # TreeRewriter has simplified semantics, and customizable policies
+    # with regards to clobbering. Please read the documentation.
     #
-    # The default diagnostic engine consumer simply prints the diagnostics to `stderr`.
+    # Keep in mind:
+    # - Rewriter was discarding the `end_pos` of the given range for `insert_before`,
+    #   and the `begin_pos` for `insert_after`. These are meaningful in TreeRewriter.
+    # - TreeRewriter's wrap/insert_before/insert_after are multiple by default, while
+    #   Rewriter would raise clobbering errors if the non '_multi' version was called.
+    # - The TreeRewriter policy closest to Rewriter's behavior is:
+    #       different_replacements: :raise,
+    #       swallowed_insertions: :raise,
+    #       crossing_deletions: :accept
     #
     # @!attribute [r] source_buffer
     #  @return [Source::Buffer]
@@ -21,6 +26,7 @@ module Parser
     #  @return [Diagnostic::Engine]
     #
     # @api public
+    # @deprecated Use {TreeRewriter}
     #
     class Rewriter
       attr_reader :source_buffer
@@ -28,8 +34,10 @@ module Parser
 
       ##
       # @param [Source::Buffer] source_buffer
+      # @deprecated Use {TreeRewriter}
       #
       def initialize(source_buffer)
+        self.class.warn_of_deprecation
         @diagnostics = Diagnostic::Engine.new
         @diagnostics.consumer = lambda do |diag|
           $stderr.puts diag.render
@@ -42,6 +50,10 @@ module Parser
 
         @insert_before_multi_order = 0
         @insert_after_multi_order = 0
+
+        @pending_queue = nil
+        @pending_clobber = nil
+        @pending_insertions = nil
       end
 
       ##
@@ -50,6 +62,7 @@ module Parser
       # @param [Range] range
       # @return [Rewriter] self
       # @raise [ClobberingError] when clobbering is detected
+      # @deprecated Use {TreeRewriter#remove}
       #
       def remove(range)
         append Rewriter::Action.new(range, ''.freeze)
@@ -62,9 +75,25 @@ module Parser
       # @param [String] content
       # @return [Rewriter] self
       # @raise [ClobberingError] when clobbering is detected
+      # @deprecated Use {TreeRewriter#insert_before}
       #
       def insert_before(range, content)
         append Rewriter::Action.new(range.begin, content)
+      end
+
+      ##
+      # Inserts new code before and after the given source range.
+      #
+      # @param [Range] range
+      # @param [String] before
+      # @param [String] after
+      # @return [Rewriter] self
+      # @raise [ClobberingError] when clobbering is detected
+      # @deprecated Use {TreeRewriter#wrap}
+      #
+      def wrap(range, before, after)
+        append Rewriter::Action.new(range.begin, before)
+        append Rewriter::Action.new(range.end, after)
       end
 
       ##
@@ -83,6 +112,7 @@ module Parser
       # @param [String] content
       # @return [Rewriter] self
       # @raise [ClobberingError] when clobbering is detected
+      # @deprecated Use {TreeRewriter#insert_before}
       #
       def insert_before_multi(range, content)
         @insert_before_multi_order -= 1
@@ -96,6 +126,7 @@ module Parser
       # @param [String] content
       # @return [Rewriter] self
       # @raise [ClobberingError] when clobbering is detected
+      # @deprecated Use {TreeRewriter#insert_after}
       #
       def insert_after(range, content)
         append Rewriter::Action.new(range.end, content)
@@ -117,6 +148,7 @@ module Parser
       # @param [String] content
       # @return [Rewriter] self
       # @raise [ClobberingError] when clobbering is detected
+      # @deprecated Use {TreeRewriter#insert_after}
       #
       def insert_after_multi(range, content)
         @insert_after_multi_order += 1
@@ -130,6 +162,7 @@ module Parser
       # @param [String] content
       # @return [Rewriter] self
       # @raise [ClobberingError] when clobbering is detected
+      # @deprecated Use {TreeRewriter#replace}
       #
       def replace(range, content)
         append Rewriter::Action.new(range, content)
@@ -140,6 +173,7 @@ module Parser
       # modified source as a new string.
       #
       # @return [String]
+      # @deprecated Use {TreeRewriter#process}
       #
       def process
         if in_transaction?
@@ -177,6 +211,7 @@ module Parser
       #
       # @raise [RuntimeError] when no block is passed
       # @raise [RuntimeError] when already in a transaction
+      # @deprecated Use {TreeRewriter#transaction}
       #
       def transaction
         unless block_given?
@@ -388,7 +423,7 @@ module Parser
       end
 
       def merge_replacements(actions)
-        result    = ''
+        result    = ''.dup
         prev_act  = nil
 
         actions.each do |act|
@@ -465,6 +500,13 @@ module Parser
       def adjacent?(range1, range2)
         range1.begin_pos <= range2.end_pos && range2.begin_pos <= range1.end_pos
       end
+
+      DEPRECATION_WARNING = [
+        'Parser::Source::Rewriter is deprecated.',
+        'Please update your code to use Parser::Source::TreeRewriter instead'
+      ].join("\n").freeze
+
+      extend Deprecation
     end
 
   end

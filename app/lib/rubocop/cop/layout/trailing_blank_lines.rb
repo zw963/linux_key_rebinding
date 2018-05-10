@@ -5,12 +5,45 @@ module RuboCop
     module Layout
       # This cop looks for trailing blank lines and a final newline in the
       # source code.
+      #
+      # @example EnforcedStyle: final_blank_line
+      #   # `final_blank_line` looks for one blank line followed by a new line
+      #   # at the end of files.
+      #
+      #   # bad
+      #   class Foo; end
+      #   # EOF
+      #
+      #   # bad
+      #   class Foo; end # EOF
+      #
+      #   # good
+      #   class Foo; end
+      #
+      #   # EOF
+      #
+      # @example EnforcedStyle: final_newline (default)
+      #   # `final_newline` looks for one newline at the end of files.
+      #
+      #   # bad
+      #   class Foo; end
+      #
+      #   # EOF
+      #
+      #   # bad
+      #   class Foo; end # EOF
+      #
+      #   # good
+      #   class Foo; end
+      #   # EOF
+      #
       class TrailingBlankLines < Cop
         include ConfigurableEnforcedStyle
+        include RangeHelp
 
         def investigate(processed_source)
-          sb = processed_source.buffer
-          return if sb.source.empty?
+          buffer = processed_source.buffer
+          return if buffer.source.empty?
 
           # The extra text that comes after the last token could be __END__
           # followed by some data to read. If so, we don't check it because
@@ -18,35 +51,43 @@ module RuboCop
           # number of newlines.
           return if ends_in_end?(processed_source)
 
-          whitespace_at_end = sb.source[/\s*\Z/]
+          whitespace_at_end = buffer.source[/\s*\Z/]
           blank_lines = whitespace_at_end.count("\n") - 1
           wanted_blank_lines = style == :final_newline ? 0 : 1
 
           return unless blank_lines != wanted_blank_lines
 
-          offense_detected(sb, wanted_blank_lines, blank_lines,
+          offense_detected(buffer, wanted_blank_lines, blank_lines,
                            whitespace_at_end)
+        end
+
+        def autocorrect(range)
+          lambda do |corrector|
+            corrector.replace(range, style == :final_newline ? "\n" : "\n\n")
+          end
         end
 
         private
 
-        def offense_detected(sb, wanted_blank_lines, blank_lines,
+        def offense_detected(buffer, wanted_blank_lines, blank_lines,
                              whitespace_at_end)
-          begin_pos = sb.source.length - whitespace_at_end.length
-          autocorrect_range = range_between(begin_pos, sb.source.length)
+          begin_pos = buffer.source.length - whitespace_at_end.length
+          autocorrect_range = range_between(begin_pos, buffer.source.length)
           begin_pos += 1 unless whitespace_at_end.empty?
-          report_range = range_between(begin_pos, sb.source.length)
-          add_offense(autocorrect_range, report_range,
-                      message(wanted_blank_lines, blank_lines))
+          report_range = range_between(begin_pos, buffer.source.length)
+
+          add_offense(autocorrect_range,
+                      location: report_range,
+                      message: message(wanted_blank_lines, blank_lines))
         end
 
         def ends_in_end?(processed_source)
-          sb = processed_source.buffer
+          buffer = processed_source.buffer
 
-          return true if sb.source.strip.start_with?('__END__')
+          return true if buffer.source.strip.start_with?('__END__')
           return false if processed_source.tokens.empty?
 
-          extra = sb.source[processed_source.tokens.last.pos.end_pos..-1]
+          extra = buffer.source[processed_source.tokens.last.end_pos..-1]
           extra && extra.strip.start_with?('__END__')
         end
 
@@ -62,14 +103,8 @@ module RuboCop
                          else
                            "instead of #{wanted_blank_lines} "
                          end
-            format('%d trailing blank lines %sdetected.', blank_lines,
-                   instead_of)
-          end
-        end
-
-        def autocorrect(range)
-          lambda do |corrector|
-            corrector.replace(range, style == :final_newline ? "\n" : "\n\n")
+            format('%<current>d trailing blank lines %<prefer>sdetected.',
+                   current: blank_lines, prefer: instead_of)
           end
         end
       end

@@ -10,11 +10,33 @@ module RuboCop
       #
       #   # bad
       #
-      #   def duplicated
+      #   def foo
       #     1
       #   end
       #
-      #   def duplicated
+      #   def foo
+      #     2
+      #   end
+      #
+      # @example
+      #
+      #   # bad
+      #
+      #   def foo
+      #     1
+      #   end
+      #
+      #   alias foo bar
+      #
+      # @example
+      #
+      #   # good
+      #
+      #   def foo
+      #     1
+      #   end
+      #
+      #   def bar
       #     2
       #   end
       #
@@ -22,15 +44,14 @@ module RuboCop
       #
       #   # good
       #
-      #   def duplicated
+      #   def foo
       #     1
       #   end
       #
-      #   def other_duplicated
-      #     2
-      #   end
+      #   alias bar foo
       class DuplicateMethods < Cop
-        MSG = 'Method `%s` is defined at both %s and %s.'.freeze
+        MSG = 'Method `%<method>s` is defined at both %<defined>s and ' \
+              '%<current>s.'.freeze
 
         def initialize(config = nil, options = nil)
           super
@@ -43,8 +64,8 @@ module RuboCop
           return if node.ancestors.any?(&:if_type?)
           return if possible_dsl?(node)
 
-          return unless (scope = node.parent_module_name)
-          found_instance_method(node, scope)
+          name, = *node
+          found_instance_method(node, name)
         end
 
         def on_defs(node)
@@ -57,6 +78,40 @@ module RuboCop
             check_const_receiver(node, name, const_name)
           elsif receiver.self_type?
             check_self_receiver(node, name)
+          end
+        end
+
+        def_node_matcher :method_alias?, <<-PATTERN
+          (alias (sym $_name) sym)
+        PATTERN
+
+        def on_alias(node)
+          return unless (name = method_alias?(node))
+          return if node.ancestors.any?(&:if_type?)
+          return if possible_dsl?(node)
+
+          found_instance_method(node, name)
+        end
+
+        def_node_matcher :alias_method?, <<-PATTERN
+          (send nil? :alias_method (sym $_name) _)
+        PATTERN
+
+        def_node_matcher :attr?, <<-PATTERN
+          (send nil? ${:attr_reader :attr_writer :attr_accessor :attr} $...)
+        PATTERN
+
+        def_node_matcher :sym_name, '(sym $_name)'
+
+        def on_send(node)
+          if (name = alias_method?(node))
+            return unless name
+            return if node.ancestors.any?(&:if_type?)
+            return if possible_dsl?(node)
+
+            found_instance_method(node, name)
+          elsif (attr = attr?(node))
+            on_attr(node, *attr)
           end
         end
 
@@ -77,12 +132,12 @@ module RuboCop
         end
 
         def message_for_dup(node, method_name)
-          format(MSG, method_name, @definitions[method_name],
-                 source_location(node))
+          format(MSG, method: method_name, defined: @definitions[method_name],
+                      current: source_location(node))
         end
 
-        def found_instance_method(node, scope)
-          name, = *node
+        def found_instance_method(node, name)
+          return unless (scope = node.parent_module_name)
           if scope =~ /\A#<Class:(.*)>\Z/
             found_method(node, "#{Regexp.last_match(1)}.#{name}")
           else
@@ -92,9 +147,35 @@ module RuboCop
 
         def found_method(node, method_name)
           if @definitions.key?(method_name)
-            add_offense(node, :keyword, message_for_dup(node, method_name))
+            loc = node.send_type? ? node.loc.selector : node.loc.keyword
+            message = message_for_dup(node, method_name)
+
+            add_offense(node, location: loc, message: message)
           else
             @definitions[method_name] = source_location(node)
+          end
+        end
+
+        def on_attr(node, attr_name, args)
+          case attr_name
+          when :attr
+            writable = args.size == 2 && args.last.true_type?
+            found_attr(node, [args.first], readable: true, writable: writable)
+          when :attr_reader
+            found_attr(node, args, readable: true)
+          when :attr_writer
+            found_attr(node, args, writable: true)
+          when :attr_accessor
+            found_attr(node, args, readable: true, writable: true)
+          end
+        end
+
+        def found_attr(node, args, readable: false, writable: false)
+          args.each do |arg|
+            name = sym_name(arg)
+            next unless name
+            found_instance_method(node, name) if readable
+            found_instance_method(node, "#{name}=") if writable
           end
         end
 

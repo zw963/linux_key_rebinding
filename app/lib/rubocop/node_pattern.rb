@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-# rubocop:disable Metrics/ClassLength
-# rubocop:disable Metrics/CyclomaticComplexity
-
+# rubocop:disable Metrics/ClassLength, Metrics/CyclomaticComplexity
 module RuboCop
   # This class performs a pattern-matching operation on an AST node.
   #
@@ -76,10 +74,10 @@ module RuboCop
   # You can nest arbitrarily deep:
   #
   #     # matches node parsed from 'Const = Class.new' or 'Const = Module.new':
-  #     '(casgn nil const (send (const nil {:Class :Module}) :new)))'
+  #     '(casgn nil? const (send (const nil? {:Class :Module}) :new)))'
   #     # matches a node parsed from an 'if', with a '==' comparison,
   #     # and no 'else' branch:
-  #     '(if (send _ :== _) _ nil)'
+  #     '(if (send _ :== _) _ nil?)'
   #
   # Note that patterns like 'send' are implemented by calling `#send_type?` on
   # the node being matched, 'const' by `#const_type?`, 'int' by `#int_type?`,
@@ -98,19 +96,26 @@ module RuboCop
     # @private
     # Builds Ruby code which implements a pattern
     class Compiler
-      RSYM    = %r{:(?:[\w+@*/?!<>=~|%^-]+|\[\]=?)}
-      ID_CHAR = /[a-zA-Z_-]/
-      META    = /\(|\)|\{|\}|\[|\]|\$\.\.\.|\$|!|\^|\.\.\./
-      NUMBER  = /-?\d+(?:\.\d+)?/
-      TOKEN   =
-        /\G(?:[\s,]+|#{META}|%\d*|#{NUMBER}|\#?#{ID_CHAR}+[\!\?]?\(?|#{RSYM}|.)/
+      SYMBOL       = %r{:(?:[\w+@*/?!<>=~|%^-]+|\[\]=?)}
+      IDENTIFIER   = /[a-zA-Z_-]/
+      META         = /\(|\)|\{|\}|\[|\]|\$\.\.\.|\$|!|\^|\.\.\./
+      NUMBER       = /-?\d+(?:\.\d+)?/
+      STRING       = /".+?"/
+      METHOD_NAME  = /\#?#{IDENTIFIER}+[\!\?]?\(?/
+      PARAM_NUMBER = /%\d*/
 
-      NODE      = /\A#{ID_CHAR}+\Z/
-      PREDICATE = /\A#{ID_CHAR}+\?\(?\Z/
-      WILDCARD  = /\A_#{ID_CHAR}*\Z/
-      FUNCALL   = /\A\##{ID_CHAR}+[\!\?]?\(?\Z/
-      LITERAL   = /\A(?:#{RSYM}|#{NUMBER}|nil)\Z/
-      PARAM     = /\A%\d*\Z/
+      SEPARATORS = /[\s]+/
+      TOKENS     = Regexp.union(META, PARAM_NUMBER, NUMBER,
+                                METHOD_NAME, SYMBOL, STRING)
+
+      TOKEN = /\G(?:#{SEPARATORS}|#{TOKENS}|.)/
+
+      NODE      = /\A#{IDENTIFIER}+\Z/
+      PREDICATE = /\A#{IDENTIFIER}+\?\(?\Z/
+      WILDCARD  = /\A_#{IDENTIFIER}*\Z/
+      FUNCALL   = /\A\##{METHOD_NAME}/
+      LITERAL   = /\A(?:#{SYMBOL}|#{NUMBER}|#{STRING})\Z/
+      PARAM     = /\A#{PARAM_NUMBER}\Z/
       CLOSING   = /\A(?:\)|\}|\])\Z/
 
       attr_reader :match_code
@@ -128,9 +133,11 @@ module RuboCop
       end
 
       def run(node_var)
-        tokens = @string.scan(TOKEN)
-        tokens.reject! { |token| token =~ /\A[\s,]+\Z/ } # drop whitespace
+        tokens =
+          @string.scan(TOKEN).reject { |token| token =~ /\A#{SEPARATORS}\Z/ }
+
         @match_code = compile_expr(tokens, node_var, false)
+
         fail_due_to('unbalanced pattern') unless tokens.empty?
       end
 
@@ -158,7 +165,7 @@ module RuboCop
         when PARAM     then compile_param(cur_node, token[1..-1], seq_head)
         when CLOSING   then fail_due_to("#{token} in invalid position")
         when nil       then fail_due_to('pattern ended prematurely')
-        else fail_due_to("invalid token #{token.inspect}")
+        else                fail_due_to("invalid token #{token.inspect}")
         end
       end
       # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
@@ -336,7 +343,8 @@ module RuboCop
         else
           n = @unify[name] = next_temp_value
           # double assign to temp#{n} to avoid "assigned but unused variable"
-          "(temp#{n} = temp#{n} = #{cur_node}#{'.type' if seq_head}; true)"
+          "(temp#{n} = #{cur_node}#{'.type' if seq_head}; " \
+          "temp#{n} = temp#{n}; true)"
         end
       end
 
@@ -361,7 +369,7 @@ module RuboCop
         if method.end_with?('(') # is there an arglist?
           args = compile_args(tokens)
           method = method[0..-2] # drop the trailing (
-          "(#{method}(#{cur_node}#{'.type' if seq_head}),#{args.join(',')})"
+          "(#{method}(#{cur_node}#{'.type' if seq_head},#{args.join(',')}))"
         else
           "(#{method}(#{cur_node}#{'.type' if seq_head}))"
         end
@@ -376,10 +384,13 @@ module RuboCop
       end
 
       def compile_args(tokens)
-        args = []
-        args << compile_arg(tokens.shift) until tokens.first == ')'
-        tokens.shift # drop the )
-        args
+        index = tokens.find_index { |token| token == ')' }
+
+        tokens.slice!(0..index).each_with_object([]) do |token, args|
+          next if [')', ','].include?(token)
+
+          args << compile_arg(token)
+        end
       end
 
       def compile_arg(token)
@@ -433,11 +444,17 @@ module RuboCop
         params.empty? ? '' : ",#{params}"
       end
 
+      def emit_guard_clause
+        <<-RUBY
+          return unless node.is_a?(RuboCop::AST::Node)
+        RUBY
+      end
+
       def emit_method_code
-        <<-CODE
-          return nil unless #{@match_code}
+        <<-RUBY
+          return unless #{@match_code}
           block_given? ? yield(#{emit_capture_list}) : (return #{emit_retval})
-        CODE
+        RUBY
       end
 
       def fail_due_to(message)
@@ -447,7 +464,7 @@ module RuboCop
       def with_temp_node(cur_node)
         with_temp_variable do |temp_var|
           # double assign to temp#{n} to avoid "assigned but unused variable"
-          yield "#{temp_var} = #{temp_var} = #{cur_node}", temp_var
+          yield "#{temp_var} = #{cur_node}; #{temp_var} = #{temp_var}", temp_var
         end
       end
 
@@ -459,6 +476,7 @@ module RuboCop
         @temps += 1
       end
     end
+    private_constant :Compiler
 
     # Helpers for defining methods based on a pattern string
     module Macros
@@ -470,9 +488,10 @@ module RuboCop
       # If the node matches, and no block is provided, the new method will
       # return the captures, or `true` if there were none.
       def def_node_matcher(method_name, pattern_str)
-        compiler = RuboCop::NodePattern::Compiler.new(pattern_str, 'node')
-        src = "def #{method_name}(node" \
+        compiler = Compiler.new(pattern_str, 'node')
+        src = "def #{method_name}(node = self" \
               "#{compiler.emit_trailing_params});" \
+              "#{compiler.emit_guard_clause}" \
               "#{compiler.emit_method_code};end"
 
         location = caller_locations(1, 1).first
@@ -486,7 +505,7 @@ module RuboCop
       # as soon as it finds a descendant which matches. Otherwise, it will
       # yield all descendants which match.
       def def_node_search(method_name, pattern_str)
-        compiler = RuboCop::NodePattern::Compiler.new(pattern_str, 'node')
+        compiler = Compiler.new(pattern_str, 'node')
         called_from = caller(1..1).first.split(':')
 
         if method_name.to_s.end_with?('?')
@@ -519,7 +538,7 @@ module RuboCop
 
       def node_search_body(method_name, trailing_params, prelude, match_code,
                            on_match)
-        <<-END
+        <<-RUBY
           def #{method_name}(node0#{trailing_params})
             #{prelude}
             node0.each_node do |node|
@@ -529,7 +548,7 @@ module RuboCop
             end
             nil
           end
-        END
+        RUBY
       end
     end
 
@@ -541,3 +560,4 @@ module RuboCop
     end
   end
 end
+# rubocop:enable Metrics/ClassLength, Metrics/CyclomaticComplexity

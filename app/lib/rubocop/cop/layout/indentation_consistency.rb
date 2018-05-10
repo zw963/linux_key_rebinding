@@ -5,17 +5,120 @@ module RuboCop
     module Layout
       # This cops checks for inconsistent indentation.
       #
-      # @example
+      # The difference between `rails` and `normal` is that the `rails` style
+      # prescribes that in classes and modules the `protected` and `private`
+      # modifier keywords shall be indented the same as public methods and that
+      # protected and private members shall be indented one step more than the
+      # modifiers. Other than that, both styles mean that entities on the same
+      # logical depth shall have the same indentation.
       #
+      # @example EnforcedStyle: normal (default)
+      #   # bad
       #   class A
       #     def test
       #       puts 'hello'
       #        puts 'world'
       #     end
       #   end
+      #
+      #   # bad
+      #   class A
+      #     def test
+      #       puts 'hello'
+      #       puts 'world'
+      #     end
+      #
+      #     protected
+      #
+      #       def foo
+      #       end
+      #
+      #     private
+      #
+      #       def bar
+      #       end
+      #   end
+      #
+      #   # good
+      #   class A
+      #     def test
+      #       puts 'hello'
+      #       puts 'world'
+      #     end
+      #   end
+      #
+      #   # good
+      #   class A
+      #     def test
+      #       puts 'hello'
+      #       puts 'world'
+      #     end
+      #
+      #     protected
+      #
+      #     def foo
+      #     end
+      #
+      #     private
+      #
+      #     def bar
+      #     end
+      #   end
+      #
+      # @example EnforcedStyle: rails
+      #   # bad
+      #   class A
+      #     def test
+      #       puts 'hello'
+      #        puts 'world'
+      #     end
+      #   end
+      #
+      #   # bad
+      #   class A
+      #     def test
+      #       puts 'hello'
+      #       puts 'world'
+      #     end
+      #
+      #     protected
+      #
+      #     def foo
+      #     end
+      #
+      #     private
+      #
+      #     def bar
+      #     end
+      #   end
+      #
+      #   # good
+      #   class A
+      #     def test
+      #       puts 'hello'
+      #       puts 'world'
+      #     end
+      #   end
+      #
+      #   # good
+      #   class A
+      #     def test
+      #       puts 'hello'
+      #       puts 'world'
+      #     end
+      #
+      #     protected
+      #
+      #       def foo
+      #       end
+      #
+      #     private
+      #
+      #       def bar
+      #       end
+      #   end
       class IndentationConsistency < Cop
-        include AutocorrectAlignment
-        include AccessModifierNode
+        include Alignment
         include ConfigurableEnforcedStyle
 
         MSG = 'Inconsistent indentation detected.'.freeze
@@ -28,6 +131,10 @@ module RuboCop
           check(node)
         end
 
+        def autocorrect(node)
+          AlignmentCorrector.correct(processed_source, node, column_delta)
+        end
+
         private
 
         def check(node)
@@ -37,7 +144,7 @@ module RuboCop
             # the AccessModifierIndentation cop. This cop uses them as dividers
             # in rails mode. Then consistency is checked only within each
             # section delimited by a modifier node.
-            if modifier_node?(child)
+            if child.send_type? && child.access_modifier?
               children_to_check << [] if style == :rails
             else
               children_to_check.last << child

@@ -5,31 +5,35 @@ module RuboCop
     # Common functionality for cops checking for missing space after
     # punctuation.
     module SpaceAfterPunctuation
-      MSG = 'Space missing after %s.'.freeze
+      MSG = 'Space missing after %<token>s.'.freeze
 
       def investigate(processed_source)
         each_missing_space(processed_source.tokens) do |token|
-          add_offense(token, token.pos, format(MSG, kind(token)))
+          add_offense(token, location: token.pos,
+                             message: format(MSG, token: kind(token)))
         end
       end
+
+      private
 
       def each_missing_space(tokens)
-        tokens.each_cons(2) do |t1, t2|
-          next unless kind(t1)
-          next unless space_missing?(t1, t2)
-          next unless space_required_before?(t2)
+        tokens.each_cons(2) do |token1, token2|
+          next unless kind(token1)
+          next unless space_missing?(token1, token2)
+          next unless space_required_before?(token2)
 
-          yield t1
+          yield token1
         end
       end
 
-      def space_missing?(t1, t2)
-        t1.pos.line == t2.pos.line && t2.pos.column == t1.pos.column + offset
+      def space_missing?(token1, token2)
+        token1.line == token2.line &&
+          token2.column == token1.column + offset
       end
 
       def space_required_before?(token)
         !(allowed_type?(token) ||
-          (token.type == :tRCURLY && space_forbidden_before_rcurly?))
+          (token.right_curly_brace? && space_forbidden_before_rcurly?))
       end
 
       def allowed_type?(token)
@@ -45,10 +49,6 @@ module RuboCop
       # token where a space should be, is 1.
       def offset
         1
-      end
-
-      def autocorrect(token)
-        ->(corrector) { corrector.replace(token.pos, token.pos.source + ' ') }
       end
     end
   end

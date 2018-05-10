@@ -5,31 +5,44 @@ module RuboCop
     module Style
       # This cop checks for the use of a method, the result of which
       # would be a literal, like an empty array, hash or string.
+      #
+      # @example
+      #   # bad
+      #   a = Array.new
+      #   h = Hash.new
+      #   s = String.new
+      #
+      #   # good
+      #   a = []
+      #   h = {}
+      #   s = ''
       class EmptyLiteral < Cop
         include FrozenStringLiteral
+        include RangeHelp
 
         ARR_MSG = 'Use array literal `[]` instead of `Array.new`.'.freeze
         HASH_MSG = 'Use hash literal `{}` instead of `Hash.new`.'.freeze
-        STR_MSG = 'Use string literal `%s` instead of `String.new`.'.freeze
+        STR_MSG = 'Use string literal `%<prefer>s` instead of ' \
+                  '`String.new`.'.freeze
 
-        def_node_matcher :array_node, '(send (const nil :Array) :new)'
-        def_node_matcher :hash_node, '(send (const nil :Hash) :new)'
-        def_node_matcher :str_node, '(send (const nil :String) :new)'
+        def_node_matcher :array_node, '(send (const nil? :Array) :new)'
+        def_node_matcher :hash_node, '(send (const nil? :Hash) :new)'
+        def_node_matcher :str_node, '(send (const nil? :String) :new)'
         def_node_matcher :array_with_block,
-                         '(block (send (const nil :Array) :new) args _)'
+                         '(block (send (const nil? :Array) :new) args _)'
         def_node_matcher :hash_with_block,
-                         '(block (send (const nil :Hash) :new) args _)'
+                         '(block (send (const nil? :Hash) :new) args _)'
 
         def on_send(node)
-          add_offense(node, :expression, ARR_MSG) if offense_array_node?(node)
-
-          add_offense(node, :expression, HASH_MSG) if offense_hash_node?(node)
+          add_offense(node, message: ARR_MSG)  if offense_array_node?(node)
+          add_offense(node, message: HASH_MSG) if offense_hash_node?(node)
 
           str_node(node) do
             return if frozen_string_literals_enabled?
 
-            add_offense(node, :expression,
-                        format(STR_MSG, preferred_string_literal))
+            add_offense(node,
+                        message: format(STR_MSG,
+                                        prefer: preferred_string_literal))
           end
         end
 
@@ -68,9 +81,8 @@ module RuboCop
             # to rewrite the arguments to wrap them in parenthesis.
             _receiver, _method_name, *args = *node.parent
 
-            Parser::Source::Range.new(node.parent.loc.expression,
-                                      args[0].loc.expression.begin_pos - 1,
-                                      args[-1].loc.expression.end_pos)
+            range_between(args[0].loc.expression.begin_pos - 1,
+                          args[-1].loc.expression.end_pos)
           else
             node.source_range
           end

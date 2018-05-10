@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Parser
 
   ##
@@ -29,10 +31,10 @@ module Parser
       # all new code should set this attribute to true.
       #
       # If set to false (the default), arguments of `m { |a| }` are emitted as
-      # `s(:args, s(:arg, :a))`
+      # `s(:args, s(:arg, :a))`.
       #
       # If set to true, arguments of `m { |a| }` are emitted as
-      # `s(:args, s(:procarg0, :a))
+      # `s(:args, s(:procarg0, :a)).
       #
       # @return [Boolean]
       attr_accessor :emit_procarg0
@@ -42,10 +44,52 @@ module Parser
 
     class << self
       ##
+      # AST compatibility attribute; locations of `__ENCODING__` are not the same
+      # as locations of `Encoding::UTF_8` causing problems during rewriting,
+      # all new code should set this attribute to true.
+      #
+      # If set to false (the default), `__ENCODING__` is emitted as
+      # ` s(:const, s(:const, nil, :Encoding), :UTF_8)`.
+      #
+      # If set to true, `__ENCODING__` is emitted as
+      # `s(:__ENCODING__)`.
+      #
+      # @return [Boolean]
+      attr_accessor :emit_encoding
+    end
+
+    @emit_encoding = false
+
+    class << self
+      ##
+      # AST compatibility attribute; indexed assignment, `x[] = 1`, is not
+      # semantically equivalent to calling the method directly, `x.[]=(1)`.
+      # Specifically, in the former case, the expression's value is always 1,
+      # and in the latter case, the expression's value is the return value
+      # of the `[]=` method.
+      #
+      # If set to false (the default), `self[1]` is emitted as
+      # `s(:send, s(:self), :[], s(:int, 1))`, and `self[1] = 2` is
+      # emitted as `s(:send, s(:self), :[]=, s(:int, 1), s(:int, 2))`.
+      #
+      # If set to true, `self[1]` is emitted as
+      # `s(:index, s(:self), s(:int, 1))`, and `self[1] = 2` is
+      # emitted as `s(:indexasgn, s(:self), s(:int, 1), s(:int, 2))`.
+      #
+      # @return [Boolean]
+      attr_accessor :emit_index
+    end
+
+    @emit_index = false
+
+    class << self
+      ##
       # @api private
       def modernize
         @emit_lambda = true
         @emit_procarg0 = true
+        @emit_encoding = true
+        @emit_index = true
       end
     end
 
@@ -54,7 +98,7 @@ module Parser
     attr_accessor :parser
 
     ##
-    # If set to true, `__FILE__` and `__LINE__` are transformed to
+    # If set to true (the default), `__FILE__` and `__LINE__` are transformed to
     # literal nodes. For example, `s(:str, "lib/foo.rb")` and `s(:int, 10)`.
     #
     # If set to false, `__FILE__` and `__LINE__` are emitted as-is,
@@ -120,11 +164,18 @@ module Parser
     end
     private :numeric
 
-    def negate(uminus_t, numeric)
+    def unary_num(unary_t, numeric)
       value, = *numeric
-      operator_loc = loc(uminus_t)
+      operator_loc = loc(unary_t)
 
-      numeric.updated(nil, [ -value ],
+      case value(unary_t)
+      when '+'
+        value = +value
+      when '-'
+        value = -value
+      end
+
+      numeric.updated(nil, [ value ],
         :location =>
           Source::Map::Operator.new(
             operator_loc,
@@ -415,8 +466,12 @@ module Parser
         end
 
       when :__ENCODING__
-        n(:const, [ n(:const, [ nil, :Encoding], nil), :UTF_8 ],
-          node.loc.dup)
+        if !self.class.emit_encoding
+          n(:const, [ n(:const, [ nil, :Encoding], nil), :UTF_8 ],
+            node.loc.dup)
+        else
+          node
+        end
 
       when :ident
         name, = *node
@@ -472,7 +527,7 @@ module Parser
         node.updated(:gvasgn)
 
       when :const
-        if @parser.in_def?
+        unless @parser.context.dynamic_const_definition_allowed?
           diagnostic :error, :dynamic_const, nil, node.loc.expression
         end
 
@@ -506,11 +561,15 @@ module Parser
 
     def op_assign(lhs, op_t, rhs)
       case lhs.type
-      when :gvasgn, :ivasgn, :lvasgn, :cvasgn, :casgn, :send, :csend
+      when :gvasgn, :ivasgn, :lvasgn, :cvasgn, :casgn, :send, :csend, :index
         operator   = value(op_t)[0..-1].to_sym
         source_map = lhs.loc.
                         with_operator(loc(op_t)).
                         with_expression(join_exprs(lhs, rhs))
+
+        if lhs.type  == :index
+          lhs = lhs.updated(:indexasgn)
+        end
 
         case operator
         when :'&&'
@@ -776,7 +835,7 @@ module Parser
         diagnostic :error, :block_and_blockarg, nil, last_arg.loc.expression, [loc(begin_t)]
       end
 
-      if [:send, :csend, :super, :zsuper, :lambda].include?(method_call.type)
+      if [:send, :csend, :index, :super, :zsuper, :lambda].include?(method_call.type)
         n(:block, [ method_call, args, body ],
           block_map(method_call.loc.expression, begin_t, end_t))
       else
@@ -816,14 +875,24 @@ module Parser
     end
 
     def index(receiver, lbrack_t, indexes, rbrack_t)
-      n(:send, [ receiver, :[], *indexes ],
-        send_index_map(receiver, lbrack_t, rbrack_t))
+      if self.class.emit_index
+        n(:index, [ receiver, *indexes ],
+          index_map(receiver, lbrack_t, rbrack_t))
+      else
+        n(:send, [ receiver, :[], *indexes ],
+          send_index_map(receiver, lbrack_t, rbrack_t))
+      end
     end
 
     def index_asgn(receiver, lbrack_t, indexes, rbrack_t)
-      # Incomplete method call.
-      n(:send, [ receiver, :[]=, *indexes ],
-        send_index_map(receiver, lbrack_t, rbrack_t))
+      if self.class.emit_index
+        n(:indexasgn, [ receiver, *indexes ],
+          index_map(receiver, lbrack_t, rbrack_t))
+      else
+        # Incomplete method call.
+        n(:send, [ receiver, :[]=, *indexes ],
+          send_index_map(receiver, lbrack_t, rbrack_t))
+      end
     end
 
     def binary_op(receiver, operator_t, arg)
@@ -878,7 +947,7 @@ module Parser
 
     def not_op(not_t, begin_t=nil, receiver=nil, end_t=nil)
       if @parser.version == 18
-        n(:not, [ receiver ],
+        n(:not, [ check_condition(receiver) ],
           unary_op_map(not_t, receiver))
       else
         if receiver.nil?
@@ -888,7 +957,7 @@ module Parser
             nil_node, :'!'
           ], send_unary_op_map(not_t, nil_node))
         else
-          n(:send, [ receiver, :'!' ],
+          n(:send, [ check_condition(receiver), :'!' ],
             send_map(nil, nil, not_t, begin_t, [receiver], end_t))
         end
       end
@@ -1097,6 +1166,8 @@ module Parser
       when :masgn
         if @parser.version <= 23
           diagnostic :error, :masgn_as_condition, nil, cond.loc.expression
+        else
+          cond
         end
 
       when :begin
@@ -1198,13 +1269,9 @@ module Parser
     def delimited_string_map(string_t)
       str_range = loc(string_t)
 
-      begin_l = Source::Range.new(str_range.source_buffer,
-                                  str_range.begin_pos,
-                                  str_range.begin_pos + 1)
+      begin_l = str_range.with(end_pos: str_range.begin_pos + 1)
 
-      end_l   = Source::Range.new(str_range.source_buffer,
-                                  str_range.end_pos - 1,
-                                  str_range.end_pos)
+      end_l   = str_range.with(begin_pos: str_range.end_pos - 1)
 
       Source::Map::Collection.new(begin_l, end_l,
                                   loc(string_t))
@@ -1213,9 +1280,7 @@ module Parser
     def prefix_string_map(symbol)
       str_range = loc(symbol)
 
-      begin_l = Source::Range.new(str_range.source_buffer,
-                                  str_range.begin_pos,
-                                  str_range.begin_pos + 1)
+      begin_l = str_range.with(end_pos: str_range.begin_pos + 1)
 
       Source::Map::Collection.new(begin_l, nil,
                                   loc(symbol))
@@ -1229,13 +1294,9 @@ module Parser
     def pair_keyword_map(key_t, value_e)
       key_range = loc(key_t)
 
-      key_l   = Source::Range.new(key_range.source_buffer,
-                                  key_range.begin_pos,
-                                  key_range.end_pos - 1)
+      key_l   = key_range.adjust(end_pos: -1)
 
-      colon_l = Source::Range.new(key_range.source_buffer,
-                                  key_range.end_pos - 1,
-                                  key_range.end_pos)
+      colon_l = key_range.with(begin_pos: key_range.end_pos - 1)
 
       [ # key map
         Source::Map::Collection.new(nil, nil,
@@ -1248,13 +1309,10 @@ module Parser
     def pair_quoted_map(begin_t, end_t, value_e)
       end_l = loc(end_t)
 
-      quote_l = Source::Range.new(end_l.source_buffer,
-                                  end_l.end_pos - 2,
-                                  end_l.end_pos - 1)
+      quote_l = end_l.with(begin_pos: end_l.end_pos - 2,
+                           end_pos: end_l.end_pos - 1)
 
-      colon_l = Source::Range.new(end_l.source_buffer,
-                                  end_l.end_pos - 1,
-                                  end_l.end_pos)
+      colon_l = end_l.with(begin_pos: end_l.end_pos - 1)
 
       [ # modified end token
         [ value(end_t), quote_l ],
@@ -1271,6 +1329,10 @@ module Parser
       if begin_t.nil? || end_t.nil?
         if parts.any?
           expr_l = join_exprs(parts.first, parts.last)
+        elsif !begin_t.nil?
+          expr_l = loc(begin_t)
+        elsif !end_t.nil?
+          expr_l = loc(end_t)
         end
       else
         expr_l = loc(begin_t).join(loc(end_t))
@@ -1338,9 +1400,7 @@ module Parser
 
     def kwarg_map(name_t, value_e=nil)
       label_range = loc(name_t)
-      name_range  = Source::Range.new(label_range.source_buffer,
-                                      label_range.begin_pos,
-                                      label_range.end_pos - 1)
+      name_range  = label_range.adjust(end_pos: -1)
 
       if value_e
         expr_l = loc(name_t).join(value_e.loc.expression)
@@ -1409,6 +1469,11 @@ module Parser
       Source::Map::Send.new(nil, loc(selector_t),
                             nil, nil,
                             expr_l)
+    end
+
+    def index_map(receiver_e, lbrack_t, rbrack_t)
+      Source::Map::Index.new(loc(lbrack_t), loc(rbrack_t),
+                             receiver_e.loc.expression.join(loc(rbrack_t)))
     end
 
     def send_index_map(receiver_e, lbrack_t, rbrack_t)
@@ -1544,19 +1609,17 @@ module Parser
       source = static_string(parts)
       return nil if source.nil?
 
-      if defined?(Encoding)
-        source = case
-        when options.children.include?(:u)
-          source.encode(Encoding::UTF_8)
-        when options.children.include?(:e)
-          source.encode(Encoding::EUC_JP)
-        when options.children.include?(:s)
-          source.encode(Encoding::WINDOWS_31J)
-        when options.children.include?(:n)
-          source.encode(Encoding::BINARY)
-        else
-          source
-        end
+      source = case
+      when options.children.include?(:u)
+        source.encode(Encoding::UTF_8)
+      when options.children.include?(:e)
+        source.encode(Encoding::EUC_JP)
+      when options.children.include?(:s)
+        source.encode(Encoding::WINDOWS_31J)
+      when options.children.include?(:n)
+        source.encode(Encoding::BINARY)
+      else
+        source
       end
 
       Regexp.new(source, (Regexp::EXTENDED if options.children.include?(:x)))
@@ -1578,16 +1641,12 @@ module Parser
       token[0]
     end
 
-    if defined?(Encoding)
-      def string_value(token)
-        unless token[0].valid_encoding?
-          diagnostic(:error, :invalid_encoding, nil, token[1])
-        end
-
-        token[0]
+    def string_value(token)
+      unless token[0].valid_encoding?
+        diagnostic(:error, :invalid_encoding, nil, token[1])
       end
-    else
-      alias string_value value
+
+      token[0]
     end
 
     def loc(token)

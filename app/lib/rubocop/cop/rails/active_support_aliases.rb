@@ -20,7 +20,7 @@ module RuboCop
       #   [1, 2, 'a'].prepend('b')
       #
       class ActiveSupportAliases < Cop
-        MSG = 'Use `%s` instead of `%s`.'.freeze
+        MSG = 'Use `%<prefer>s` instead of `%<current>s`.'.freeze
 
         ALIASES = {
           starts_with?: {
@@ -38,13 +38,11 @@ module RuboCop
         end
 
         def on_send(node)
-          ALIASES.keys.each do |aliased_method|
+          ALIASES.each_key do |aliased_method|
             register_offense(node, aliased_method) if
               public_send(aliased_method, node)
           end
         end
-
-        private
 
         def autocorrect(node)
           return false if append(node)
@@ -55,11 +53,13 @@ module RuboCop
           end
         end
 
+        private
+
         def register_offense(node, method_name)
           add_offense(
             node,
-            :expression,
-            format(MSG, ALIASES[method_name][:original], method_name)
+            message: format(MSG, prefer: ALIASES[method_name][:original],
+                                 current: method_name)
           )
         end
       end

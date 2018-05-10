@@ -16,58 +16,19 @@ module RuboCop
       # an offense is reported.
       #
       class Copyright < Cop
+        include RangeHelp
+
+        MSG = 'Include a copyright notice matching /%<notice>s/ before ' \
+              'any code.'.freeze
         AUTOCORRECT_EMPTY_WARNING = 'An AutocorrectNotice must be defined in' \
                                     'your RuboCop config'.freeze
-
-        def message
-          "Include a copyright notice matching /#{notice}/" \
-          'before any code.'
-        end
-
-        def notice
-          cop_config['Notice']
-        end
-
-        def autocorrect_notice
-          cop_config['AutocorrectNotice']
-        end
 
         def investigate(processed_source)
           return if notice.empty?
           return if notice_found?(processed_source)
           range = source_range(processed_source.buffer, 1, 0)
-          add_offense(insert_notice_before(processed_source), range, message)
-        end
-
-        def insert_notice_before(processed_source)
-          token_index = 0
-          token_index += 1 if shebang_token?(processed_source, token_index)
-          token_index += 1 if encoding_token?(processed_source, token_index)
-          processed_source.tokens[token_index]
-        end
-
-        def shebang_token?(processed_source, token_index)
-          return false if token_index >= processed_source.tokens.size
-          token = processed_source.tokens[token_index]
-          token.type == :tCOMMENT && token.text =~ /^#!.*$/
-        end
-
-        def encoding_token?(processed_source, token_index)
-          return false if token_index >= processed_source.tokens.size
-          token = processed_source.tokens[token_index]
-          token.type == :tCOMMENT &&
-            token.text =~ /^#.*coding\s?[:=]\s?(?:UTF|utf)-8/
-        end
-
-        def notice_found?(processed_source)
-          notice_found = false
-          notice_regexp = Regexp.new(notice)
-          processed_source.tokens.each do |token|
-            break unless token.type == :tCOMMENT
-            notice_found = !(token.text =~ notice_regexp).nil?
-            break if notice_found
-          end
-          notice_found
+          add_offense(insert_notice_before(processed_source),
+                      location: range, message: format(MSG, notice: notice))
         end
 
         def autocorrect(token)
@@ -82,6 +43,46 @@ module RuboCop
             range = token.nil? ? range_between(0, 0) : token.pos
             corrector.insert_before(range, "#{autocorrect_notice}\n")
           end
+        end
+
+        private
+
+        def notice
+          cop_config['Notice']
+        end
+
+        def autocorrect_notice
+          cop_config['AutocorrectNotice']
+        end
+
+        def insert_notice_before(processed_source)
+          token_index = 0
+          token_index += 1 if shebang_token?(processed_source, token_index)
+          token_index += 1 if encoding_token?(processed_source, token_index)
+          processed_source.tokens[token_index]
+        end
+
+        def shebang_token?(processed_source, token_index)
+          return false if token_index >= processed_source.tokens.size
+          token = processed_source.tokens[token_index]
+          token.comment? && token.text =~ /^#!.*$/
+        end
+
+        def encoding_token?(processed_source, token_index)
+          return false if token_index >= processed_source.tokens.size
+          token = processed_source.tokens[token_index]
+          token.comment? && token.text =~ /^#.*coding\s?[:=]\s?(?:UTF|utf)-8/
+        end
+
+        def notice_found?(processed_source)
+          notice_found = false
+          notice_regexp = Regexp.new(notice)
+          processed_source.each_token do |token|
+            break unless token.comment?
+            notice_found = !(token.text =~ notice_regexp).nil?
+            break if notice_found
+          end
+          notice_found
         end
       end
     end

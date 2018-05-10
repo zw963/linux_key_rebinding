@@ -7,21 +7,22 @@ module RuboCop
       # would suffice.
       #
       # @example
-      #   @bad
+      #   # bad
+      #   'abc'.match?(/bc\Z/)
       #   'abc' =~ /bc\Z/
       #   'abc'.match(/bc\Z/)
       #
-      #   @good
+      #   # good
       #   'abc'.end_with?('bc')
       class EndWith < Cop
         MSG = 'Use `String#end_with?` instead of a regex match anchored to ' \
               'the end of the string.'.freeze
         SINGLE_QUOTE = "'".freeze
 
-        def_node_matcher :redundant_regex?, <<-END
-          {(send $!nil {:match :=~} (regexp (str $#literal_at_end?) (regopt)))
+        def_node_matcher :redundant_regex?, <<-PATTERN
+          {(send $!nil? {:match :=~ :match?} (regexp (str $#literal_at_end?) (regopt)))
            (send (regexp (str $#literal_at_end?) (regopt)) {:match :=~} $_)}
-        END
+        PATTERN
 
         def literal_at_end?(regex_str)
           # is this regexp 'literal' in the sense of only matching literal
@@ -33,7 +34,7 @@ module RuboCop
         def on_send(node)
           return unless redundant_regex?(node)
 
-          add_offense(node, :expression)
+          add_offense(node)
         end
 
         def autocorrect(node)

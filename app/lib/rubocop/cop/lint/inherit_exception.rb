@@ -8,23 +8,19 @@ module RuboCop
       # `StandardError`. It is configurable to suggest using either
       # `RuntimeError` (default) or `StandardError` instead.
       #
-      # @example
-      #
+      # @example EnforcedStyle: runtime_error (default)
       #   # bad
       #
       #   class C < Exception; end
-      #
-      # @example
-      #
-      #   # EnforcedStyle: runtime_error (default)
       #
       #   # good
       #
       #   class C < RuntimeError; end
       #
-      # @example
+      # @example EnforcedStyle: standard_error
+      #   # bad
       #
-      #   # EnforcedStyle: standard_error
+      #   class C < Exception; end
       #
       #   # good
       #
@@ -32,7 +28,7 @@ module RuboCop
       class InheritException < Cop
         include ConfigurableEnforcedStyle
 
-        MSG = 'Inherit from `%s` instead of `%s`.'.freeze
+        MSG = 'Inherit from `%<prefer>s` instead of `%<current>s`.'.freeze
         PREFERRED_BASE_CLASS = {
           runtime_error: 'RuntimeError',
           standard_error: 'StandardError'
@@ -54,24 +50,25 @@ module RuboCop
         def on_class(node)
           _class, base_class, _body = *node
 
-          return if base_class.nil?
+          return unless base_class && illegal_class_name?(base_class)
 
-          check(base_class)
-        end
-
-        private
-
-        def check(node)
-          return unless ILLEGAL_CLASSES.include?(node.const_name)
-
-          msg = format(MSG, preferred_base_class, node.const_name)
-          add_offense(node, :expression, msg)
+          add_offense(base_class)
         end
 
         def autocorrect(node)
           lambda do |corrector|
             corrector.replace(node.loc.expression, preferred_base_class)
           end
+        end
+
+        private
+
+        def message(node)
+          format(MSG, prefer: preferred_base_class, current: node.const_name)
+        end
+
+        def illegal_class_name?(class_node)
+          ILLEGAL_CLASSES.include?(class_node.const_name)
         end
 
         def preferred_base_class

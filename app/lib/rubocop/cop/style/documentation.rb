@@ -11,12 +11,26 @@ module RuboCop
       # The documentation requirement is annulled if the class or module has
       # a "#:nodoc:" comment next to it. Likewise, "#:nodoc: all" does the
       # same for all its children.
+      #
+      # @example
+      #   # bad
+      #   class Person
+      #     # ...
+      #   end
+      #
+      #   # good
+      #   # Description/Explanation of Person class
+      #   class Person
+      #     # ...
+      #   end
+      #
       class Documentation < Cop
         include DocumentationComment
 
-        MSG = 'Missing top-level %s documentation comment.'.freeze
+        MSG = 'Missing top-level %<type>s documentation comment.'.freeze
 
         def_node_matcher :constant_definition?, '{class module casgn}'
+        def_node_search :outer_module, '(const (const nil? _) _)'
 
         def on_class(node)
           _, _, body = *node
@@ -37,8 +51,12 @@ module RuboCop
         def check(node, body, type)
           return if namespace?(body)
           return if documentation_comment?(node) || nodoc_comment?(node)
+          return if compact_namespace?(node) &&
+                    nodoc_comment?(outer_module(node).first)
 
-          add_offense(node, :keyword, format(MSG, type))
+          add_offense(node,
+                      location: :keyword,
+                      message: format(MSG, type: type))
         end
 
         def namespace?(node)
@@ -49,6 +67,10 @@ module RuboCop
           else
             constant_definition?(node)
           end
+        end
+
+        def compact_namespace?(node)
+          node.loc.name.source =~ /::/
         end
 
         # First checks if the :nodoc: comment is associated with the

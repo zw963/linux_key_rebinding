@@ -1,15 +1,17 @@
+# frozen_string_literal: true
+
+if RUBY_VERSION =~ /^1\.[89]\./
+  require 'parser/version'
+  raise LoadError, <<-UNSUPPORTED_VERSION_MSG
+parser v#{Parser::VERSION} cannot run on Ruby #{RUBY_VERSION}.
+Please upgrade to Ruby 2.0.0 or higher, or use an older version of the parser gem.
+  UNSUPPORTED_VERSION_MSG
+end
+
 require 'set'
 require 'racc/parser'
 
 require 'ast'
-
-if RUBY_VERSION < '1.9'
-  require 'parser/compatibility/ruby1_8'
-end
-
-if RUBY_VERSION < '2.0'
-  require 'parser/compatibility/ruby1_9'
-end
 
 ##
 # @api public
@@ -17,6 +19,7 @@ end
 module Parser
   require 'parser/version'
   require 'parser/messages'
+  require 'parser/deprecation'
 
   module AST
     require 'parser/ast/node'
@@ -33,6 +36,8 @@ module Parser
 
     require 'parser/source/rewriter'
     require 'parser/source/rewriter/action'
+    require 'parser/source/tree_rewriter'
+    require 'parser/source/tree_rewriter/action'
 
     require 'parser/source/map'
     require 'parser/source/map/operator'
@@ -42,6 +47,7 @@ module Parser
     require 'parser/source/map/keyword'
     require 'parser/source/map/definition'
     require 'parser/source/map/send'
+    require 'parser/source/map/index'
     require 'parser/source/map/condition'
     require 'parser/source/map/ternary'
     require 'parser/source/map/for'
@@ -66,16 +72,10 @@ module Parser
     require 'parser/builders/default'
   end
 
+  require 'parser/context'
+
   require 'parser/base'
 
   require 'parser/rewriter'
-
-  ##
-  # Verify that the current Ruby implementation supports Encoding.
-  # @raise [RuntimeError]
-  def self.check_for_encoding_support
-    unless defined?(Encoding)
-      raise RuntimeError, 'Parsing 1.9 and later versions of Ruby is not supported on 1.8 due to the lack of Encoding support'
-    end
-  end
+  require 'parser/tree_rewriter'
 end

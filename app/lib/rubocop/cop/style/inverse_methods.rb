@@ -27,15 +27,21 @@ module RuboCop
       #   foo != bar
       #   foo == bar
       #   !!('foo' =~ /^\w+$/)
+      #   !(foo.class < Numeric) # Checking class hierarchy is allowed
       class InverseMethods < Cop
+        include IgnoredNode
+
         MSG = 'Use `%<inverse>s` instead of inverting `%<method>s`.'.freeze
+        CLASS_COMPARISON_METHODS = %i[<= >= < >].freeze
         EQUALITY_METHODS = %i[== != =~ !~ <= >= < >].freeze
+        NEGATED_EQUALITY_METHODS = %i[!= !~].freeze
+        CAMEL_CASE = /[A-Z]+[a-z]+/
 
         def_node_matcher :inverse_candidate?, <<-PATTERN
           {
-            (send $(send (...) $_ ...) :!)
-            (send (block $(send (...) $_) ...) :!)
-            (send (begin $(send (...) $_ ...)) :!)
+            (send $(send $(...) $_ $...) :!)
+            (send (block $(send $(...) $_) $...) :!)
+            (send (begin $(send $(...) $_ $...)) :!)
           }
         PATTERN
 
@@ -48,31 +54,35 @@ module RuboCop
         PATTERN
 
         def on_send(node)
-          inverse_candidate?(node) do |_method_call, method|
+          return if part_of_ignored_node?(node)
+          inverse_candidate?(node) do |_method_call, lhs, method, rhs|
             return unless inverse_methods.key?(method)
+            return if possible_class_hierarchy_check?(lhs, rhs, method)
             return if negated?(node)
 
             add_offense(node,
-                        :expression,
-                        format(MSG, method: method,
-                                    inverse: inverse_methods[method]))
+                        message: format(MSG, method: method,
+                                             inverse: inverse_methods[method]))
           end
         end
 
         def on_block(node)
-          inverse_block?(node) do |_method_call, method, _block|
+          inverse_block?(node) do |_method_call, method, block|
             return unless inverse_blocks.key?(method)
             return if negated?(node) && negated?(node.parent)
 
+            # Inverse method offenses inside of the block of an inverse method
+            # offense, such as `y.reject { |key, _value| !(key =~ /c\d/) }`,
+            # can cause auto-correction to apply improper corrections.
+            ignore_node(block)
             add_offense(node,
-                        :expression,
-                        format(MSG, method: method,
-                                    inverse: inverse_blocks[method]))
+                        message: format(MSG, method: method,
+                                             inverse: inverse_blocks[method]))
           end
         end
 
         def autocorrect(node)
-          method_call, method = inverse_candidate?(node)
+          method_call, _lhs, method, _rhs = inverse_candidate?(node)
 
           if method_call && method
             lambda do |corrector|
@@ -91,18 +101,22 @@ module RuboCop
 
         def correct_inverse_block(node)
           method_call, method, block = inverse_block?(node)
-          selector = block.loc.selector.source
 
           lambda do |corrector|
             corrector.replace(method_call.loc.selector,
                               inverse_blocks[method].to_s)
+            correct_inverse_selector(block, corrector)
+          end
+        end
 
-            if ['!=', '!~'].include?(selector)
-              selector[0] = '='
-              corrector.replace(block.loc.selector, selector)
-            else
-              corrector.remove(block.loc.selector)
-            end
+        def correct_inverse_selector(block, corrector)
+          selector = block.loc.selector.source
+
+          if NEGATED_EQUALITY_METHODS.include?(selector.to_sym)
+            selector[0] = '='
+            corrector.replace(block.loc.selector, selector)
+          else
+            corrector.remove(block.loc.selector)
           end
         end
 
@@ -132,6 +146,19 @@ module RuboCop
           Parser::Source::Range.new(node.loc.expression.source_buffer,
                                     method_call.loc.expression.end_pos,
                                     node.loc.expression.end_pos)
+        end
+
+        # When comparing classes, `!(Integer < Numeric)` is not the same as
+        # `Integer > Numeric`.
+        def possible_class_hierarchy_check?(lhs, rhs, method)
+          CLASS_COMPARISON_METHODS.include?(method) &&
+            (camel_case_constant?(lhs) ||
+             (rhs.size == 1 &&
+              camel_case_constant?(rhs.first)))
+        end
+
+        def camel_case_constant?(node)
+          node.const_type? && node.source =~ CAMEL_CASE
         end
       end
     end

@@ -11,18 +11,15 @@ module RuboCop
       # Note: A method definition is not considered empty if it contains
       #       comments.
       #
-      # @example
-      #
-      #   # EnforcedStyle: compact (default)
-      #
-      #   @bad
+      # @example EnforcedStyle: compact (default)
+      #   # bad
       #   def foo(bar)
       #   end
       #
       #   def self.foo(bar)
       #   end
       #
-      #   @good
+      #   # good
       #   def foo(bar); end
       #
       #   def foo(bar)
@@ -31,36 +28,32 @@ module RuboCop
       #
       #   def self.foo(bar); end
       #
-      #   # EnforcedStyle: expanded
-      #
-      #   @bad
+      # @example EnforcedStyle: expanded
+      #   # bad
       #   def foo(bar); end
       #
       #   def self.foo(bar); end
       #
-      #   @good
+      #   # good
       #   def foo(bar)
       #   end
       #
       #   def self.foo(bar)
       #   end
       class EmptyMethod < Cop
-        include OnMethodDef
         include ConfigurableEnforcedStyle
 
         MSG_COMPACT = 'Put empty method definitions on a single line.'.freeze
         MSG_EXPANDED = 'Put the `end` of empty method definitions on the ' \
                        'next line.'.freeze
 
-        def on_method_def(node, _method_name, _args, body)
-          return if body || comment_lines?(node)
-          return if compact_style? && compact?(node)
-          return if expanded_style? && expanded?(node)
+        def on_def(node)
+          return if node.body || comment_lines?(node)
+          return if correct_style?(node)
 
-          add_offense(node, node.source_range, message)
+          add_offense(node)
         end
-
-        private
+        alias on_defs on_def
 
         def autocorrect(node)
           lambda do |corrector|
@@ -68,19 +61,30 @@ module RuboCop
           end
         end
 
-        def message
+        private
+
+        def message(_node)
           compact_style? ? MSG_COMPACT : MSG_EXPANDED
         end
 
+        def correct_style?(node)
+          compact_style? && compact?(node) ||
+            expanded_style? && expanded?(node)
+        end
+
         def corrected(node)
-          method_name, args, _body, scope = method_def_node_parts(node)
+          arguments = node.arguments? ? node.arguments.source : ''
+          scope     = node.receiver ? "#{node.receiver.source}." : ''
 
-          arguments = !args.children.empty? ? args.source : ''
-          indent    = ' ' * node.loc.column
-          joint     = compact_style? ? '; ' : "\n#{indent}"
-          scope     = scope ? 'self.' : ''
+          signature = [scope, node.method_name, arguments].join
 
-          ["def #{scope}#{method_name}#{arguments}", 'end'].join(joint)
+          ["def #{signature}", 'end'].join(joint(node))
+        end
+
+        def joint(node)
+          indent = ' ' * node.loc.column
+
+          compact_style? ? '; ' : "\n#{indent}"
         end
 
         def comment_lines?(node)

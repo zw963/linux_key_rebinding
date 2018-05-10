@@ -21,6 +21,8 @@ module RuboCop
       #     # Some code
       #   end
       class EmptyLineAfterMagicComment < Cop
+        include RangeHelp
+
         MSG = 'Add an empty line after magic comments.'.freeze
         BLANK_LINE = /\A\s*\z/
 
@@ -32,7 +34,7 @@ module RuboCop
           offending_range =
             source_range(source.buffer, last_magic_comment.loc.line + 1, 0)
 
-          add_offense(offending_range, offending_range)
+          add_offense(offending_range, location: offending_range)
         end
 
         def autocorrect(token)

@@ -2,10 +2,12 @@ class   ProgressBar
 module  Calculators
 class   Length
   attr_reader   :length_override
-  attr_accessor :current_length
+  attr_accessor :current_length,
+                :output
 
   def initialize(options = {})
     self.length_override = options[:length]
+    self.output          = options[:output]
     self.current_length  = nil
   end
 
@@ -37,6 +39,7 @@ class   Length
 
   # This code was copied and modified from Rake, available under MIT-LICENSE
   # Copyright (c) 2003, 2004 Jim Weirich
+  # rubocop:disable Lint/RescueWithoutErrorClass
   def terminal_width
     return 80 unless unix?
 
@@ -45,13 +48,16 @@ class   Length
   rescue
     80
   end
+  # rubocop:enable Lint/RescueWithoutErrorClass
 
   # rubocop:disable Lint/DuplicateMethods
   begin
     require 'io/console'
 
     def dynamic_width
-      if IO.console
+      if output && output.tty?
+        dynamic_width_via_output_stream_object
+      elsif IO.console
         dynamic_width_via_io_object
       else
         dynamic_width_via_system_calls
@@ -61,6 +67,11 @@ class   Length
     def dynamic_width
       dynamic_width_via_system_calls
     end
+  end
+
+  def dynamic_width_via_output_stream_object
+    _rows, columns = output.winsize
+    columns
   end
 
   def dynamic_width_via_io_object

@@ -19,7 +19,7 @@ module Parser
   end
 
   def default_encoding
-    Encoding::BINARY if defined? Encoding
+    Encoding::BINARY
   end
 ##### State transition tables begin ###
 
@@ -2598,7 +2598,7 @@ racc_token_table = {
   :tFLOAT => 59,
   :tUPLUS => 60,
   :tUMINUS => 61,
-  :tUMINUS_NUM => 62,
+  :tUNARY_NUM => 62,
   :tPOW => 63,
   :tCMP => 64,
   :tEQ => 65,
@@ -2751,7 +2751,7 @@ Racc_token_to_s_table = [
   "tFLOAT",
   "tUPLUS",
   "tUMINUS",
-  "tUMINUS_NUM",
+  "tUNARY_NUM",
   "tPOW",
   "tCMP",
   "tEQ",
@@ -3089,7 +3089,7 @@ def _reduce_18(val, _values, result)
 end
 
 def _reduce_19(val, _values, result)
-                      if in_def?
+                      if @context.indirectly_in_def?
                         diagnostic :error, :begin_in_method, nil, val[0]
                       end
 
@@ -3261,6 +3261,7 @@ end
 
 def _reduce_48(val, _values, result)
                       @static_env.extend_dynamic
+                      @context.push(:block)
                     
     result
 end
@@ -3269,6 +3270,7 @@ def _reduce_49(val, _values, result)
                       result = [ val[0], val[2], val[3], val[4] ]
 
                       @static_env.unextend
+                      @context.pop
                     
     result
 end
@@ -4565,12 +4567,13 @@ end
 
 def _reduce_304(val, _values, result)
                       @static_env.extend_static
+                      @context.push(:class)
                     
     result
 end
 
 def _reduce_305(val, _values, result)
-                      if in_def?
+                      unless @context.class_definition_allowed?
                         diagnostic :error, :class_in_def, nil, val[0]
                       end
 
@@ -4580,15 +4583,14 @@ def _reduce_305(val, _values, result)
                                                   val[4], val[5])
 
                       @static_env.unextend
+                      @context.pop
                     
     result
 end
 
 def _reduce_306(val, _values, result)
-                      result = @def_level
-                      @def_level = 0
-
                       @static_env.extend_static
+                      @context.push(:sclass)
                     
     result
 end
@@ -4598,8 +4600,7 @@ def _reduce_307(val, _values, result)
                                                    val[5], val[6])
 
                       @static_env.unextend
-
-                      @def_level = val[4]
+                      @context.pop
                     
     result
 end
@@ -4611,7 +4612,7 @@ def _reduce_308(val, _values, result)
 end
 
 def _reduce_309(val, _values, result)
-                      if in_def?
+                      unless @context.module_definition_allowed?
                         diagnostic :error, :module_in_def, nil, val[0]
                       end
 
@@ -4624,8 +4625,8 @@ def _reduce_309(val, _values, result)
 end
 
 def _reduce_310(val, _values, result)
-                      @def_level += 1
                       @static_env.extend_static
+                      @context.push(:def)
                     
     result
 end
@@ -4635,7 +4636,7 @@ def _reduce_311(val, _values, result)
                                   val[3], val[4], val[5])
 
                       @static_env.unextend
-                      @def_level -= 1
+                      @context.pop
                     
     result
 end
@@ -4647,8 +4648,8 @@ def _reduce_312(val, _values, result)
 end
 
 def _reduce_313(val, _values, result)
-                      @def_level += 1
                       @static_env.extend_static
+                      @context.push(:defs)
                     
     result
 end
@@ -4658,7 +4659,7 @@ def _reduce_314(val, _values, result)
                                   val[4], val[6], val[7], val[8])
 
                       @static_env.unextend
-                      @def_level -= 1
+                      @context.pop
                     
     result
 end
@@ -4843,6 +4844,7 @@ end
 
 def _reduce_351(val, _values, result)
                       @static_env.extend_dynamic
+                      @context.push(:block)
                     
     result
 end
@@ -4851,6 +4853,7 @@ def _reduce_352(val, _values, result)
                       result = [ val[0], val[2], val[3], val[4] ]
 
                       @static_env.unextend
+                      @context.pop
                     
     result
 end
@@ -4925,6 +4928,7 @@ end
 
 def _reduce_362(val, _values, result)
                       @static_env.extend_dynamic
+                      @context.push(:block)
                     
     result
 end
@@ -4933,12 +4937,14 @@ def _reduce_363(val, _values, result)
                       result = [ val[0], val[2], val[3], val[4] ]
 
                       @static_env.unextend
+                      @context.pop
                     
     result
 end
 
 def _reduce_364(val, _values, result)
                       @static_env.extend_dynamic
+                      @context.push(:block)
                     
     result
 end
@@ -4947,6 +4953,7 @@ def _reduce_365(val, _values, result)
                       result = [ val[0], val[2], val[3], val[4] ]
 
                       @static_env.unextend
+                      @context.pop
                     
     result
 end
@@ -5221,15 +5228,25 @@ def _reduce_414(val, _values, result)
 end
 
 def _reduce_415(val, _values, result)
-                      result = @builder.negate(val[0],
-                                  @builder.integer(val[1]))
+                      num = @builder.integer(val[1])
+                      if @builder.respond_to? :negate
+                        # AST builder interface compatibility
+                        result = @builder.negate(val[0], num)
+                      else
+                        result = @builder.unary_num(val[0], num)
+                      end
                     
     result
 end
 
 def _reduce_416(val, _values, result)
-                      result = @builder.negate(val[0],
-                                  @builder.float(val[1]))
+                      num = @builder.float(val[1])
+                      if @builder.respond_to? :negate
+                        # AST builder interface compatibility
+                        result = @builder.negate(val[0], num)
+                      else
+                        result = @builder.unary_num(val[0], num)
+                      end
                     
     result
 end

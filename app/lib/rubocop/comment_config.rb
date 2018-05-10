@@ -4,7 +4,7 @@ module RuboCop
   # This class parses the special `rubocop:disable` comments in a source
   # and provides a way to check if each cop is enabled at arbitrary line.
   class CommentConfig
-    UNNEEDED_DISABLE = 'Lint/UnneededDisable'.freeze
+    UNNEEDED_DISABLE = 'Lint/UnneededCopDisableDirective'.freeze
 
     COP_NAME_PATTERN = '([A-Z]\w+/)?(?:[A-Z]\w+)'.freeze
     COP_NAMES_PATTERN = "(?:#{COP_NAME_PATTERN} , )*#{COP_NAME_PATTERN}".freeze
@@ -34,7 +34,28 @@ module RuboCop
       @cop_disabled_line_ranges ||= analyze
     end
 
+    def extra_enabled_comments
+      extra_enabled_comments_with_names([], {})
+    end
+
     private
+
+    def extra_enabled_comments_with_names(extras, names)
+      each_directive do |comment, cop_names, disabled|
+        next unless comment_only_line?(comment.loc.expression.line)
+        cop_names.each do |name|
+          names[name] ||= 0
+          if disabled
+            names[name] += 1
+          elsif names[name] > 0
+            names[name] -= 1
+          else
+            extras << [comment, name]
+          end
+        end
+      end
+      extras
+    end
 
     def analyze
       analyses = Hash.new { |hash, key| hash[key] = CopAnalysis.new([], nil) }
@@ -106,7 +127,7 @@ module RuboCop
     def each_directive
       return if processed_source.comments.nil?
 
-      processed_source.comments.each do |comment|
+      processed_source.each_comment do |comment|
         directive = directive_parts(comment)
         next unless directive
 
@@ -129,7 +150,7 @@ module RuboCop
     end
 
     def qualified_cop_name(cop_name)
-      Cop::Cop.qualified_cop_name(cop_name.strip, processed_source.buffer.name)
+      Cop::Cop.qualified_cop_name(cop_name.strip, processed_source.file_path)
     end
 
     def all_cop_names
@@ -144,11 +165,8 @@ module RuboCop
 
     def non_comment_token_line_numbers
       @non_comment_token_line_numbers ||= begin
-        non_comment_tokens = processed_source.tokens.reject do |token|
-          token.type == :tCOMMENT
-        end
-
-        non_comment_tokens.map { |token| token.pos.line }.uniq
+        non_comment_tokens = processed_source.tokens.reject(&:comment?)
+        non_comment_tokens.map(&:line).uniq
       end
     end
   end

@@ -4,38 +4,104 @@ module RuboCop
   module Cop
     module Style
       # Checks for `if` expressions that do not have an `else` branch.
-      # SupportedStyles
       #
-      # if
-      # @example
+      # Supported styles are: if, case, both.
+      #
+      # @example EnforcedStyle: if
+      #   # warn when an `if` expression is missing an `else` branch.
+      #
       #   # bad
       #   if condition
       #     statement
       #   end
       #
-      # case
-      # @example
+      #   # good
+      #   if condition
+      #     statement
+      #   else
+      #     # the content of `else` branch will be determined by Style/EmptyElse
+      #   end
+      #
+      #   # good
+      #   case var
+      #   when condition
+      #     statement
+      #   end
+      #
+      #   # good
+      #   case var
+      #   when condition
+      #     statement
+      #   else
+      #     # the content of `else` branch will be determined by Style/EmptyElse
+      #   end
+      #
+      # @example EnforcedStyle: case
+      #   # warn when a `case` expression is missing an `else` branch.
+      #
       #   # bad
       #   case var
       #   when condition
       #     statement
       #   end
       #
-      # @example
+      #   # good
+      #   case var
+      #   when condition
+      #     statement
+      #   else
+      #     # the content of `else` branch will be determined by Style/EmptyElse
+      #   end
+      #
+      #   # good
+      #   if condition
+      #     statement
+      #   end
+      #
       #   # good
       #   if condition
       #     statement
       #   else
-      #   # the content of the else branch will be determined by Style/EmptyElse
+      #     # the content of `else` branch will be determined by Style/EmptyElse
+      #   end
+      #
+      # @example EnforcedStyle: both (default)
+      #   # warn when an `if` or `case` expression is missing an `else` branch.
+      #
+      #   # bad
+      #   if condition
+      #     statement
+      #   end
+      #
+      #   # bad
+      #   case var
+      #   when condition
+      #     statement
+      #   end
+      #
+      #   # good
+      #   if condition
+      #     statement
+      #   else
+      #     # the content of `else` branch will be determined by Style/EmptyElse
+      #   end
+      #
+      #   # good
+      #   case var
+      #   when condition
+      #     statement
+      #   else
+      #     # the content of `else` branch will be determined by Style/EmptyElse
       #   end
       class MissingElse < Cop
         include OnNormalIfUnless
         include ConfigurableEnforcedStyle
 
-        MSG = '`%s` condition requires an `else`-clause.'.freeze
-        MSG_NIL = '`%s` condition requires an `else`-clause with ' \
+        MSG = '`%<type>s` condition requires an `else`-clause.'.freeze
+        MSG_NIL = '`%<type>s` condition requires an `else`-clause with ' \
                   '`nil` in it.'.freeze
-        MSG_EMPTY = '`%s` condition requires an empty `else`-clause.'.freeze
+        MSG_EMPTY = '`%<type>s` condition requires an empty ' \
+                    '`else`-clause.'.freeze
 
         def on_normal_if_unless(node)
           return if case_style?
@@ -57,13 +123,26 @@ module RuboCop
 
           if empty_else_cop_enabled?
             if empty_else_style == :empty
-              add_offense(node, :expression, format(MSG_NIL, node.type))
+              add_offense(node)
             elsif empty_else_style == :nil
-              add_offense(node, :expression, format(MSG_EMPTY, node.type))
+              add_offense(node)
             end
           end
 
-          add_offense(node, :expression, format(MSG, node.type))
+          add_offense(node)
+        end
+
+        def message(node)
+          template = case empty_else_style
+                     when :empty
+                       MSG_NIL
+                     when :nil
+                       MSG_EMPTY
+                     else
+                       MSG
+                     end
+
+          format(template, type: node.type)
         end
 
         def if_style?

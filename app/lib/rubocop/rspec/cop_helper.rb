@@ -10,15 +10,15 @@ module CopHelper
   let(:enabled_rails) { false }
   let(:rails_version) { false }
 
-  def inspect_source_file(cop, source)
-    Tempfile.open('tmp') { |f| inspect_source(cop, source, f) }
+  def inspect_source_file(source)
+    Tempfile.open('tmp') { |f| inspect_source(source, f) }
   end
 
-  def inspect_gemfile(cop, source)
-    inspect_source(cop, source, 'Gemfile')
+  def inspect_gemfile(source)
+    inspect_source(source, 'Gemfile')
   end
 
-  def inspect_source(cop, source, file = nil)
+  def inspect_source(source, file = nil)
     if source.is_a?(Array) && source.size == 1
       raise "Don't use an array for a single line of code: #{source}"
     end
@@ -41,11 +41,11 @@ module CopHelper
     RuboCop::ProcessedSource.new(source, ruby_version, file)
   end
 
-  def autocorrect_source_file(cop, source)
-    Tempfile.open('tmp') { |f| autocorrect_source(cop, source, f) }
+  def autocorrect_source_file(source)
+    Tempfile.open('tmp') { |f| autocorrect_source(source, f) }
   end
 
-  def autocorrect_source(cop, source, file = nil)
+  def autocorrect_source(source, file = nil)
     cop.instance_variable_get(:@options)[:auto_correct] = true
     processed_source = parse_source(source, file)
     _investigate(cop, processed_source)
@@ -55,10 +55,10 @@ module CopHelper
     corrector.rewrite
   end
 
-  def autocorrect_source_with_loop(cop, source, file = nil)
+  def autocorrect_source_with_loop(source, file = nil)
     loop do
       cop.instance_variable_set(:@corrections, [])
-      new_source = autocorrect_source(cop, source, file)
+      new_source = autocorrect_source(source, file)
       return new_source if new_source == source
       source = new_source
     end
@@ -91,8 +91,4 @@ module RuboCop
       end
     end
   end
-end
-
-RSpec.configure do |config|
-  config.include CopHelper
 end

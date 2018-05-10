@@ -14,14 +14,14 @@ module RuboCop
       class Eval < Cop
         MSG = 'The use of `eval` is a serious security risk.'.freeze
 
-        def_node_matcher :eval?, <<-END
-          (send {nil (send nil :binding)} :eval $!str ...)
-        END
+        def_node_matcher :eval?, <<-PATTERN
+          (send {nil? (send nil? :binding)} :eval $!str ...)
+        PATTERN
 
         def on_send(node)
           eval?(node) do |code|
             return if code.dstr_type? && code.recursive_literal?
-            add_offense(node, :selector)
+            add_offense(node, location: :selector)
           end
         end
       end

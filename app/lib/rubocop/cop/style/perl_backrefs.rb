@@ -5,11 +5,18 @@ module RuboCop
     module Style
       # This cop looks for uses of Perl-style regexp match
       # backreferences like $1, $2, etc.
+      #
+      # @example
+      #   # bad
+      #   puts $1
+      #
+      #   # good
+      #   puts Regexp.last_match(1)
       class PerlBackrefs < Cop
         MSG = 'Avoid the use of Perl-style backrefs.'.freeze
 
         def on_nth_ref(node)
-          add_offense(node, :expression)
+          add_offense(node)
         end
 
         def autocorrect(node)

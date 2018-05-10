@@ -9,12 +9,12 @@ module RuboCop
       #
       #  # good
       #  class Rails5Job < ApplicationJob
-      #    ...
+      #    # ...
       #  end
       #
       #  # bad
       #  class Rails4Job < ActiveJob::Base
-      #    ...
+      #    # ...
       #  end
       class ApplicationJob < Cop
         extend TargetRailsVersion
@@ -23,9 +23,17 @@ module RuboCop
 
         MSG = 'Jobs should subclass `ApplicationJob`.'.freeze
         SUPERCLASS = 'ApplicationJob'.freeze
-        BASE_PATTERN = '(const (const nil :ActiveJob) :Base)'.freeze
+        BASE_PATTERN = '(const (const nil? :ActiveJob) :Base)'.freeze
 
+        # rubocop:disable Layout/ClassStructure
         include RuboCop::Cop::EnforceSuperclass
+        # rubocop:enable Layout/ClassStructure
+
+        def autocorrect(node)
+          lambda do |corrector|
+            corrector.replace(node.source_range, self.class::SUPERCLASS)
+          end
+        end
       end
     end
   end

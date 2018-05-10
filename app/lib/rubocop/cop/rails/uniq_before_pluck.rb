@@ -8,13 +8,6 @@ module RuboCop
       # The use of uniq before pluck is preferred because it executes within
       # the database.
       #
-      # @example
-      #   # bad
-      #   Model.pluck(:id).uniq
-      #
-      #   # good
-      #   Model.uniq.pluck(:id)
-      #
       # This cop has two different enforcement modes. When the EnforcedStyle
       # is conservative (the default) then only calls to pluck on a constant
       # (i.e. a model class) before uniq are added as offenses.
@@ -24,29 +17,45 @@ module RuboCop
       # cannot distinguish between calls to pluck on an ActiveRecord::Relation
       # vs a call to pluck on an ActiveRecord::Associations::CollectionProxy.
       #
-      # @example
-      #   # this will return a Relation that pluck is called on
-      #   Model.where(...).pluck(:id).uniq
-      #
-      #   # an association on an instance will return a CollectionProxy
-      #   instance.assoc.pluck(:id).uniq
-      #
       # Autocorrect is disabled by default for this cop since it may generate
       # false positives.
       #
+      # @example EnforcedStyle: conservative (default)
+      #   # bad
+      #   Model.pluck(:id).uniq
+      #
+      #   # good
+      #   Model.uniq.pluck(:id)
+      #
+      # @example EnforcedStyle: aggressive
+      #   # bad
+      #   # this will return a Relation that pluck is called on
+      #   Model.where(cond: true).pluck(:id).uniq
+      #
+      #   # bad
+      #   # an association on an instance will return a CollectionProxy
+      #   instance.assoc.pluck(:id).uniq
+      #
+      #   # bad
+      #   Model.pluck(:id).uniq
+      #
+      #   # good
+      #   Model.uniq.pluck(:id)
+      #
       class UniqBeforePluck < RuboCop::Cop::Cop
         include ConfigurableEnforcedStyle
+        include RangeHelp
 
-        MSG = 'Use `%s` before `pluck`.'.freeze
+        MSG = 'Use `%<method>s` before `pluck`.'.freeze
         NEWLINE = "\n".freeze
-        PATTERN = '[!^block (send (send %s :pluck ...) ${:uniq :distinct} ...)]'
-                  .freeze
+        PATTERN = '[!^block (send (send %<type>s :pluck ...) ' \
+                  '${:uniq :distinct} ...)]'.freeze
 
         def_node_matcher :conservative_node_match,
-                         format(PATTERN, 'const')
+                         format(PATTERN, type: 'const')
 
         def_node_matcher :aggressive_node_match,
-                         format(PATTERN, '_')
+                         format(PATTERN, type: '_')
 
         def on_send(node)
           method = if style == :conservative
@@ -55,7 +64,10 @@ module RuboCop
                      aggressive_node_match(node)
                    end
 
-          add_offense(node, :selector, format(MSG, method)) if method
+          return unless method
+
+          add_offense(node, location: :selector,
+                            message: format(MSG, method: method))
         end
 
         def autocorrect(node)

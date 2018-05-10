@@ -12,15 +12,18 @@ module RuboCop
       #   # good
       #   something.map(&:upcase)
       class SymbolProc < Cop
-        MSG = 'Pass `&:%s` as an argument to `%s` instead of a block.'.freeze
+        include RangeHelp
+
+        MSG = 'Pass `&:%<method>s` as an argument to `%<block_method>s` ' \
+              'instead of a block.'.freeze
         SUPER_TYPES = %i[super zsuper].freeze
 
-        def_node_matcher :proc_node?, '(send (const nil :Proc) :new)'
+        def_node_matcher :proc_node?, '(send (const nil? :Proc) :new)'
         def_node_matcher :symbol_proc?, <<-PATTERN
           (block
             ${(send ...) (super ...) zsuper}
-            $(args (arg _))
-            $(send lvar $_))
+            (args (arg _var))
+            (send (lvar _var) $_))
         PATTERN
 
         def self.autocorrect_incompatible_with
@@ -28,7 +31,7 @@ module RuboCop
         end
 
         def on_block(node)
-          symbol_proc?(node) do |send_or_super, block_args, block_body, method|
+          symbol_proc?(node) do |send_or_super, method|
             block_method_name = resolve_block_method_name(send_or_super)
 
             # TODO: Rails-specific handling that we should probably make
@@ -37,7 +40,6 @@ module RuboCop
             return if proc_node?(send_or_super)
             return if %i[lambda proc].include?(block_method_name)
             return if ignored_method?(block_method_name)
-            return unless can_shorten?(block_args, block_body)
 
             offense(node, method, block_method_name)
           end
@@ -72,10 +74,10 @@ module RuboCop
           range = range_between(block_start, block_end)
 
           add_offense(node,
-                      range,
-                      format(MSG,
-                             method_name,
-                             block_method_name))
+                      location: range,
+                      message: format(MSG,
+                                      method: method_name,
+                                      block_method: block_method_name))
         end
 
         def autocorrect_method(corrector, node, args, method_name)
@@ -102,7 +104,7 @@ module RuboCop
         def block_range_with_space(node)
           block_range = range_between(begin_pos_for_replacement(node),
                                       node.loc.end.end_pos)
-          range_with_surrounding_space(block_range, :left)
+          range_with_surrounding_space(range: block_range, side: :left)
         end
 
         def begin_pos_for_replacement(node)
@@ -122,20 +124,6 @@ module RuboCop
 
         def ignored_method?(name)
           ignored_methods.include?(name.to_s)
-        end
-
-        def can_shorten?(block_args, block_body)
-          argument_matches_receiver?(block_args, block_body)
-        end
-
-        # TODO: This might be clearer as a node matcher with unification
-        def argument_matches_receiver?(block_args, block_body)
-          receiver, = *block_body
-
-          block_arg_name, = *block_args.children.first
-          receiver_name, = *receiver
-
-          block_arg_name == receiver_name
         end
 
         def super?(node)

@@ -18,13 +18,13 @@ module RuboCop
         new(*args).distance
       end
 
-      def initialize(a, b)
-        if a.size < b.size
-          @shorter = a
-          @longer = b
+      def initialize(string_a, string_b)
+        if string_a.size < string_b.size
+          @shorter = string_a
+          @longer = string_b
         else
-          @shorter = b
-          @longer = a
+          @shorter = string_b
+          @longer = string_a
         end
       end
 
@@ -46,6 +46,7 @@ module RuboCop
         compute_non_zero_distance(matched_count.to_f, transposition_count)
       end
 
+      # rubocop:disable Metrics/AbcSize
       def find_common_characters
         common_chars_of_shorter = Array.new(shorter.size)
         common_chars_of_longer = Array.new(longer.size)
@@ -68,6 +69,7 @@ module RuboCop
 
         [common_chars_of_shorter, common_chars_of_longer].map(&:compact)
       end
+      # rubocop:enable Metrics/AbcSize
 
       def count_transpositions(common_chars_a, common_chars_b)
         common_chars_a.size.times.count do |index|
@@ -93,7 +95,7 @@ module RuboCop
       end
 
       def matching_window
-        @matching_window ||= (longer.size / 2).to_i - 1
+        @matching_window ||= (longer.size / 2) - 1
       end
     end
 
@@ -114,8 +116,9 @@ module RuboCop
 
       attr_reader :boost_threshold, :scaling_factor
 
-      def initialize(a, b, boost_threshold = nil, scaling_factor = nil)
-        super(a, b)
+      def initialize(string_a, string_b,
+                     boost_threshold = nil, scaling_factor = nil)
+        super(string_a, string_b)
         @boost_threshold = boost_threshold || DEFAULT_BOOST_THRESHOLD
         @scaling_factor = scaling_factor || DEFAULT_SCALING_FACTOR
       end

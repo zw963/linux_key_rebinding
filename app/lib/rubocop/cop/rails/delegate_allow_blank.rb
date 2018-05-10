@@ -17,7 +17,7 @@ module RuboCop
         MSG = '`allow_blank` is not a valid option, use `allow_nil`.'.freeze
 
         def_node_matcher :delegate_options, <<-PATTERN
-          (send nil :delegate _ $hash)
+          (send nil? :delegate _ $hash)
         PATTERN
 
         def_node_matcher :allow_blank_option?, <<-PATTERN
@@ -29,16 +29,16 @@ module RuboCop
 
           return unless offending_node
 
-          add_offense(offending_node, :expression)
+          add_offense(offending_node)
         end
-
-        private
 
         def autocorrect(pair_node)
           lambda do |corrector|
             corrector.replace(pair_node.key.source_range, 'allow_nil')
           end
         end
+
+        private
 
         def allow_blank_option(node)
           delegate_options(node) do |hash|

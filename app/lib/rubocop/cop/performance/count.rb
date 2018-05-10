@@ -39,8 +39,9 @@ module RuboCop
       #   Model.where(id: [1, 2, 3]).to_a.count { |m| m.method == true }
       class Count < Cop
         include SafeMode
+        include RangeHelp
 
-        MSG = 'Use `count` instead of `%s...%s`.'.freeze
+        MSG = 'Use `count` instead of `%<selector>s...%<counter>s`.'.freeze
 
         def_node_matcher :count_candidate?, <<-PATTERN
           {
@@ -59,11 +60,12 @@ module RuboCop
               selector_node.loc.selector.begin_pos
             end
 
-            add_offense(node, range, format(MSG, selector, counter))
+            add_offense(node,
+                        location: range,
+                        message: format(MSG, selector: selector,
+                                             counter: counter))
           end
         end
-
-        private
 
         def autocorrect(node)
           selector_node, selector, _counter = count_candidate?(node)
@@ -78,6 +80,8 @@ module RuboCop
             corrector.replace(selector_loc, 'count')
           end
         end
+
+        private
 
         def eligible_node?(node)
           !(node.parent && node.parent.block_type?)

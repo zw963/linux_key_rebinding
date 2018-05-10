@@ -7,13 +7,48 @@ module RuboCop
       # preferred alternative is set in the EnforcedStyle configuration
       # parameter. An *each* call with a block on a single line is always
       # allowed, however.
+      #
+      # @example EnforcedStyle: each (default)
+      #   # bad
+      #   def foo
+      #     for n in [1, 2, 3] do
+      #       puts n
+      #     end
+      #   end
+      #
+      #   # good
+      #   def foo
+      #     [1, 2, 3].each do |n|
+      #       puts n
+      #     end
+      #   end
+      #
+      # @example EnforcedStyle: for
+      #   # bad
+      #   def foo
+      #     [1, 2, 3].each do |n|
+      #       puts n
+      #     end
+      #   end
+      #
+      #   # good
+      #   def foo
+      #     for n in [1, 2, 3] do
+      #       puts n
+      #     end
+      #   end
+      #
       class For < Cop
         include ConfigurableEnforcedStyle
+        include RangeHelp
+
         EACH_LENGTH = 'each'.length
 
         def on_for(node)
           if style == :each
-            add_offense(node, :keyword, 'Prefer `each` over `for`.') do
+            msg = 'Prefer `each` over `for`.'
+
+            add_offense(node, location: :keyword, message: msg) do
               opposite_style_detected
             end
           else
@@ -39,7 +74,9 @@ module RuboCop
         def incorrect_style_detected(method)
           end_pos = method.source_range.end_pos
           range = range_between(end_pos - EACH_LENGTH, end_pos)
-          add_offense(range, range, 'Prefer `for` over `each`.') do
+          msg = 'Prefer `for` over `each`.'
+
+          add_offense(range, location: range, message: msg) do
             opposite_style_detected
           end
         end

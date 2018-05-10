@@ -1,7 +1,6 @@
 require_relative 'wrapper'
 
 module Rainbow
-
   def self.global
     @global ||= Wrapper.new
   end
@@ -14,6 +13,9 @@ module Rainbow
     global.enabled = value
   end
 
+  def self.uncolor(string)
+    StringUtils.uncolor(string)
+  end
 end
 
 def Rainbow(string)

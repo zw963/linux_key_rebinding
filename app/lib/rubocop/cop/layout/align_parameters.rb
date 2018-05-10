@@ -6,10 +6,7 @@ module RuboCop
       # Here we check if the parameters on a multi-line method call or
       # definition are aligned.
       #
-      # @example
-      #
-      #   # EnforcedStyle: with_first_parameter
-      #
+      # @example EnforcedStyle: with_first_parameter (default)
       #   # good
       #
       #   foo :bar,
@@ -20,10 +17,7 @@ module RuboCop
       #   foo :bar,
       #     :baz
       #
-      # @example
-      #
-      #   # EnforcedStyle: with_fixed_indentation
-      #
+      # @example EnforcedStyle: with_fixed_indentation
       #   # good
       #
       #   foo :bar,
@@ -34,37 +28,35 @@ module RuboCop
       #   foo :bar,
       #       :baz
       class AlignParameters < Cop
-        include AutocorrectAlignment
-        include OnMethodDef
+        include Alignment
 
-        ALIGN_PARAMS_MSG = 'Align the parameters of a method %s if they span ' \
-          'more than one line.'.freeze
+        ALIGN_PARAMS_MSG = 'Align the parameters of a method %<type>s if ' \
+          'they span more than one line.'.freeze
 
         FIXED_INDENT_MSG = 'Use one level of indentation for parameters ' \
-          'following the first line of a multi-line method %s.'.freeze
+          'following the first line of a multi-line method %<type>s.'.freeze
 
         def on_send(node)
-          return if node.arguments.size < 2 || node.method?(:[]=)
+          return if node.arguments.size < 2 ||
+                    node.send_type? && node.method?(:[]=)
 
           check_alignment(node.arguments, base_column(node, node.arguments))
         end
+        alias on_def  on_send
+        alias on_defs on_send
 
-        def on_method_def(node, _method_name, args, _body)
-          args = args.children
-
-          return if args.size < 2
-
-          check_alignment(args, base_column(node, args))
+        def autocorrect(node)
+          AlignmentCorrector.correct(processed_source, node, column_delta)
         end
+
+        private
 
         def message(node)
           type = node && node.parent.send_type? ? 'call' : 'definition'
           msg = fixed_indentation? ? FIXED_INDENT_MSG : ALIGN_PARAMS_MSG
 
-          format(msg, type)
+          format(msg, type: type)
         end
-
-        private
 
         def fixed_indentation?
           cop_config['EnforcedStyle'] == 'with_fixed_indentation'

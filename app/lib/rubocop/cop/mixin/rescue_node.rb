@@ -7,9 +7,11 @@ module RuboCop
       def investigate(processed_source)
         @modifier_locations = processed_source
                               .tokens
-                              .select { |t| t.type == :kRESCUE_MOD }
+                              .select(&:rescue_modifier?)
                               .map(&:pos)
       end
+
+      private
 
       def rescue_modifier?(node)
         node &&

@@ -41,26 +41,24 @@ module RuboCop
       #     foo&.bar { |e| e.baz }
       class SafeNavigation < Cop
         extend TargetRubyVersion
+        include RangeHelp
 
-        MSG = 'Use safe navigation (`&.`) instead of `%s`.'.freeze
+        MSG = 'Use safe navigation (`&.`) instead of `%<try>s`.'.freeze
 
         def_node_matcher :try_call, <<-PATTERN
-          (send !nil ${:try :try!} $_ ...)
+          (send !nil? ${:try :try!} $_ ...)
         PATTERN
 
         minimum_target_ruby_version 2.3
 
         def on_send(node)
-          try_call(node) do |try_method, method_to_try|
+          try_call(node) do |try_method, dispatch|
             return if try_method == :try && !cop_config['ConvertTry']
-            return unless method_to_try.sym_type?
-            method, = *method_to_try
-            return unless method =~ /\w+[=!?]?/
-            add_offense(node, :expression, format(MSG, try_method))
+            return unless dispatch.sym_type? && dispatch.value =~ /\w+[=!?]?/
+
+            add_offense(node, message: format(MSG, try: try_method))
           end
         end
-
-        private
 
         def autocorrect(node)
           method_node, *params = *node.arguments
@@ -73,6 +71,8 @@ module RuboCop
             corrector.replace(range, replacement(method, params))
           end
         end
+
+        private
 
         def replacement(method, params)
           new_params = params.map(&:source).join(', ')

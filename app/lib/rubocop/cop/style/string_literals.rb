@@ -4,6 +4,28 @@ module RuboCop
   module Cop
     module Style
       # Checks if uses of quotes match the configured preference.
+      #
+      # @example EnforcedStyle: single_quotes (default)
+      #   # bad
+      #   "No special symbols"
+      #   "No string interpolation"
+      #   "Just text"
+      #
+      #   # good
+      #   'No special symbols'
+      #   'No string interpolation'
+      #   'Just text'
+      #   "Wait! What's #{this}!"
+      #
+      # @example EnforcedStyle: double_quotes
+      #   # bad
+      #   'Just some text'
+      #   'No special chars or interpolation'
+      #
+      #   # good
+      #   "Just some text"
+      #   "No special chars or interpolation"
+      #   "Every string in #{project} uses double_quotes"
       class StringLiterals < Cop
         include ConfigurableEnforcedStyle
         include StringLiteralsHelp
@@ -16,7 +38,7 @@ module RuboCop
           # If one part of that continued string contains interpolations,
           # then it will be parsed as a nested `dstr` node
           return unless consistent_multiline?
-          return if node.loc.is_a?(Parser::Source::Map::Heredoc)
+          return if node.heredoc?
 
           children = node.children
           return unless all_string_literals?(children)
@@ -24,12 +46,16 @@ module RuboCop
           quote_styles = detect_quote_styles(node)
 
           if quote_styles.size > 1
-            add_offense(node, :expression, MSG_INCONSISTENT)
+            add_offense(node, message: MSG_INCONSISTENT)
           else
             check_multiline_quote_style(node, quote_styles[0])
           end
 
           ignore_node(node)
+        end
+
+        def autocorrect(node)
+          StringLiteralCorrector.correct(node, style)
         end
 
         private
@@ -50,7 +76,7 @@ module RuboCop
           styles.map(&:source).uniq
         end
 
-        def message(*)
+        def message(_node)
           if style == :single_quotes
             "Prefer single-quoted strings when you don't need string " \
             'interpolation or special symbols.'
@@ -76,10 +102,11 @@ module RuboCop
           range = node.source_range
           children = node.children
           if unexpected_single_quotes?(quote)
-            add_offense(node, range) if children.all? { |c| wrong_quotes?(c) }
+            all_children_with_quotes = children.all? { |c| wrong_quotes?(c) }
+            add_offense(node, location: range) if all_children_with_quotes
           elsif unexpected_double_quotes?(quote) &&
                 !accept_child_double_quotes?(children)
-            add_offense(node, range)
+            add_offense(node, location: range)
           end
         end
 

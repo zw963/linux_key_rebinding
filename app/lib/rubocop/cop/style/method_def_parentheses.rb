@@ -5,14 +5,99 @@ module RuboCop
     module Style
       # This cops checks for parentheses around the arguments in method
       # definitions. Both instance and class/singleton methods are checked.
+      #
+      # @example EnforcedStyle: require_parentheses (default)
+      #   # The `require_parentheses` style requires method definitions
+      #   # to always use parentheses
+      #
+      #   # bad
+      #   def bar num1, num2
+      #     num1 + num2
+      #   end
+      #
+      #   def foo descriptive_var_name,
+      #           another_descriptive_var_name,
+      #           last_descriptive_var_name
+      #     do_something
+      #   end
+      #
+      #   # good
+      #   def bar(num1, num2)
+      #     num1 + num2
+      #   end
+      #
+      #   def foo(descriptive_var_name,
+      #           another_descriptive_var_name,
+      #           last_descriptive_var_name)
+      #     do_something
+      #   end
+      #
+      # @example EnforcedStyle: require_no_parentheses
+      #   # The `require_no_parentheses` style requires method definitions
+      #   # to never use parentheses
+      #
+      #   # bad
+      #   def bar(num1, num2)
+      #     num1 + num2
+      #   end
+      #
+      #   def foo(descriptive_var_name,
+      #           another_descriptive_var_name,
+      #           last_descriptive_var_name)
+      #     do_something
+      #   end
+      #
+      #   # good
+      #   def bar num1, num2
+      #     num1 + num2
+      #   end
+      #
+      #   def foo descriptive_var_name,
+      #           another_descriptive_var_name,
+      #           last_descriptive_var_name
+      #     do_something
+      #   end
+      #
+      # @example EnforcedStyle: require_no_parentheses_except_multiline
+      #   # The `require_no_parentheses_except_multiline` style prefers no
+      #   # parantheses when method definition arguments fit on single line,
+      #   # but prefers parantheses when arguments span multiple lines.
+      #
+      #   # bad
+      #   def bar(num1, num2)
+      #     num1 + num2
+      #   end
+      #
+      #   def foo descriptive_var_name,
+      #           another_descriptive_var_name,
+      #           last_descriptive_var_name
+      #     do_something
+      #   end
+      #
+      #   # good
+      #   def bar num1, num2
+      #     num1 + num2
+      #   end
+      #
+      #   def foo(descriptive_var_name,
+      #           another_descriptive_var_name,
+      #           last_descriptive_var_name)
+      #     do_something
+      #   end
       class MethodDefParentheses < Cop
-        include OnMethodDef
         include ConfigurableEnforcedStyle
+        include RangeHelp
 
-        def on_method_def(node, _method_name, args, _body)
+        MSG_PRESENT = 'Use def without parentheses.'.freeze
+        MSG_MISSING = 'Use def with parentheses when there are ' \
+                      'parameters.'.freeze
+
+        def on_def(node)
+          args = node.arguments
+
           if require_parentheses?(args)
-            if arguments_without_parentheses?(args)
-              missing_parentheses(node, args)
+            if arguments_without_parentheses?(node)
+              missing_parentheses(node)
             else
               correct_style_detected
             end
@@ -22,6 +107,7 @@ module RuboCop
             correct_style_detected
           end
         end
+        alias on_defs on_def
 
         def autocorrect(node)
           lambda do |corrector|
@@ -30,8 +116,9 @@ module RuboCop
               corrector.replace(node.loc.begin, ' ')
               corrector.remove(node.loc.end)
             else
-              args_expr = args_node(node).source_range
-              args_with_space = range_with_surrounding_space(args_expr, :left)
+              args_expr = node.arguments.source_range
+              args_with_space = range_with_surrounding_space(range: args_expr,
+                                                             side: :left)
               just_space = range_between(args_with_space.begin_pos,
                                          args_expr.begin_pos)
               corrector.replace(just_space, '(')
@@ -48,34 +135,22 @@ module RuboCop
              args.multiline?)
         end
 
-        def arguments_without_parentheses?(args)
-          arguments?(args) && !parentheses?(args)
+        def arguments_without_parentheses?(node)
+          node.arguments? && !parentheses?(node.arguments)
         end
 
-        def missing_parentheses(node, args)
-          add_offense(node, args.source_range,
-                      'Use def with parentheses when there are parameters.') do
+        def missing_parentheses(node)
+          location = node.arguments.source_range
+
+          add_offense(node, location: location, message: MSG_MISSING) do
             unexpected_style_detected(:require_no_parentheses)
           end
         end
 
         def unwanted_parentheses(args)
-          add_offense(args, :expression, 'Use def without parentheses.') do
+          add_offense(args, message: MSG_PRESENT) do
             unexpected_style_detected(:require_parentheses)
           end
-        end
-
-        def args_node(def_node)
-          if def_node.def_type?
-            _method_name, args, _body = *def_node
-          else
-            _scope, _method_name, args, _body = *def_node
-          end
-          args
-        end
-
-        def arguments?(args)
-          !args.children.empty?
         end
       end
     end

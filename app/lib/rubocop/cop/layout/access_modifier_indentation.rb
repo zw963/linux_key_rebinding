@@ -6,9 +6,7 @@ module RuboCop
       # Modifiers should be indented as deep as method definitions, or as deep
       # as the class/module keyword, depending on configuration.
       #
-      # @example
-      #   # EnforcedStyle: indent (default)
-      #
+      # @example EnforcedStyle: indent (default)
       #   # bad
       #   class Plumbus
       #   private
@@ -21,8 +19,7 @@ module RuboCop
       #     def smooth; end
       #   end
       #
-      #   # EnforcedStyle: outdent
-      #
+      # @example EnforcedStyle: outdent
       #   # bad
       #   class Plumbus
       #     private
@@ -35,11 +32,10 @@ module RuboCop
       #     def smooth; end
       #   end
       class AccessModifierIndentation < Cop
-        include AutocorrectAlignment
+        include Alignment
         include ConfigurableEnforcedStyle
-        include AccessModifierNode
 
-        MSG = '%s access modifiers like `%s`.'.freeze
+        MSG = '%<style>s access modifiers like `%<node>s`.'.freeze
 
         def on_class(node)
           _name, _base_class, body = *node
@@ -62,12 +58,16 @@ module RuboCop
           check_body(node.body, node)
         end
 
+        def autocorrect(node)
+          AlignmentCorrector.correct(processed_source, node, @column_delta)
+        end
+
         private
 
         def check_body(body, node)
           return if body.nil? # Empty class etc.
 
-          modifiers = body.each_child_node.select { |c| modifier_node?(c) }
+          modifiers = body.each_child_node(:send).select(&:access_modifier?)
           class_column = node.source_range.column
 
           modifiers.each { |modifier| check_modifier(modifier, class_column) }
@@ -81,7 +81,7 @@ module RuboCop
           if @column_delta.zero?
             correct_style_detected
           else
-            add_offense(send_node, :expression) do
+            add_offense(send_node) do
               if offset == unexpected_indent_offset
                 opposite_style_detected
               else
@@ -92,7 +92,7 @@ module RuboCop
         end
 
         def message(node)
-          format(MSG, style.capitalize, node.loc.selector.source)
+          format(MSG, style: style.capitalize, node: node.loc.selector.source)
         end
 
         def expected_indent_offset

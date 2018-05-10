@@ -35,7 +35,20 @@ module RuboCop
           return if allowed_lhs?(lhs) || allowed_rhs?(rhs) ||
                     allowed_masign?(lhs_elements, rhs_elements)
 
-          add_offense(node, :expression)
+          add_offense(node)
+        end
+
+        def autocorrect(node)
+          lambda do |corrector|
+            left, right = *node
+            left_elements = *left
+            right_elements = [*right].compact
+            order = find_valid_order(left_elements, right_elements)
+            correction = assignment_corrector(node, order)
+
+            corrector.replace(correction.correction_range,
+                              correction.correction)
+          end
         end
 
         private
@@ -66,19 +79,6 @@ module RuboCop
 
         def return_of_method_call?(node)
           node.block_type? || node.send_type?
-        end
-
-        def autocorrect(node)
-          lambda do |corrector|
-            left, right = *node
-            left_elements = *left
-            right_elements = [*right].compact
-            order = find_valid_order(left_elements, right_elements)
-            correction = assignment_corrector(node, order)
-
-            corrector.replace(correction.correction_range,
-                              correction.correction)
-          end
         end
 
         def assignment_corrector(node, order)
@@ -115,7 +115,7 @@ module RuboCop
           end
         end
 
-        def_node_matcher :implicit_self_getter?, '(send nil $_)'
+        def_node_matcher :implicit_self_getter?, '(send nil? $_)'
 
         # Helper class necessitated by silly design of TSort prior to Ruby 2.1
         # Newer versions have a better API, but that doesn't help us
@@ -159,7 +159,7 @@ module RuboCop
           def accesses?(rhs, lhs)
             if lhs.method?(:[]=)
               matching_calls(rhs, lhs.receiver, :[]).any? do |args|
-                args == lhs.method_args
+                args == lhs.arguments
               end
             else
               access_method = lhs.method_name.to_s.chop.to_sym
@@ -174,7 +174,7 @@ module RuboCop
 
         # An internal class for correcting parallel assignment
         class GenericCorrector
-          include AutocorrectAlignment
+          include Alignment
 
           attr_reader :config, :node
 

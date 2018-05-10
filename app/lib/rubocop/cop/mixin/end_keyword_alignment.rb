@@ -6,7 +6,10 @@ module RuboCop
     module EndKeywordAlignment
       include ConfigurableEnforcedStyle
 
-      MSG = '`end` at %d, %d is not aligned with `%s` at %d, %d.'.freeze
+      BYTE_ORDER_MARK = 0xfeff # The Unicode codepoint
+
+      MSG = '`end` at %<end_line>d, %<end_col>d is not aligned with ' \
+            '`%<source>s` at %<align_line>d, %<align_col>d.'.freeze
 
       private
 
@@ -39,9 +42,12 @@ module RuboCop
 
       def add_offense_for_misalignment(node, align_with)
         end_loc = node.loc.end
-        msg = format(MSG, end_loc.line, end_loc.column, align_with.source,
-                     align_with.line, align_with.column)
-        add_offense(node, end_loc, msg)
+        msg = format(MSG, end_line: end_loc.line,
+                          end_col: end_loc.column,
+                          source: align_with.source,
+                          align_line: align_with.line,
+                          align_col: align_with.column)
+        add_offense(node, location: end_loc, message: msg)
       end
 
       def style_parameter_name
@@ -49,35 +55,28 @@ module RuboCop
       end
 
       def variable_alignment?(whole_expression, rhs, end_alignment_style)
-        end_alignment_style == :variable &&
+        case end_alignment_style
+        when :variable
           !line_break_before_keyword?(whole_expression, rhs)
+        when :start_of_line
+          true
+        end
       end
 
       def line_break_before_keyword?(whole_expression, rhs)
-        rhs.loc.line > whole_expression.line
+        rhs.first_line > whole_expression.line
       end
 
-      def align(node, align_to)
-        whitespace = whitespace_range(node)
-        return false unless whitespace.source.strip.empty?
-
-        column = alignment_column(align_to)
-        ->(corrector) { corrector.replace(whitespace, ' ' * column) }
-      end
-
-      def whitespace_range(node)
-        begin_pos = node.loc.end.begin_pos
-
-        range_between(begin_pos - node.loc.end.column, begin_pos)
-      end
-
-      def alignment_column(align_to)
-        if !align_to
-          0
-        elsif align_to.respond_to?(:loc)
-          align_to.source_range.column
+      # Returns the column attribute of the range, except if the range is on
+      # the first line and there's a byte order mark at the beginning of that
+      # line, in which case 1 is subtracted from the column value. This gives
+      # the column as it appears when viewing the file in an editor.
+      def effective_column(range)
+        if range.line == 1 &&
+           @processed_source.raw_source.codepoints.first == BYTE_ORDER_MARK
+          range.column - 1
         else
-          align_to.column
+          range.column
         end
       end
     end

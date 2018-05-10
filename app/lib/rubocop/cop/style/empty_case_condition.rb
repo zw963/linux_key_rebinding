@@ -36,16 +36,16 @@ module RuboCop
       #     puts 'more'
       #   end
       class EmptyCaseCondition < Cop
+        include RangeHelp
+
         MSG = 'Do not use empty `case` condition, instead use an `if` '\
               'expression.'.freeze
 
         def on_case(case_node)
           return if case_node.condition
 
-          add_offense(case_node, :keyword, MSG)
+          add_offense(case_node, location: :keyword)
         end
-
-        private
 
         def autocorrect(case_node)
           when_branches = case_node.when_branches
@@ -55,6 +55,8 @@ module RuboCop
             correct_when_conditions(corrector, when_branches)
           end
         end
+
+        private
 
         def correct_case_when(corrector, case_node, when_nodes)
           case_range = case_node.loc.keyword.join(when_nodes.first.loc.keyword)

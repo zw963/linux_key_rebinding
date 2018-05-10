@@ -8,10 +8,7 @@ module RuboCop
       # It is configurable to enforce the inverse, using `verbose` method
       # names also.
       #
-      # @example
-      #
-      #  # EnforcedStyle: short (default)
-      #
+      # @example EnforcedStyle: short (default)
       #  # bad
       #  Hash#has_key?
       #  Hash#has_value?
@@ -20,10 +17,7 @@ module RuboCop
       #  Hash#key?
       #  Hash#value?
       #
-      # @example
-      #
-      #  # EnforcedStyle: verbose
-      #
+      # @example EnforcedStyle: verbose
       #  # bad
       #  Hash#key?
       #  Hash#value?
@@ -34,7 +28,7 @@ module RuboCop
       class PreferredHashMethods < Cop
         include ConfigurableEnforcedStyle
 
-        MSG = 'Use `Hash#%s` instead of `Hash#%s`.'.freeze
+        MSG = 'Use `Hash#%<prefer>s` instead of `Hash#%<current>s`.'.freeze
 
         OFFENDING_SELECTORS = {
           short: %i[has_key? has_value?],
@@ -45,7 +39,7 @@ module RuboCop
           return unless node.arguments.one? &&
                         offending_selector?(node.method_name)
 
-          add_offense(node, :selector)
+          add_offense(node, location: :selector)
         end
 
         def autocorrect(node)
@@ -58,7 +52,9 @@ module RuboCop
         private
 
         def message(node)
-          format(MSG, proper_method_name(node.method_name), node.method_name)
+          format(MSG,
+                 prefer: proper_method_name(node.method_name),
+                 current: node.method_name)
         end
 
         def proper_method_name(method_name)

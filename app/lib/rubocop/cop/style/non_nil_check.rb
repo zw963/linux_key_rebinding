@@ -7,26 +7,27 @@ module RuboCop
       #
       # @example
       #
-      #  # bad
-      #  if x != nil
+      #   # bad
+      #   if x != nil
+      #   end
       #
-      #  # good (when not allowing semantic changes)
-      #  # bad (when allowing semantic changes)
-      #  if !x.nil?
+      #   # good (when not allowing semantic changes)
+      #   # bad (when allowing semantic changes)
+      #   if !x.nil?
+      #   end
       #
-      #  # good (when allowing semantic changes)
-      #  if x
+      #   # good (when allowing semantic changes)
+      #   if x
+      #   end
       #
       # Non-nil checks are allowed if they are the final nodes of predicate.
       #
-      #  # good
-      #  def signed_in?
-      #    !current_user.nil?
-      #  end
+      #   # good
+      #   def signed_in?
+      #     !current_user.nil?
+      #   end
       class NonNilCheck < Cop
-        include OnMethodDef
-
-        def_node_matcher :not_equal_to_nil?, '(send _ :!= (:nil))'
+        def_node_matcher :not_equal_to_nil?, '(send _ :!= nil)'
         def_node_matcher :unless_check?, '(if (send _ :nil?) ...)'
         def_node_matcher :nil_check?, '(send _ :nil?)'
         def_node_matcher :not_and_nil_check?, '(send (send _ :nil?) :!)'
@@ -35,10 +36,34 @@ module RuboCop
           return if ignored_node?(node)
 
           if not_equal_to_nil?(node)
-            add_offense(node, :selector)
+            add_offense(node, location: :selector)
           elsif include_semantic_changes? &&
                 (not_and_nil_check?(node) || unless_and_nil_check?(node))
-            add_offense(node, :expression)
+            add_offense(node)
+          end
+        end
+
+        def on_def(node)
+          body = node.body
+
+          return unless node.predicate_method? && body
+
+          if body.begin_type?
+            ignore_node(body.children.last)
+          else
+            ignore_node(body)
+          end
+        end
+        alias on_defs on_def
+
+        def autocorrect(node)
+          case node.method_name
+          when :!=
+            autocorrect_comparison(node)
+          when :!
+            autocorrect_non_nil(node, node.receiver)
+          when :nil?
+            autocorrect_unless_nil(node, node.receiver)
           end
         end
 
@@ -61,28 +86,6 @@ module RuboCop
 
         def include_semantic_changes?
           cop_config['IncludeSemanticChanges']
-        end
-
-        def on_method_def(_node, name, _args, body)
-          # only predicate methods are handled differently
-          return unless name.to_s.end_with?('?') && body
-
-          if body.begin_type?
-            ignore_node(body.children.last)
-          else
-            ignore_node(body)
-          end
-        end
-
-        def autocorrect(node)
-          case node.method_name
-          when :!=
-            autocorrect_comparison(node)
-          when :!
-            autocorrect_non_nil(node, node.receiver)
-          when :nil?
-            autocorrect_unless_nil(node, node.receiver)
-          end
         end
 
         def autocorrect_comparison(node)

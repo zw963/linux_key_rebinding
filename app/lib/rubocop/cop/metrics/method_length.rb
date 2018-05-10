@@ -7,16 +7,21 @@ module RuboCop
       # Comment lines can optionally be ignored.
       # The maximum allowed length is configurable.
       class MethodLength < Cop
-        include OnMethodDef
         include TooManyLines
 
         LABEL = 'Method'.freeze
 
-        private
-
-        def on_method_def(node, _method_name, _args, _body)
+        def on_def(node)
           check_code_length(node)
         end
+        alias on_defs on_def
+
+        def on_block(node)
+          return unless node.send_node.method_name == :define_method
+          check_code_length(node)
+        end
+
+        private
 
         def cop_label
           LABEL

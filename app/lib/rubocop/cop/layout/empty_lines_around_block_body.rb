@@ -6,24 +6,20 @@ module RuboCop
       # This cops checks if empty lines around the bodies of blocks match
       # the configuration.
       #
-      # @example
-      #
-      #   # EnforcedStyle: empty_lines
-      #
+      # @example EnforcedStyle: empty_lines
       #   # good
       #
       #   foo do |bar|
       #
-      #     ...
+      #     # ...
       #
       #   end
       #
-      #   # EnforcedStyle: no_empty_lines
-      #
+      # @example EnforcedStyle: no_empty_lines (default)
       #   # good
       #
       #   foo do |bar|
-      #     ...
+      #     # ...
       #   end
       class EmptyLinesAroundBlockBody < Cop
         include EmptyLinesAroundBody
@@ -32,6 +28,10 @@ module RuboCop
 
         def on_block(node)
           check(node, node.body)
+        end
+
+        def autocorrect(node)
+          EmptyLineCorrector.correct(node)
         end
       end
     end

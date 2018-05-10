@@ -32,7 +32,7 @@ module RuboCop
       #   end
       class UselessAssignment < Cop
         include NameSimilarity
-        MSG = 'Useless assignment to variable - `%s`.'.freeze
+        MSG = 'Useless assignment to variable - `%<variable>s`.'.freeze
 
         def join_force?(force_class)
           force_class == VariableForce
@@ -58,14 +58,14 @@ module RuboCop
                          assignment.node.loc.name
                        end
 
-            add_offense(nil, location, message)
+            add_offense(nil, location: location, message: message)
           end
         end
 
         def message_for_useless_assignment(assignment)
           variable = assignment.variable
 
-          format(MSG, variable.name) +
+          format(MSG, variable: variable.name) +
             message_specification(assignment, variable).to_s
         end
 

@@ -13,10 +13,7 @@ module RuboCop
       # will also suggest constructing error objects when the exception is
       # passed multiple arguments.
       #
-      # @example
-      #
-      #   # EnforcedStyle: exploded
-      #
+      # @example EnforcedStyle: exploded (default)
       #   # bad
       #   raise StandardError.new("message")
       #
@@ -26,10 +23,7 @@ module RuboCop
       #   raise MyCustomError.new(arg1, arg2, arg3)
       #   raise MyKwArgError.new(key1: val1, key2: val2)
       #
-      # @example
-      #
-      #   # EnforcedStyle: compact
-      #
+      # @example EnforcedStyle: compact
       #   # bad
       #   raise StandardError, "message"
       #   raise RuntimeError, arg1, arg2, arg3
@@ -42,9 +36,9 @@ module RuboCop
         include ConfigurableEnforcedStyle
 
         EXPLODED_MSG = 'Provide an exception class and message ' \
-          'as arguments to `%s`.'.freeze
+          'as arguments to `%<method>s`.'.freeze
         COMPACT_MSG = 'Provide an exception object ' \
-          'as an argument to `%s`.'.freeze
+          'as an argument to `%<method>s`.'.freeze
 
         def on_send(node)
           return unless node.command?(:raise) || node.command?(:fail)
@@ -57,41 +51,40 @@ module RuboCop
           end
         end
 
-        private
-
         def autocorrect(node)
-          new_exception = if style == :compact
-                            correction_exploded_to_compact(node.arguments)
-                          else
-                            correction_compact_to_exploded(node.first_argument)
-                          end
-          replacement = "#{node.method_name} #{new_exception}"
+          replacement = if style == :compact
+                          correction_exploded_to_compact(node)
+                        else
+                          correction_compact_to_exploded(node)
+                        end
 
           ->(corrector) { corrector.replace(node.source_range, replacement) }
         end
 
+        private
+
         def correction_compact_to_exploded(node)
-          exception_node, _new, message_node = *node
+          exception_node, _new, message_node = *node.first_argument
 
           message = message_node && message_node.source
 
           correction = exception_node.const_name.to_s
           correction = "#{correction}, #{message}" if message
 
-          correction
+          "#{node.method_name} #{correction}"
         end
 
         def correction_exploded_to_compact(node)
-          exception_node, *message_nodes = *node
+          exception_node, *message_nodes = *node.arguments
+          return node.source if message_nodes.size > 1
 
-          messages = message_nodes.map(&:source).join(', ')
-
-          "#{exception_node.const_name}.new(#{messages})"
+          argument = message_nodes.first.source
+          "#{node.method_name} #{exception_node.const_name}.new(#{argument})"
         end
 
         def check_compact(node)
           if node.arguments.size > 1
-            add_offense(node, :expression, message(node.method_name)) do
+            add_offense(node) do
               opposite_style_detected
             end
           else
@@ -108,7 +101,7 @@ module RuboCop
 
           return if acceptable_exploded_args?(first_arg.arguments)
 
-          add_offense(node, :expression, message(node.method_name)) do
+          add_offense(node) do
             opposite_style_detected
           end
         end
@@ -127,11 +120,11 @@ module RuboCop
           arg.hash_type? || arg.splat_type?
         end
 
-        def message(method)
+        def message(node)
           if style == :compact
-            format(COMPACT_MSG, method)
+            format(COMPACT_MSG, method: node.method_name)
           else
-            format(EXPLODED_MSG, method)
+            format(EXPLODED_MSG, method: node.method_name)
           end
         end
       end

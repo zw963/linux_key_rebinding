@@ -7,7 +7,7 @@ token kCLASS kMODULE kDEF kUNDEF kBEGIN kRESCUE kENSURE kEND kIF kUNLESS
       kUNTIL_MOD kRESCUE_MOD kALIAS kDEFINED klBEGIN klEND k__LINE__
       k__FILE__ tIDENTIFIER tFID tGVAR tIVAR tCONSTANT tCVAR tNTH_REF
       tBACK_REF tSTRING_CONTENT tINTEGER tFLOAT tUPLUS
-      tUMINUS tUMINUS_NUM tPOW tCMP tEQ tEQQ tNEQ tGEQ tLEQ tANDOP
+      tUMINUS tUNARY_NUM tPOW tCMP tEQ tEQQ tNEQ tGEQ tLEQ tANDOP
       tOROP tMATCH tNMATCH tDOT tDOT2 tDOT3 tAREF tASET tLSHFT tRSHFT
       tCOLON2 tCOLON3 tOP_ASGN tASSOC tLPAREN tLPAREN2 tRPAREN tLPAREN_ARG
       tLBRACK tLBRACK2 tRBRACK tLBRACE tLBRACE_ARG tSTAR tSTAR2 tAMPER tAMPER2
@@ -19,7 +19,7 @@ token kCLASS kMODULE kDEF kUNDEF kBEGIN kRESCUE kENSURE kEND kIF kUNLESS
 prechigh
   right    tBANG tTILDE tUPLUS
   right    tPOW
-  right    tUMINUS_NUM tUMINUS
+  right    tUNARY_NUM tUMINUS
   left     tSTAR2 tDIVIDE tPERCENT
   left     tPLUS tMINUS
   left     tLSHFT tRSHFT
@@ -142,7 +142,7 @@ rule
                     }
                 | klBEGIN tLCURLY compstmt tRCURLY
                     {
-                      if in_def?
+                      if @context.indirectly_in_def?
                         diagnostic :error, :begin_in_method, nil, val[0]
                       end
 
@@ -268,12 +268,14 @@ rule
  cmd_brace_block: tLBRACE_ARG
                     {
                       @static_env.extend_dynamic
+                      @context.push(:block)
                     }
                     opt_block_var compstmt tRCURLY
                     {
                       result = [ val[0], val[2], val[3], val[4] ]
 
                       @static_env.unextend
+                      @context.pop
                     }
 
          command: operation command_args =tLOWEST
@@ -615,14 +617,14 @@ rule
                     {
                       result = @builder.binary_op(val[0], val[1], val[2])
                     }
-                | tUMINUS_NUM tINTEGER tPOW arg
+                | tUNARY_NUM tINTEGER tPOW arg
                     {
                       result = @builder.unary_op(val[0],
                                   @builder.binary_op(
                                     @builder.integer(val[1]),
                                       val[2], val[3]))
                     }
-                | tUMINUS_NUM tFLOAT tPOW arg
+                | tUNARY_NUM tFLOAT tPOW arg
                     {
                       result = @builder.unary_op(val[0],
                                   @builder.binary_op(
@@ -1122,10 +1124,11 @@ rule
                 | kCLASS cpath superclass
                     {
                       @static_env.extend_static
+                      @context.push(:class)
                     }
                     bodystmt kEND
                     {
-                      if in_def?
+                      unless @context.class_definition_allowed?
                         diagnostic :error, :class_in_def, nil, val[0]
                       end
 
@@ -1135,13 +1138,12 @@ rule
                                                   val[4], val[5])
 
                       @static_env.unextend
+                      @context.pop
                     }
                 | kCLASS tLSHFT expr term
                     {
-                      result = @def_level
-                      @def_level = 0
-
                       @static_env.extend_static
+                      @context.push(:sclass)
                     }
                     bodystmt kEND
                     {
@@ -1149,8 +1151,7 @@ rule
                                                    val[5], val[6])
 
                       @static_env.unextend
-
-                      @def_level = val[4]
+                      @context.pop
                     }
                 | kMODULE cpath
                     {
@@ -1158,7 +1159,7 @@ rule
                     }
                     bodystmt kEND
                     {
-                      if in_def?
+                      unless @context.module_definition_allowed?
                         diagnostic :error, :module_in_def, nil, val[0]
                       end
 
@@ -1169,8 +1170,8 @@ rule
                     }
                 | kDEF fname
                     {
-                      @def_level += 1
                       @static_env.extend_static
+                      @context.push(:def)
                     }
                     f_arglist bodystmt kEND
                     {
@@ -1178,7 +1179,7 @@ rule
                                   val[3], val[4], val[5])
 
                       @static_env.unextend
-                      @def_level -= 1
+                      @context.pop
                     }
                 | kDEF singleton dot_or_colon
                     {
@@ -1186,8 +1187,8 @@ rule
                     }
                     fname
                     {
-                      @def_level += 1
                       @static_env.extend_static
+                      @context.push(:defs)
                     }
                     f_arglist bodystmt kEND
                     {
@@ -1195,7 +1196,7 @@ rule
                                   val[4], val[6], val[7], val[8])
 
                       @static_env.unextend
-                      @def_level -= 1
+                      @context.pop
                     }
                 | kBREAK
                     {
@@ -1330,12 +1331,14 @@ rule
         do_block: kDO_BLOCK
                     {
                       @static_env.extend_dynamic
+                      @context.push(:block)
                     }
                     opt_block_var compstmt kEND
                     {
                       result = [ val[0], val[2], val[3], val[4] ]
 
                       @static_env.unextend
+                      @context.pop
                     }
 
       block_call: command do_block
@@ -1393,22 +1396,26 @@ rule
      brace_block: tLCURLY
                     {
                       @static_env.extend_dynamic
+                      @context.push(:block)
                     }
                     opt_block_var compstmt tRCURLY
                     {
                       result = [ val[0], val[2], val[3], val[4] ]
 
                       @static_env.unextend
+                      @context.pop
                     }
                 | kDO
                     {
                       @static_env.extend_dynamic
+                      @context.push(:block)
                     }
                     opt_block_var compstmt kEND
                     {
                       result = [ val[0], val[2], val[3], val[4] ]
 
                       @static_env.unextend
+                      @context.pop
                     }
 
        case_body: kWHEN when_args then compstmt cases
@@ -1617,15 +1624,25 @@ xstring_contents: # nothing
                     {
                       result = @builder.float(val[0])
                     }
-                | tUMINUS_NUM tINTEGER =tLOWEST
+                | tUNARY_NUM tINTEGER =tLOWEST
                     {
-                      result = @builder.negate(val[0],
-                                  @builder.integer(val[1]))
+                      num = @builder.integer(val[1])
+                      if @builder.respond_to? :negate
+                        # AST builder interface compatibility
+                        result = @builder.negate(val[0], num)
+                      else
+                        result = @builder.unary_num(val[0], num)
+                      end
                     }
-                | tUMINUS_NUM tFLOAT   =tLOWEST
+                | tUNARY_NUM tFLOAT   =tLOWEST
                     {
-                      result = @builder.negate(val[0],
-                                  @builder.float(val[1]))
+                      num = @builder.float(val[1])
+                      if @builder.respond_to? :negate
+                        # AST builder interface compatibility
+                        result = @builder.negate(val[0], num)
+                      else
+                        result = @builder.unary_num(val[0], num)
+                      end
                     }
 
         variable: tIDENTIFIER
@@ -1913,5 +1930,5 @@ require 'parser'
   end
 
   def default_encoding
-    Encoding::BINARY if defined? Encoding
+    Encoding::BINARY
   end

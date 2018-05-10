@@ -49,7 +49,6 @@ module RuboCop
       #   end
       class DocumentationMethod < Cop
         include DocumentationComment
-        include OnMethodDef
         include DefNode
 
         MSG = 'Missing method documentation comment.'.freeze
@@ -57,10 +56,7 @@ module RuboCop
         def on_def(node)
           check(node)
         end
-
-        def on_method_def(node, *)
-          check(node)
-        end
+        alias on_defs on_def
 
         private
 
@@ -68,7 +64,7 @@ module RuboCop
           return if non_public?(node) && !require_for_non_public_methods?
           return if documentation_comment?(node)
 
-          add_offense(node, :expression, MSG)
+          add_offense(node)
         end
 
         def require_for_non_public_methods?

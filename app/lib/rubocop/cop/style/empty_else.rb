@@ -6,24 +6,8 @@ module RuboCop
       # Checks for empty else-clauses, possibly including comments and/or an
       # explicit `nil` depending on the EnforcedStyle.
       #
-      # SupportedStyles:
-      #
-      # @example
-      #   # good for all styles
-      #
-      #   if condition
-      #     statement
-      #   else
-      #     statement
-      #   end
-      #
-      #   # good for all styles
-      #   if condition
-      #     statement
-      #   end
-      #
-      # @example
-      #   # empty - warn only on empty else
+      # @example EnforcedStyle: empty
+      #   # warn only on empty else
       #
       #   # bad
       #   if condition
@@ -38,8 +22,20 @@ module RuboCop
       #     nil
       #   end
       #
-      # @example
-      #   # nil - warn on else with nil in it
+      #   # good
+      #   if condition
+      #     statement
+      #   else
+      #     statement
+      #   end
+      #
+      #   # good
+      #   if condition
+      #     statement
+      #   end
+      #
+      # @example EnforcedStyle: nil
+      #   # warn on else with nil in it
       #
       #   # bad
       #   if condition
@@ -54,8 +50,20 @@ module RuboCop
       #   else
       #   end
       #
-      # @example
-      #   # both - warn on empty else and else with nil in it
+      #   # good
+      #   if condition
+      #     statement
+      #   else
+      #     statement
+      #   end
+      #
+      #   # good
+      #   if condition
+      #     statement
+      #   end
+      #
+      # @example EnforcedStyle: both (default)
+      #   # warn on empty else and else with nil in it
       #
       #   # bad
       #   if condition
@@ -68,10 +76,23 @@ module RuboCop
       #   if condition
       #     statement
       #   else
+      #   end
+      #
+      #   # good
+      #   if condition
+      #     statement
+      #   else
+      #     statement
+      #   end
+      #
+      #   # good
+      #   if condition
+      #     statement
       #   end
       class EmptyElse < Cop
         include OnNormalIfUnless
         include ConfigurableEnforcedStyle
+        include RangeHelp
 
         MSG = 'Redundant `else`-clause.'.freeze
 
@@ -81,6 +102,16 @@ module RuboCop
 
         def on_case(node)
           check(node)
+        end
+
+        def autocorrect(node)
+          return false if autocorrect_forbidden?(node.type.to_s)
+          return false if comment_in_else?(node)
+
+          lambda do |corrector|
+            end_pos = base_node(node).loc.end.begin_pos
+            corrector.remove(range_between(node.loc.else.begin_pos, end_pos))
+          end
         end
 
         private
@@ -101,27 +132,31 @@ module RuboCop
         def empty_check(node)
           return unless node.else? && !node.else_branch
 
-          add_offense(node, :else, MSG)
+          add_offense(node, location: :else)
         end
 
         def nil_check(node)
           return unless node.else_branch && node.else_branch.nil_type?
 
-          add_offense(node, :else, MSG)
+          add_offense(node, location: :else)
         end
 
-        def autocorrect(node)
-          return false if autocorrect_forbidden?(node.type.to_s)
+        def comment_in_else?(node)
+          range = else_line_range(node.loc)
+          processed_source.find_comment { |c| range.include?(c.loc.line) }
+        end
 
-          lambda do |corrector|
-            end_pos = base_if_node(node).loc.end.begin_pos
+        def else_line_range(loc)
+          return 0..0 if loc.else.nil? || loc.end.nil?
+          loc.else.first_line..loc.end.first_line
+        end
 
-            corrector.remove(range_between(node.loc.else.begin_pos, end_pos))
+        def base_node(node)
+          return node if node.case_type?
+          return node unless node.elsif?
+          node.each_ancestor(:if, :case, :when).find(-> { node }) do |parent|
+            parent.loc.end
           end
-        end
-
-        def base_if_node(node)
-          node.each_ancestor(:if).find { |parent| parent.loc.end } || node
         end
 
         def autocorrect_forbidden?(type)

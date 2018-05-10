@@ -6,17 +6,18 @@ module RuboCop
       # Check for parentheses around stabby lambda arguments.
       # There are two different styles. Defaults to `require_parentheses`.
       #
-      # @example
-      #   # require_parentheses - bad
+      # @example EnforcedStyle: require_parentheses (default)
+      #   # bad
       #   ->a,b,c { a + b + c }
       #
-      #   # require_parentheses - good
+      #   # good
       #   ->(a,b,c) { a + b + c}
       #
-      #   # require_no_parentheses - bad
+      # @example EnforcedStyle: require_no_parentheses
+      #   # bad
       #   ->(a,b,c) { a + b + c }
       #
-      #   # require_no_parentheses - good
+      #   # good
       #   ->a,b,c { a + b + c}
       class StabbyLambdaParentheses < Cop
         include ConfigurableEnforcedStyle
@@ -24,22 +25,12 @@ module RuboCop
         MSG_REQUIRE = 'Wrap stabby lambda arguments with parentheses.'.freeze
         MSG_NO_REQUIRE = 'Do not wrap stabby lambda arguments ' \
                          'with parentheses.'.freeze
-        ARROW = '->'.freeze
-
         def on_send(node)
-          return unless arrow_lambda_with_args?(node)
+          return unless stabby_lambda_with_args?(node)
+          return unless redundant_parentheses?(node) ||
+                        missing_parentheses?(node)
 
-          if style == :require_parentheses
-            if parentheses?(node)
-              correct_style_detected
-            else
-              missing_parentheses(node)
-            end
-          elsif parentheses?(node)
-            unwanted_parentheses(node)
-          else
-            correct_style_detected
-          end
+          add_offense(node.parent.arguments)
         end
 
         def autocorrect(node)
@@ -52,21 +43,21 @@ module RuboCop
 
         private
 
-        def missing_parentheses(node)
-          add_offense(node_args(node), :expression, MSG_REQUIRE) do
-            opposite_style_detected
-          end
+        def missing_parentheses?(node)
+          style == :require_parentheses && !parentheses?(node)
         end
 
-        def unwanted_parentheses(node)
-          add_offense(node_args(node), :expression, MSG_NO_REQUIRE) do
-            opposite_style_detected
-          end
+        def redundant_parentheses?(node)
+          style == :require_no_parentheses && parentheses?(node)
+        end
+
+        def message(_node)
+          style == :require_parentheses ? MSG_REQUIRE : MSG_NO_REQUIRE
         end
 
         def missing_parentheses_corrector(node)
           lambda do |corrector|
-            args_loc = node_args(node).source_range
+            args_loc = node.parent.arguments.source_range
 
             corrector.insert_before(args_loc, '(')
             corrector.insert_after(args_loc, ')')
@@ -75,37 +66,19 @@ module RuboCop
 
         def unwanted_parentheses_corrector(node)
           lambda do |corrector|
-            args_loc = node_args(node).loc
+            args_loc = node.parent.arguments.loc
 
             corrector.replace(args_loc.begin, '')
             corrector.remove(args_loc.end)
           end
         end
 
-        def arrow_lambda_with_args?(node)
-          lambda_node?(node) && arrow_form?(node) && args?(node)
-        end
-
-        def lambda_node?(node)
-          receiver, call = *node
-          !receiver && call == :lambda
-        end
-
-        def arrow_form?(node)
-          node.loc.selector.source == ARROW
-        end
-
-        def node_args(node)
-          _call, args, _body = *node.parent
-          args
-        end
-
-        def args?(node)
-          !node_args(node).children.empty?
+        def stabby_lambda_with_args?(node)
+          node.stabby_lambda? && node.parent.arguments?
         end
 
         def parentheses?(node)
-          node_args(node).loc.begin
+          node.parent.arguments.loc.begin
         end
       end
     end

@@ -18,13 +18,13 @@ module RuboCop
       #
       #   class ItemApi
       #     rescue_from ValidationError do |e| # non-iteration block with arg
-      #       return message: 'validation error' unless e.errors # allowed
+      #       return { message: 'validation error' } unless e.errors # allowed
       #       error_array = e.errors.map do |error| # block with method chain
       #         return if error.suppress? # warned
       #         return "#{error.param}: invalid" unless error.message # allowed
       #         "#{error.param}: #{error.message}"
       #       end
-      #       message: 'validation error', errors: error_array
+      #       { message: 'validation error', errors: error_array }
       #     end
       #
       #     def update_items
@@ -59,7 +59,7 @@ module RuboCop
             next if args_node.children.empty?
 
             if chained_send?(send_node)
-              add_offense(return_node, :keyword)
+              add_offense(return_node, location: :keyword)
               break
             end
           end
@@ -75,7 +75,7 @@ module RuboCop
           !return_node.children.empty?
         end
 
-        def_node_matcher :chained_send?, '(send !nil ...)'
+        def_node_matcher :chained_send?, '(send !nil? ...)'
         def_node_matcher :define_method?, <<-PATTERN
           (send _ {:define_method :define_singleton_method} _)
         PATTERN

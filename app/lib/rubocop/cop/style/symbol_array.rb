@@ -7,26 +7,21 @@ module RuboCop
       # using the %i() syntax.
       #
       # Alternatively, it checks for symbol arrays using the %i() syntax on
-      # projects which do not want to use that syntax, perhaps because they
-      # support a version of Ruby lower than 2.0.
+      # projects which do not want to use that syntax.
       #
       # Configuration option: MinSize
       # If set, arrays with fewer elements than this value will not trigger the
       # cop. For example, a `MinSize of `3` will not enforce a style on an array
       # of 2 or fewer elements.
       #
-      # @example
-      #   EnforcedStyle: percent (default)
-      #
+      # @example EnforcedStyle: percent (default)
       #   # good
       #   %i[foo bar baz]
       #
       #   # bad
       #   [:foo, :bar, :baz]
       #
-      # @example
-      #   EnforcedStyle: brackets
-      #
+      # @example EnforcedStyle: brackets
       #   # good
       #   [:foo, :bar, :baz]
       #
@@ -37,9 +32,7 @@ module RuboCop
         include ArraySyntax
         include ConfigurableEnforcedStyle
         include PercentLiteral
-        extend TargetRubyVersion
-
-        minimum_target_ruby_version 2.0
+        include PercentArray
 
         PERCENT_MSG = 'Use `%i` or `%I` for an array of symbols.'.freeze
         ARRAY_MSG = 'Use `[]` for an array of symbols.'.freeze
@@ -50,6 +43,8 @@ module RuboCop
 
         def on_array(node)
           if bracketed_array_of?(:sym, node)
+            return if symbols_contain_spaces?(node)
+
             check_bracketed_array(node)
           elsif node.percent_literal?(:symbol)
             check_percent_array(node)
@@ -66,29 +61,6 @@ module RuboCop
 
         private
 
-        def check_bracketed_array(node)
-          return if comments_in_array?(node) ||
-                    symbols_contain_spaces?(node) ||
-                    below_array_length?(node)
-
-          array_style_detected(:brackets, node.values.size)
-          add_offense(node, :expression, PERCENT_MSG) if style == :percent
-        end
-
-        def check_percent_array(node)
-          array_style_detected(:percent, node.values.size)
-          add_offense(node, :expression, ARRAY_MSG) if style == :brackets
-        end
-
-        def comments_in_array?(node)
-          comments = processed_source.comments
-          array_range = node.source_range.to_a
-
-          comments.any? do |comment|
-            !(comment.loc.expression.to_a & array_range).empty?
-          end
-        end
-
         def symbols_contain_spaces?(node)
           node.children.any? do |sym|
             content, = *sym
@@ -97,11 +69,40 @@ module RuboCop
         end
 
         def correct_bracketed(node)
-          syms = node.children.map { |c| to_symbol_literal(c.children[0].to_s) }
+          syms = node.children.map { |c| to_symbol_literal(c.value.to_s) }
 
           lambda do |corrector|
             corrector.replace(node.source_range, "[#{syms.join(', ')}]")
           end
+        end
+
+        def to_symbol_literal(string)
+          if symbol_without_quote?(string)
+            ":#{string}"
+          else
+            ":#{to_string_literal(string)}"
+          end
+        end
+
+        def symbol_without_quote?(string)
+          special_gvars = %w[
+            $! $" $$ $& $' $* $+ $, $/ $; $: $. $< $= $> $? $@ $\\ $_ $` $~ $0
+            $-0 $-F $-I $-K $-W $-a $-d $-i $-l $-p $-v $-w
+          ]
+          redefinable_operators = %w(
+            | ^ & <=> == === =~ > >= < <= << >>
+            + - * / % ** ~ +@ -@ [] []= ` ! != !~
+          )
+
+          # method name
+          string =~ /\A[a-zA-Z_]\w*[!?]?\z/ ||
+            # instance / class variable
+            string =~ /\A\@\@?[a-zA-Z_]\w*\z/ ||
+            # global variable
+            string =~ /\A\$[1-9]\d*\z/ ||
+            string =~ /\A\$[a-zA-Z_]\w*\z/ ||
+            special_gvars.include?(string) ||
+            redefinable_operators.include?(string)
         end
       end
     end

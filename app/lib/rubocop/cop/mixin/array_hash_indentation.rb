@@ -4,6 +4,8 @@ module RuboCop
   module Cop
     # Common code for indenting literal arrays and hashes.
     module ArrayHashIndentation
+      private
+
       def each_argument_node(node, type)
         left_parenthesis = node.loc.begin
 
@@ -72,8 +74,9 @@ module RuboCop
       end
 
       def incorrect_style_detected(styles, first, left_parenthesis)
-        add_offense(first, :expression,
-                    message(base_description(left_parenthesis))) do
+        msg = message(base_description(left_parenthesis))
+
+        add_offense(first, message: msg) do
           ambiguous_style_detected(*styles)
         end
       end

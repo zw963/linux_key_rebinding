@@ -11,21 +11,17 @@ module RuboCop
       #
       # Configuration option: MinSize
       # If set, arrays with fewer elements than this value will not trigger the
-      # cop. For example, a `MinSize of `3` will not enforce a style on an array
-      # of 2 or fewer elements.
+      # cop. For example, a `MinSize` of `3` will not enforce a style on an
+      # array of 2 or fewer elements.
       #
-      # @example
-      #   EnforcedStyle: percent (default)
-      #
+      # @example EnforcedStyle: percent (default)
       #   # good
       #   %w[foo bar baz]
       #
       #   # bad
       #   ['foo', 'bar', 'baz']
       #
-      # @example
-      #   EnforcedStyle: brackets
-      #
+      # @example EnforcedStyle: brackets
       #   # good
       #   ['foo', 'bar', 'baz']
       #
@@ -35,11 +31,11 @@ module RuboCop
         include ArrayMinSize
         include ArraySyntax
         include ConfigurableEnforcedStyle
+        include PercentArray
         include PercentLiteral
 
         PERCENT_MSG = 'Use `%w` or `%W` for an array of words.'.freeze
         ARRAY_MSG = 'Use `[]` for an array of words.'.freeze
-        QUESTION_MARK_SIZE = '?'.size
 
         class << self
           attr_accessor :largest_brackets
@@ -47,6 +43,8 @@ module RuboCop
 
         def on_array(node)
           if bracketed_array_of?(:str, node)
+            return if complex_content?(node.values)
+
             check_bracketed_array(node)
           elsif node.percent_literal?(:string)
             check_percent_array(node)
@@ -64,30 +62,10 @@ module RuboCop
         private
 
         def check_bracketed_array(node)
-          return if complex_content?(node.values) ||
-                    comments_in_array?(node) ||
-                    below_array_length?(node)
+          return if allowed_bracket_array?(node)
 
           array_style_detected(:brackets, node.values.size)
-          add_offense(node, :expression, PERCENT_MSG) if style == :percent
-        end
-
-        def check_percent_array(node)
-          array_style_detected(:percent, node.values.size)
-          add_offense(node, :expression, ARRAY_MSG) if style == :brackets
-        end
-
-        def percent_syntax?(node)
-          node.loc.begin && node.loc.begin.source =~ /\A%[wW]/
-        end
-
-        def comments_in_array?(node)
-          comments = processed_source.comments
-          array_range = node.source_range.to_a
-
-          comments.any? do |comment|
-            !(comment.loc.expression.to_a & array_range).empty?
-          end
+          add_offense(node) if style == :percent
         end
 
         def complex_content?(strings)

@@ -7,55 +7,65 @@ module RuboCop
       # can better be implemented using `casecmp`.
       #
       # @example
-      #   @bad
+      #   # bad
       #   str.downcase == 'abc'
       #   str.upcase.eql? 'ABC'
       #   'abc' == str.downcase
       #   'ABC'.eql? str.upcase
       #   str.downcase == str.downcase
       #
-      #   @good
+      #   # good
       #   str.casecmp('ABC').zero?
       #   'abc'.casecmp(str).zero?
       class Casecmp < Cop
-        MSG = 'Use `casecmp` instead of `%s %s`.'.freeze
+        MSG = 'Use `casecmp` instead of `%<methods>s`.'.freeze
         CASE_METHODS = %i[downcase upcase].freeze
 
-        def_node_matcher :downcase_eq, <<-END
+        def_node_matcher :downcase_eq, <<-PATTERN
           (send
             $(send _ ${:downcase :upcase})
             ${:== :eql? :!=}
             ${str (send _ {:downcase :upcase} ...) (begin str)})
-        END
+        PATTERN
 
-        def_node_matcher :eq_downcase, <<-END
+        def_node_matcher :eq_downcase, <<-PATTERN
           (send
             {str (send _ {:downcase :upcase} ...) (begin str)}
             ${:== :eql? :!=}
             $(send _ ${:downcase :upcase}))
-        END
+        PATTERN
+
+        def_node_matcher :downcase_downcase, <<-PATTERN
+          (send
+            $(send _ ${:downcase :upcase})
+            ${:== :eql? :!=}
+            $(send _ ${:downcase :upcase}))
+        PATTERN
 
         def on_send(node)
           return if part_of_ignored_node?(node)
 
           inefficient_comparison(node) do |range, is_other_part, *methods|
             ignore_node(node) if is_other_part
-            add_offense(node, range, format(MSG, *methods))
+            add_offense(node, location: range,
+                              message: format(MSG, methods: methods.join(' ')))
           end
         end
 
         def autocorrect(node)
-          downcase_eq(node) do
+          if downcase_downcase(node)
+            receiver, method, rhs = *node
+            arg, = *rhs
+          elsif downcase_eq(node)
             receiver, method, arg = *node
-            variable, = *receiver
-            return correction(node, receiver, method, arg, variable)
+          elsif eq_downcase(node)
+            arg, method, receiver = *node
+          else
+            return
           end
 
-          eq_downcase(node) do
-            arg, method, receiver = *node
-            variable, = *receiver
-            return correction(node, receiver, method, arg, variable)
-          end
+          variable, = *receiver
+          correction(node, receiver, method, arg, variable)
         end
 
         private

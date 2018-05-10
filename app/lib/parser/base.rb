@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Parser
 
   ##
@@ -93,9 +95,7 @@ module Parser
     end
 
     def self.setup_source_buffer(file, line, string, encoding)
-      if string.respond_to? :force_encoding
-        string = string.dup.force_encoding(encoding)
-      end
+      string = string.dup.force_encoding(encoding)
 
       source_buffer = Source::Buffer.new(file, line)
 
@@ -113,6 +113,7 @@ module Parser
     attr_reader :builder
     attr_reader :static_env
     attr_reader :source_buffer
+    attr_reader :context
 
     ##
     # @param [Parser::Builders::Default] builder The AST builder to use.
@@ -128,6 +129,10 @@ module Parser
 
       @builder = builder
       @builder.parser = self
+      @context = Context.new
+
+      # Last emitted token
+      @last_token = nil
 
       if self.class::Racc_debug_parser && ENV['RACC_DEBUG']
         @yydebug = true
@@ -141,10 +146,10 @@ module Parser
     #
     def reset
       @source_buffer = nil
-      @def_level     = 0 # count of nested def's.
 
       @lexer.reset
       @static_env.reset
+      @context.reset
 
       self
     end
@@ -217,18 +222,12 @@ module Parser
       @lexer.comments = nil
     end
 
-    ##
-    # @api private
-    # @return [Boolean]
-    #
-    def in_def?
-      @def_level > 0
-    end
-
     private
 
     def next_token
-      @lexer.advance
+      token = @lexer.advance
+      @last_token = token
+      token
     end
 
     def check_kwarg_name(name_t)

@@ -97,6 +97,8 @@ module RuboCop
 
         @offenses = []
         @corrections = []
+        @corrected_nodes = {}
+        @corrected_nodes.compare_by_identity
         @processed_source = nil
       end
 
@@ -105,28 +107,33 @@ module RuboCop
       end
 
       def cop_config
-        @cop_config ||= @config.for_cop(self)
+        # Use department configuration as basis, but let individual cop
+        # configuration override.
+        @cop_config ||= @config.for_cop(self.class.department.to_s)
+                               .merge(@config.for_cop(self))
       end
 
       def message(_node = nil)
         self.class::MSG
       end
 
-      def add_offense(node, loc, message = nil, severity = nil)
-        location = find_location(node, loc)
+      # rubocop:disable Metrics/CyclomaticComplexity
+      def add_offense(node, location: :expression, message: nil, severity: nil)
+        loc = find_location(node, location)
 
-        return if duplicate_location?(location)
+        return if duplicate_location?(loc)
 
         severity = custom_severity || severity || default_severity
 
         message ||= message(node)
         message = annotate(message)
 
-        status = enabled_line?(location.line) ? correct(node) : :disabled
+        status = enabled_line?(loc.line) ? correct(node) : :disabled
 
-        @offenses << Offense.new(severity, location, message, name, status)
+        @offenses << Offense.new(severity, loc, message, name, status)
         yield if block_given? && status != :disabled
       end
+      # rubocop:enable Metrics/CyclomaticComplexity
 
       def find_location(node, loc)
         # Location can be provided as a symbol, e.g.: `:keyword`
@@ -140,7 +147,9 @@ module RuboCop
       def correct(node)
         return :unsupported unless support_autocorrect?
         return :uncorrected unless autocorrect?
+        return :already_corrected if @corrected_nodes.key?(node)
 
+        @corrected_nodes[node] = true
         correction = autocorrect(node)
         return :uncorrected unless correction
         @corrections << correction

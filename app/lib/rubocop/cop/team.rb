@@ -36,7 +36,9 @@ module RuboCop
       def inspect_file(processed_source)
         # If we got any syntax errors, return only the syntax offenses.
         unless processed_source.valid_syntax?
-          return Lint::Syntax.offenses_from_processed_source(processed_source)
+          return Lint::Syntax.offenses_from_processed_source(
+            processed_source, @config, @options
+          )
         end
 
         offenses(processed_source)
@@ -117,19 +119,25 @@ module RuboCop
 
       def autocorrect_all_cops(buffer, cops)
         corrector = Corrector.new(buffer)
-        skip = Set.new
 
-        cops.each do |cop|
-          next if cop.corrections.empty?
-          next if skip.include?(cop.class)
-          corrector.corrections.concat(cop.corrections)
-          skip.merge(cop.class.autocorrect_incompatible_with)
-        end
+        collate_corrections(corrector, cops)
 
         if !corrector.corrections.empty?
           corrector.rewrite
         else
           buffer.source
+        end
+      end
+
+      def collate_corrections(corrector, cops)
+        skips = Set.new
+
+        cops.each do |cop|
+          next if cop.corrections.empty?
+          next if skips.include?(cop.class)
+
+          corrector.corrections.concat(cop.corrections)
+          skips.merge(cop.class.autocorrect_incompatible_with)
         end
       end
 
@@ -156,21 +164,21 @@ module RuboCop
         end
       end
 
-      def handle_warning(e, location)
-        message = Rainbow("#{e.message} (from file: #{location})").yellow
+      def handle_warning(error, location)
+        message = Rainbow("#{error.message} (from file: #{location})").yellow
 
         @warnings << message
         warn message
-        puts e.backtrace if debug?
+        puts error.backtrace if debug?
       end
 
-      def handle_error(e, location, cop)
+      def handle_error(error, location, cop)
         message = Rainbow("An error occurred while #{cop.name}" \
                            " cop was inspecting #{location}.").red
         @errors << message
         warn message
         if debug?
-          puts e.message, e.backtrace
+          puts error.message, error.backtrace
         else
           warn 'To see the complete backtrace run rubocop -d.'
         end

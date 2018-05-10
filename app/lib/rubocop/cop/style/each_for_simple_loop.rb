@@ -10,17 +10,17 @@ module RuboCop
       # This check only applies if the block takes no parameters.
       #
       # @example
-      #   @bad
+      #   # bad
       #   (1..5).each { }
       #
-      #   @good
+      #   # good
       #   5.times { }
       #
       # @example
-      #   @bad
+      #   # bad
       #   (0...10).each {}
       #
-      #   @good
+      #   # good
       #   10.times {}
       class EachForSimpleLoop < Cop
         MSG = 'Use `Integer#times` for a simple loop which iterates a fixed ' \
@@ -33,10 +33,8 @@ module RuboCop
 
           range = send_node.receiver.source_range.join(send_node.loc.selector)
 
-          add_offense(node, range)
+          add_offense(node, location: range)
         end
-
-        private
 
         def autocorrect(node)
           lambda do |corrector|
@@ -44,10 +42,12 @@ module RuboCop
 
             max += 1 if range_type == :irange
 
-            corrector.replace(node.children.first.source_range,
+            corrector.replace(node.send_node.source_range,
                               "#{max - min}.times")
           end
         end
+
+        private
 
         def_node_matcher :offending_each_range, <<-PATTERN
           (block (send (begin (${irange erange} (int $_) (int $_))) :each) (args) ...)

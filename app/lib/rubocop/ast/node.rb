@@ -20,8 +20,11 @@ module RuboCop
     #
     class Node < Parser::AST::Node # rubocop:disable Metrics/ClassLength
       include RuboCop::AST::Sexp
+      extend NodePattern::Macros
 
-      COMPARISON_OPERATORS = %i[! == === != <= >= > < <=>].freeze
+      # <=> isn't included here, because it doesn't return a boolean.
+      COMPARISON_OPERATORS = %i[== === != <= >= > <].freeze
+      ARITHMETIC_OPERATORS = %i[+ - * / % **].freeze
 
       TRUTHY_LITERALS = %i[str dstr xstr int float sym dsym array
                            hash regexp true irange erange complex
@@ -43,19 +46,6 @@ module RuboCop
                     yield].freeze
       OPERATOR_KEYWORDS = %i[and or].freeze
       SPECIAL_KEYWORDS = %w[__FILE__ __LINE__ __ENCODING__].freeze
-
-      # def_matcher can be used to define a pattern-matching method on Node
-      class << self
-        def def_matcher(method_name, pattern_str)
-          compiler = RuboCop::NodePattern::Compiler.new(pattern_str, 'self')
-          src = "def #{method_name}(" \
-                "#{compiler.emit_param_list});" \
-                "#{compiler.emit_method_code};end"
-
-          location = caller_locations(1, 1).first
-          class_eval(src, location.path, location.lineno)
-        end
-      end
 
       # @see http://rubydoc.info/gems/ast/AST/Node:initialize
       def initialize(type, children = [], properties = {})
@@ -110,7 +100,8 @@ module RuboCop
       # part of it is changed.
       def updated(type = nil, children = nil, properties = {})
         properties[:location] ||= @location
-        self.class.new(type || @type, children || @children, properties)
+        klass = RuboCop::AST::Builder::NODE_MAP[type || @type] || Node
+        klass.new(type || @type, children || @children, properties)
       end
 
       # Returns the index of the receiver node in its siblings. (Sibling index
@@ -119,6 +110,16 @@ module RuboCop
       # @return [Integer] the index of the receiver node in its siblings
       def sibling_index
         parent.children.index { |sibling| sibling.equal?(self) }
+      end
+
+      # Common destructuring method. This can be used to normalize
+      # destructuring for different variations of the node.
+      # Some node types override this with their own custom
+      # destructuring method.
+      #
+      # @return [Array<Node>] the different parts of the ndde
+      def node_parts
+        to_a
       end
 
       # Calls the given block for each ancestor node from parent to root.
@@ -269,14 +270,40 @@ module RuboCop
         loc.expression
       end
 
+      def first_line
+        loc.line
+      end
+
+      def last_line
+        loc.last_line
+      end
+
+      def line_count
+        return 0 unless source_range
+        source_range.last_line - source_range.first_line + 1
+      end
+
+      def nonempty_line_count
+        source.lines.grep(/\S/).size
+      end
+
+      def source_length
+        source_range ? source_range.size : 0
+      end
+
       ## Destructuring
 
-      def_matcher :receiver,    '{(send $_ ...) (block (send $_ ...) ...)}'
-      def_matcher :method_name, '{(send _ $_ ...) (block (send _ $_ ...) ...)}'
-      def_matcher :method_args, '{(send _ _ $...) (block (send _ _ $...) ...)}'
+      def_node_matcher :receiver, <<-PATTERN
+        {(send $_ ...) (block (send $_ ...) ...)}
+      PATTERN
+
+      def_node_matcher :method_name, <<-PATTERN
+        {(send _ $_ ...) (block (send _ $_ ...) ...)}
+      PATTERN
+
       # Note: for masgn, #asgn_rhs will be an array node
-      def_matcher :asgn_rhs, '[assignment? (... $_)]'
-      def_matcher :str_content, '(str $_)'
+      def_node_matcher :asgn_rhs, '[assignment? (... $_)]'
+      def_node_matcher :str_content, '(str $_)'
 
       def const_name
         return unless const_type?
@@ -288,11 +315,11 @@ module RuboCop
         end
       end
 
-      def_matcher :defined_module0, <<-PATTERN
+      def_node_matcher :defined_module0, <<-PATTERN
         {(class (const $_ $_) ...)
          (module (const $_ $_) ...)
-         (casgn $_ $_        (send (const nil {:Class :Module}) :new ...))
-         (casgn $_ $_ (block (send (const nil {:Class :Module}) :new ...) ...))}
+         (casgn $_ $_        (send (const nil? {:Class :Module}) :new ...))
+         (casgn $_ $_ (block (send (const nil? {:Class :Module}) :new ...) ...))}
       PATTERN
       private :defined_module0
 
@@ -320,11 +347,15 @@ module RuboCop
       ## Predicates
 
       def multiline?
-        source_range && (source_range.first_line != source_range.last_line)
+        line_count > 1
       end
 
       def single_line?
-        !multiline?
+        line_count == 1
+      end
+
+      def empty_source?
+        source_length.zero?
       end
 
       def asgn_method_call?
@@ -332,10 +363,19 @@ module RuboCop
           method_name.to_s.end_with?('='.freeze)
       end
 
-      def_matcher :equals_asgn?, '{lvasgn ivasgn cvasgn gvasgn casgn masgn}'
-      def_matcher :shorthand_asgn?, '{op_asgn or_asgn and_asgn}'
-      def_matcher :assignment?,
-                  '{equals_asgn? shorthand_asgn? asgn_method_call?}'
+      def arithmetic_operation?
+        ARITHMETIC_OPERATORS.include?(method_name)
+      end
+
+      def_node_matcher :equals_asgn?, <<-PATTERN
+        {lvasgn ivasgn cvasgn gvasgn casgn masgn}
+      PATTERN
+
+      def_node_matcher :shorthand_asgn?, '{op_asgn or_asgn and_asgn}'
+
+      def_node_matcher :assignment?, <<-PATTERN
+        {equals_asgn? shorthand_asgn? asgn_method_call?}
+      PATTERN
 
       def literal?
         LITERALS.include?(type)
@@ -368,7 +408,7 @@ module RuboCop
           case type
           when :send
             receiver, method_name, *args = *self
-            COMPARISON_OPERATORS.include?(method_name) &&
+            [*COMPARISON_OPERATORS, :!, :<=>].include?(method_name) &&
               receiver.send(recursive_kind) &&
               args.all?(&recursive_kind)
           when :begin, :pair, *OPERATOR_KEYWORDS, *COMPOSITE_LITERALS
@@ -424,6 +464,10 @@ module RuboCop
           source_range.begin_pos != loc.selector.begin_pos
       end
 
+      def parenthesized_call?
+        loc.begin && loc.begin.is?('(')
+      end
+
       def chained?
         return false unless argument?
 
@@ -439,24 +483,25 @@ module RuboCop
         int_type? || float_type?
       end
 
-      def_matcher :guard_clause?, <<-PATTERN
-        [{(send nil {:raise :fail} ...) return break next} single_line?]
+      def_node_matcher :guard_clause?, <<-PATTERN
+        [{(send nil? {:raise :fail} ...) return break next} single_line?]
       PATTERN
 
-      def_matcher :lambda?, '(block (send nil :lambda) ...)'
-      def_matcher :proc?, <<-PATTERN
-        {(block (send nil :proc) ...)
-         (block (send (const nil :Proc) :new) ...)
-         (send (const nil :Proc) :new)}
-      PATTERN
-      def_matcher :lambda_or_proc?, '{lambda? proc?}'
-
-      def_matcher :class_constructor?, <<-PATTERN
-        {       (send (const nil {:Class :Module}) :new ...)
-         (block (send (const nil {:Class :Module}) :new ...) ...)}
+      def_node_matcher :proc?, <<-PATTERN
+        {(block (send nil? :proc) ...)
+         (block (send (const nil? :Proc) :new) ...)
+         (send (const nil? :Proc) :new)}
       PATTERN
 
-      def_matcher :module_definition?, <<-PATTERN
+      def_node_matcher :lambda?, '(block (send nil? :lambda) ...)'
+      def_node_matcher :lambda_or_proc?, '{lambda? proc?}'
+
+      def_node_matcher :class_constructor?, <<-PATTERN
+        {       (send (const nil? {:Class :Module}) :new ...)
+         (block (send (const nil? {:Class :Module}) :new ...) ...)}
+      PATTERN
+
+      def_node_matcher :module_definition?, <<-PATTERN
         {class module (casgn _ _ class_constructor?)}
       PATTERN
 
@@ -468,7 +513,7 @@ module RuboCop
       # So, does the return value of this node matter? If we changed it to
       # `(...; nil)`, might that affect anything?
       #
-      # rubocop:disable Metrics/MethodLength
+      # rubocop:disable Metrics/MethodLength, Metrics/CyclomaticComplexity
       def value_used?
         # Be conservative and return true if we're not sure.
         return false if parent.nil?
@@ -490,7 +535,7 @@ module RuboCop
           true
         end
       end
-      # rubocop:enable Metrics/MethodLength
+      # rubocop:enable Metrics/MethodLength, Metrics/CyclomaticComplexity
 
       # Some expressions are evaluated for their value, some for their side
       # effects, and some for both.
@@ -596,15 +641,9 @@ module RuboCop
         end
       end
 
-      def new_class_or_module_block?(block_node)
-        receiver = block_node.receiver
-
-        block_node.method_name == :new &&
-          receiver && receiver.const_type? &&
-          (receiver.const_name == 'Class' || receiver.const_name == 'Module') &&
-          block_node.parent &&
-          block_node.parent.casgn_type?
-      end
+      def_node_matcher :new_class_or_module_block?, <<-PATTERN
+        ^(casgn _ _ (block (send (const _ {:Class :Module}) :new) ...))
+      PATTERN
     end
   end
 end

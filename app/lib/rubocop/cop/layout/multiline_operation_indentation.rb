@@ -6,15 +6,35 @@ module RuboCop
       # This cop checks the indentation of the right hand side operand in
       # binary operations that span more than one line.
       #
-      # @example
+      # @example EnforcedStyle: aligned (default)
       #   # bad
       #   if a +
-      #   b
+      #       b
       #     something
       #   end
+      #
+      #   # good
+      #   if a +
+      #      b
+      #     something
+      #   end
+      #
+      # @example EnforcedStyle: indented
+      #   # bad
+      #   if a +
+      #      b
+      #     something
+      #   end
+      #
+      #   # good
+      #   if a +
+      #       b
+      #     something
+      #   end
+      #
       class MultilineOperationIndentation < Cop
         include ConfigurableEnforcedStyle
-        include AutocorrectAlignment
+        include Alignment
         include MultilineExpressionIndentation
 
         def on_and(node)
@@ -34,6 +54,10 @@ module RuboCop
                                 '`EnforcedStyle` is `indented`.'
         end
 
+        def autocorrect(node)
+          AlignmentCorrector.correct(processed_source, node, @column_delta)
+        end
+
         private
 
         def relevant_node?(node)
@@ -48,7 +72,7 @@ module RuboCop
 
         def offending_range(node, lhs, rhs, given_style)
           return false unless begins_its_line?(rhs)
-          return false if lhs.loc.line == rhs.line # Needed for unary op.
+          return false if lhs.first_line == rhs.line # Needed for unary op.
           return false if not_for_this_cop?(node)
 
           correct_column = if should_align?(node, rhs, given_style)

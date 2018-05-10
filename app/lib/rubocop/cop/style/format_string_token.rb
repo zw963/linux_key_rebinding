@@ -5,70 +5,92 @@ module RuboCop
     module Style
       # Use a consistent style for named format string tokens.
       #
-      # @example
+      # **Note:**
+      # `unannotated` style cop only works for strings
+      # which are passed as arguments to those methods:
+      # `sprintf`, `format`, `%`.
+      # The reason is that *unannotated* format is very similar
+      # to encoded URLs or Date/Time formatting strings.
       #
-      #   EnforcedStyle: annotated
+      # @example EnforcedStyle: annotated (default)
       #
       #   # bad
-      #
       #   format('%{greeting}', greeting: 'Hello')
       #   format('%s', 'Hello')
       #
       #   # good
-      #
       #   format('%<greeting>s', greeting: 'Hello')
       #
-      # @example
-      #
-      #   EnforcedStyle: template
+      # @example EnforcedStyle: template
       #
       #   # bad
-      #
       #   format('%<greeting>s', greeting: 'Hello')
       #   format('%s', 'Hello')
       #
       #   # good
-      #
       #   format('%{greeting}', greeting: 'Hello')
+      #
+      # @example EnforcedStyle: unannotated
+      #
+      #   # bad
+      #   format('%<greeting>s', greeting: 'Hello')
+      #   format('%{greeting}', 'Hello')
+      #
+      #   # good
+      #   format('%s', 'Hello')
       class FormatStringToken < Cop
         include ConfigurableEnforcedStyle
 
         FIELD_CHARACTERS = Regexp.union(%w[A B E G X a b c d e f g i o p s u x])
+        FORMAT_STRING_METHODS = %i[sprintf format %].freeze
 
         STYLE_PATTERNS = {
           annotated: /(?<token>%<[^>]+>#{FIELD_CHARACTERS})/,
-          template:  /(?<token>%\{[^\}]+\})/
+          template: /(?<token>%\{[^\}]+\})/,
+          unannotated: /(?<token>%#{FIELD_CHARACTERS})/
         }.freeze
 
-        TOKEN_PATTERN = Regexp.union(STYLE_PATTERNS.values)
-
         def on_str(node)
-          return if node.each_ancestor(:xstr).any?
+          return if placeholder_argument?(node)
+          return if node.each_ancestor(:xstr, :regexp).any?
 
           tokens(node) do |detected_style, token_range|
-            if detected_style == style
+            if detected_style == style ||
+               unannotated_format?(node, detected_style)
               correct_style_detected
             else
               style_detected(detected_style)
-              add_offense(node, token_range, message(detected_style))
+              add_offense(node, location: token_range,
+                                message: message(detected_style))
             end
           end
         end
 
         private
 
+        def includes_format_methods?(node)
+          node.each_ancestor.any? do |ancestor|
+            FORMAT_STRING_METHODS.include?(ancestor.method_name)
+          end
+        end
+
+        def unannotated_format?(node, detected_style)
+          detected_style == :unannotated && !includes_format_methods?(node)
+        end
+
         def message(detected_style)
           "Prefer #{message_text(style)} over #{message_text(detected_style)}."
         end
 
-        # rubocop:disable FormatStringToken
+        # rubocop:disable Style/FormatStringToken
         def message_text(style)
           case style
           when :annotated then 'annotated tokens (like `%<foo>s`)'
-          when :template  then 'template tokens (like `%{foo}`)'
+          when :template then 'template tokens (like `%{foo}`)'
+          when :unannotated then 'unannotated tokens (like `%s`)'
           end
         end
-        # rubocop:enable FormatStringToken
+        # rubocop:enable Style/FormatStringToken
 
         def tokens(str_node, &block)
           return if str_node.source == '__FILE__'
@@ -134,6 +156,13 @@ module RuboCop
             new_begin,
             new_end
           )
+        end
+
+        def placeholder_argument?(node)
+          return false unless node.parent
+          return true if node.parent.pair_type?
+
+          placeholder_argument?(node.parent)
         end
       end
     end

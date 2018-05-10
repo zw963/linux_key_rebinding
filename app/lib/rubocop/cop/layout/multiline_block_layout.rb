@@ -36,6 +36,8 @@ module RuboCop
       #     bar(i)
       #   }
       class MultilineBlockLayout < Cop
+        include RangeHelp
+
         MSG = 'Block body expression is on the same line as ' \
               'the block start.'.freeze
         ARG_MSG = 'Block argument expression is not on the same line as the ' \
@@ -48,23 +50,9 @@ module RuboCop
             add_offense_for_expression(node, node.arguments, ARG_MSG)
           end
 
-          return unless node.body && node.loc.begin.line == node.body.loc.line
+          return unless node.body && node.loc.begin.line == node.body.first_line
 
           add_offense_for_expression(node, node.body, MSG)
-        end
-
-        private
-
-        def args_on_beginning_line?(node)
-          !node.arguments? ||
-            node.loc.begin.line == node.arguments.loc.last_line
-        end
-
-        def add_offense_for_expression(node, expr, msg)
-          expression = expr.source_range
-          range = range_between(expression.begin_pos, expression.end_pos)
-
-          add_offense(node, range, msg)
         end
 
         def autocorrect(node)
@@ -78,15 +66,32 @@ module RuboCop
 
             expr_before_body ||= node.loc.begin
 
-            if expr_before_body.line == node.body.loc.line
+            if expr_before_body.line == node.body.first_line
               autocorrect_body(corrector, node, node.body)
             end
           end
         end
 
+        private
+
+        def args_on_beginning_line?(node)
+          !node.arguments? ||
+            node.loc.begin.line == node.arguments.loc.last_line
+        end
+
+        def add_offense_for_expression(node, expr, msg)
+          expression = expr.source_range
+          range = range_between(expression.begin_pos, expression.end_pos)
+
+          add_offense(node, location: range, message: msg)
+        end
+
         def autocorrect_arguments(corrector, node)
-          end_pos = range_with_surrounding_space(node.arguments.source_range,
-                                                 :right, false).end_pos
+          end_pos = range_with_surrounding_space(
+            range: node.arguments.source_range,
+            side: :right,
+            newlines: false
+          ).end_pos
           range = range_between(node.loc.begin.end.begin_pos, end_pos)
           corrector.replace(range, " |#{block_arg_string(node.arguments)}|")
         end

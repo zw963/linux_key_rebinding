@@ -7,23 +7,23 @@ module RuboCop
       #
       # @example
       #
-      #  # bad
-      #  if x == nil
+      #   # bad
+      #   if x == nil
+      #   end
       #
-      #  # good
-      #  if x.nil?
+      #   # good
+      #   if x.nil?
+      #   end
       class NilComparison < Cop
         MSG = 'Prefer the use of the `nil?` predicate.'.freeze
 
-        def_node_matcher :nil_comparison?, '(send _ {:== :===} (:nil))'
+        def_node_matcher :nil_comparison?, '(send _ {:== :===} nil)'
 
         def on_send(node)
           nil_comparison?(node) do
-            add_offense(node, :selector)
+            add_offense(node, location: :selector)
           end
         end
-
-        private
 
         def autocorrect(node)
           new_code = node.source.sub(/\s*={2,3}\s*nil/, '.nil?')

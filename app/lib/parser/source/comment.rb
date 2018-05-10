@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Parser
   module Source
 
@@ -72,10 +74,9 @@ module Parser
       # @return [Symbol]
       #
       def type
-        case text
-        when /^#/
+        if text.start_with?("#".freeze)
           :inline
-        when /^=begin/
+        elsif text.start_with?("=begin".freeze)
           :document
         end
       end

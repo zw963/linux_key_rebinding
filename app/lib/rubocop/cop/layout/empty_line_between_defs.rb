@@ -30,7 +30,13 @@ module RuboCop
       #   def b
       #   end
       class EmptyLineBetweenDefs < Cop
+        include RangeHelp
+
         MSG = 'Use empty lines between method definitions.'.freeze
+
+        def self.autocorrect_incompatible_with
+          [Layout::EmptyLines]
+        end
 
         # We operate on `begin` nodes, instead of using `OnMethodDef`,
         # so that we can walk over pairs of consecutive nodes and
@@ -50,7 +56,24 @@ module RuboCop
           return if nodes.all?(&:single_line?) &&
                     cop_config['AllowAdjacentOneLineDefs']
 
-          add_offense(nodes.last, :keyword)
+          add_offense(nodes.last, location: :keyword)
+        end
+
+        def autocorrect(node)
+          prev_def = prev_node(node)
+
+          # finds position of first newline
+          end_pos = prev_def.loc.end.end_pos
+          source_buffer = prev_def.loc.end.source_buffer
+          newline_pos = source_buffer.source.index("\n", end_pos)
+
+          count = blank_lines_count_between(prev_def, node)
+
+          if count > maximum_empty_lines
+            autocorrect_remove_lines(newline_pos, count)
+          else
+            autocorrect_insert_lines(newline_pos, count)
+          end
         end
 
         private
@@ -103,23 +126,6 @@ module RuboCop
 
         def def_end(node)
           node.loc.end.line
-        end
-
-        def autocorrect(node)
-          prev_def = prev_node(node)
-
-          # finds position of first newline
-          end_pos = prev_def.loc.end.end_pos
-          source_buffer = prev_def.loc.end.source_buffer
-          newline_pos = source_buffer.source.index("\n", end_pos)
-
-          count = blank_lines_count_between(prev_def, node)
-
-          if count > maximum_empty_lines
-            autocorrect_remove_lines(newline_pos, count)
-          else
-            autocorrect_insert_lines(newline_pos, count)
-          end
         end
 
         def autocorrect_remove_lines(newline_pos, count)

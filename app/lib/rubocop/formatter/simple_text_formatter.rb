@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'rubocop/formatter/colorizable'
-require 'rubocop/formatter/text_util'
+require_relative 'colorizable'
+require_relative 'text_util'
 
 module RuboCop
   module Formatter
@@ -70,7 +70,7 @@ module RuboCop
       end
 
       def annotate_message(msg)
-        msg.gsub(/`(.*?)`/, yellow('\1'))
+        msg.gsub(/`(.*?)`/m, yellow('\1'))
       end
 
       def message(offense)

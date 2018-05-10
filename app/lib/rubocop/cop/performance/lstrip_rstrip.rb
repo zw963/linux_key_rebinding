@@ -7,25 +7,30 @@ module RuboCop
       # `strip`.
       #
       # @example
-      #   @bad
+      #   # bad
       #   'abc'.lstrip.rstrip
       #   'abc'.rstrip.lstrip
       #
-      #   @good
+      #   # good
       #   'abc'.strip
       class LstripRstrip < Cop
-        MSG = 'Use `strip` instead of `%s.%s`.'.freeze
+        include RangeHelp
 
-        def_node_matcher :lstrip_rstrip, <<-END
+        MSG = 'Use `strip` instead of `%<methods>s`.'.freeze
+
+        def_node_matcher :lstrip_rstrip, <<-PATTERN
           {(send $(send _ $:rstrip) $:lstrip)
            (send $(send _ $:lstrip) $:rstrip)}
-        END
+        PATTERN
 
         def on_send(node)
           lstrip_rstrip(node) do |first_send, method_one, method_two|
             range = range_between(first_send.loc.selector.begin_pos,
                                   node.source_range.end_pos)
-            add_offense(node, range, format(MSG, method_one, method_two))
+            add_offense(node,
+                        location: range,
+                        message: format(MSG,
+                                        methods: "#{method_one}.#{method_two}"))
           end
         end
 

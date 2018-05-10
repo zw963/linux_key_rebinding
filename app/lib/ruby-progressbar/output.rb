@@ -7,12 +7,17 @@ class   Output
   def initialize(options = {})
     self.bar               = options[:bar]
     self.stream            = options[:output] || DEFAULT_OUTPUT_STREAM
-    self.length_calculator = Calculators::Length.new(options)
     self.throttle          = Throttle.new(options)
+    self.length_calculator = Calculators::Length.new(
+                               :length => options[:length],
+                               :output => stream
+                             )
   end
 
   def self.detect(options = {})
-    if (options[:output] || DEFAULT_OUTPUT_STREAM).tty?
+    if options[:output].is_a?(Class) && options[:output] <= ProgressBar::Output
+      options[:output].new(options)
+    elsif (options[:output] || DEFAULT_OUTPUT_STREAM).tty?
       Outputs::Tty.new(options)
     else
       Outputs::NonTty.new(options)
@@ -47,15 +52,17 @@ class   Output
     end
   end
 
-  def print_and_flush
-    stream.print bar_update_string + eol
-    stream.flush
-  end
-
   protected
 
   attr_accessor :length_calculator,
                 :throttle,
                 :bar
+
+  private
+
+  def print_and_flush
+    stream.print bar_update_string + eol
+    stream.flush
+  end
 end
 end

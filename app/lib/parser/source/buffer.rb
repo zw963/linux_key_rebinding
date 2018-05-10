@@ -1,4 +1,5 @@
 # encoding: ascii-8bit
+# frozen_string_literal: true
 
 module Parser
   module Source
@@ -28,7 +29,7 @@ module Parser
       # @api private
       #
       ENCODING_RE =
-        /\#.*coding\s*[:=]\s*
+        /[\s#](en)?coding\s*[:=]\s*
           (
             # Special-case: there's a UTF8-MAC encoding.
             (utf8-mac)
@@ -54,7 +55,7 @@ module Parser
         string =~ /\A(.*)\n?(.*\n)?/
         first_line, second_line = $1, $2
 
-        if first_line =~ /\A\xef\xbb\xbf/ # BOM
+        if first_line.start_with?("\xef\xbb\xbf".freeze) # BOM
           return Encoding::UTF_8
         elsif first_line[0, 2] == '#!'.freeze
           encoding_line = second_line
@@ -62,8 +63,10 @@ module Parser
           encoding_line = first_line
         end
 
+        return nil if encoding_line.nil? || encoding_line[0] != '#'
+
         if (result = ENCODING_RE.match(encoding_line))
-          Encoding.find(result[2] || result[3] || result[5])
+          Encoding.find(result[3] || result[4] || result[6])
         else
           nil
         end
@@ -100,7 +103,7 @@ module Parser
       end
 
       def initialize(name, first_line = 1)
-        @name        = name
+        @name        = name.to_s
         @source      = nil
         @first_line  = first_line
 
@@ -156,13 +159,11 @@ module Parser
       # @return [String]
       #
       def source=(input)
-        if defined?(Encoding)
-          input = input.dup if input.frozen?
-          input = self.class.reencode_string(input)
+        input = input.dup if input.frozen?
+        input = self.class.reencode_string(input)
 
-          unless input.valid_encoding?
-            raise EncodingError, "invalid byte sequence in #{input.encoding.name}"
-          end
+        unless input.valid_encoding?
+          raise EncodingError, "invalid byte sequence in #{input.encoding.name}"
         end
 
         self.raw_source = input
@@ -182,8 +183,7 @@ module Parser
 
         @source = input.gsub("\r\n".freeze, "\n".freeze).freeze
 
-        if defined?(Encoding) &&
-           !@source.ascii_only? &&
+        if !@source.ascii_only? &&
            @source.encoding != Encoding::UTF_32LE &&
            @source.encoding != Encoding::BINARY
           @slice_source = @source.encode(Encoding::UTF_32LE)
@@ -246,7 +246,7 @@ module Parser
       def source_lines
         @lines ||= begin
           lines = @source.lines.to_a
-          lines << '' if @source.end_with?("\n".freeze)
+          lines << ''.dup if @source.end_with?("\n".freeze)
 
           lines.each do |line|
             line.chomp!("\n".freeze)
@@ -289,6 +289,13 @@ module Parser
       end
 
       ##
+      # @return [Range] A range covering the whole source
+      #
+      def source_range
+        @source_range ||= Range.new(self, 0, source.size)
+      end
+
+      ##
       # Number of last line in the buffer
       #
       # @return [Integer]
@@ -312,19 +319,9 @@ module Parser
         @line_begins
       end
 
-      if [].respond_to?(:bsearch)
-        def line_for(position)
-          # Fast O(log n) variant for Ruby >=2.0.
-          line_begins.bsearch do |line, line_begin|
-            line_begin <= position
-          end
-        end
-      else
-        def line_for(position)
-          # Slower O(n) variant for Ruby <2.0.
-          line_begins.find do |line, line_begin|
-            line_begin <= position
-          end
+      def line_for(position)
+        line_begins.bsearch do |line, line_begin|
+          line_begin <= position
         end
       end
     end

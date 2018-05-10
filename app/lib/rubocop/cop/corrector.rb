@@ -33,7 +33,12 @@ module RuboCop
       def initialize(source_buffer, corrections = [])
         @source_buffer = source_buffer
         @corrections = corrections
-        @source_rewriter = Parser::Source::Rewriter.new(source_buffer)
+        @source_rewriter = Parser::Source::TreeRewriter.new(
+          source_buffer,
+          different_replacements: :raise,
+          swallowed_insertions: :raise,
+          crossing_deletions: :accept
+        )
 
         @diagnostics = []
         # Don't print warnings to stderr if corrections conflict with each other
@@ -75,6 +80,11 @@ module RuboCop
       # @param [Parser::Source::Range] range
       # @param [String] content
       def insert_before(range, content)
+        # TODO: Fix Cops using bad ranges instead
+        if range.end_pos > @source_buffer.source.size
+          range = range.with(end_pos: @source_buffer.source.size)
+        end
+
         @source_rewriter.insert_before(range, content)
       end
 

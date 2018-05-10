@@ -6,6 +6,8 @@ require 'time'
 module RuboCop
   # Common methods and behaviors for dealing with remote config files.
   class RemoteConfig
+    attr_reader :uri
+
     CACHE_LIFETIME = 24 * 60 * 60
 
     def initialize(url, base_dir)
@@ -17,12 +19,20 @@ module RuboCop
       return cache_path unless cache_path_expired?
 
       request do |response|
-        open cache_path, 'w' do |io|
+        next if response.is_a?(Net::HTTPNotModified)
+        next if response.is_a?(SocketError)
+        File.open cache_path, 'w' do |io|
           io.write response.body
         end
       end
 
       cache_path
+    end
+
+    def inherit_from_remote(file, path)
+      new_uri = @uri.dup
+      new_uri.path.gsub!(%r{/[^/]*$}, "/#{file}")
+      RemoteConfig.new(new_uri.to_s, File.dirname(path))
     end
 
     private
@@ -39,11 +49,13 @@ module RuboCop
       end
 
       handle_response(http.request(request), limit, &block)
+    rescue SocketError => err
+      handle_response(err, limit, &block)
     end
 
     def handle_response(response, limit, &block)
       case response
-      when Net::HTTPSuccess
+      when Net::HTTPSuccess, Net::HTTPNotModified, SocketError
         yield response
       when Net::HTTPRedirection
         request(URI.parse(response['location']), limit - 1, &block)

@@ -19,69 +19,62 @@ module RuboCop
       # * ruby19_no_mixed_keys - forces use of ruby 1.9 syntax and forbids mixed
       #   syntax hashes
       #
-      # @example
-      #   "EnforcedStyle => 'ruby19'"
+      # @example EnforcedStyle: ruby19 (default)
+      #   # bad
+      #   {:a => 2}
+      #   {b: 1, :c => 2}
       #
-      #   @good
+      #   # good
       #   {a: 2, b: 1}
       #   {:c => 2, 'd' => 2} # acceptable since 'd' isn't a symbol
       #   {d: 1, 'e' => 2} # technically not forbidden
       #
-      #   @bad
-      #   {:a => 2}
-      #   {b: 1, :c => 2}
-      #
-      # @example
-      #   "EnforcedStyle => 'hash_rockets'"
-      #
-      #   @good
-      #   {:a => 1, :b => 2}
-      #
-      #   @bad
+      # @example EnforcedStyle: hash_rockets
+      #   # bad
       #   {a: 1, b: 2}
       #   {c: 1, 'd' => 5}
       #
-      # @example
-      #   "EnforcedStyle => 'no_mixed_keys'"
-      #
-      #   @good
+      #   # good
       #   {:a => 1, :b => 2}
-      #   {c: 1, d: 2}
       #
-      #   @bad
+      # @example EnforcedStyle: no_mixed_keys
+      #   # bad
       #   {:a => 1, b: 2}
       #   {c: 1, 'd' => 2}
       #
-      # @example
-      #   "EnforcedStyle => 'ruby19_no_mixed_keys'"
+      #   # good
+      #   {:a => 1, :b => 2}
+      #   {c: 1, d: 2}
       #
-      #   @good
-      #   {a: 1, b: 2}
-      #   {:c => 3, 'd' => 4}
-      #
-      #   @bad
+      # @example EnforcedStyle: ruby19_no_mixed_keys
+      #   # bad
       #   {:a => 1, :b => 2}
       #   {c: 2, 'd' => 3} # should just use hash rockets
+      #
+      #   # good
+      #   {a: 1, b: 2}
+      #   {:c => 3, 'd' => 4}
       class HashSyntax < Cop
         include ConfigurableEnforcedStyle
+        include RangeHelp
 
         MSG_19 = 'Use the new Ruby 1.9 hash syntax.'.freeze
         MSG_NO_MIXED_KEYS = "Don't mix styles in the same hash.".freeze
         MSG_HASH_ROCKETS = 'Use hash rockets syntax.'.freeze
 
         def on_hash(node)
-          return if node.pairs.empty?
+          pairs = node.pairs
 
-          @force_hash_rockets = force_hash_rockets?(node.pairs)
+          return if pairs.empty?
 
-          if style == :hash_rockets || @force_hash_rockets
-            hash_rockets_check(node.pairs)
+          if style == :hash_rockets || force_hash_rockets?(pairs)
+            hash_rockets_check(pairs)
           elsif style == :ruby19_no_mixed_keys
-            ruby19_no_mixed_keys_check(node.pairs)
+            ruby19_no_mixed_keys_check(pairs)
           elsif style == :no_mixed_keys
-            no_mixed_keys_check(node.pairs)
+            no_mixed_keys_check(pairs)
           else
-            ruby19_check(node.pairs)
+            ruby19_check(pairs)
           end
         end
 
@@ -94,7 +87,7 @@ module RuboCop
         end
 
         def ruby19_no_mixed_keys_check(pairs)
-          if @force_hash_rockets
+          if force_hash_rockets?
             check(pairs, ':', MSG_HASH_ROCKETS)
           elsif sym_indices?(pairs)
             check(pairs, '=>', MSG_19)
@@ -113,7 +106,7 @@ module RuboCop
 
         def autocorrect(node)
           lambda do |corrector|
-            if style == :hash_rockets || @force_hash_rockets
+            if style == :hash_rockets || force_hash_rockets?
               autocorrect_hash_rockets(corrector, node)
             elsif style == :ruby19_no_mixed_keys || style == :no_mixed_keys
               autocorrect_no_mixed_keys(corrector, node)
@@ -164,9 +157,8 @@ module RuboCop
         def check(pairs, delim, msg)
           pairs.each do |pair|
             if pair.delimiter == delim
-              add_offense(pair,
-                          pair.source_range.begin.join(pair.loc.operator),
-                          msg) do
+              location = pair.source_range.begin.join(pair.loc.operator)
+              add_offense(pair, location: location, message: msg) do
                 opposite_style_detected
               end
             else
@@ -175,34 +167,44 @@ module RuboCop
           end
         end
 
-        def autocorrect_ruby19(corrector, node)
-          key = node.children.first.source_range
-          op = node.loc.operator
+        def autocorrect_ruby19(corrector, pair_node)
+          key = pair_node.key
+          op = pair_node.loc.operator
 
-          range = range_between(key.begin_pos, op.end_pos)
-          range = range_with_surrounding_space(range, :right)
-          corrector.replace(range,
-                            range.source.sub(/^:(.*\S)\s*=>\s*$/, '\1: '))
+          range = range_between(key.source_range.begin_pos, op.end_pos)
+          range = range_with_surrounding_space(range: range, side: :right)
+
+          space = argument_without_space?(pair_node.parent) ? ' ' : ''
+
+          corrector.replace(
+            range,
+            range.source.sub(/^:(.*\S)\s*=>\s*$/, space.to_s + '\1: ')
+          )
         end
 
-        def autocorrect_hash_rockets(corrector, node)
-          key = node.children.first.source_range
-          op = node.loc.operator
+        def argument_without_space?(node)
+          node.argument? &&
+            node.loc.expression.begin_pos == node.parent.loc.selector.end_pos
+        end
 
-          corrector.insert_after(key, node.inverse_delimiter(true))
+        def autocorrect_hash_rockets(corrector, pair_node)
+          key = pair_node.key.source_range
+          op = pair_node.loc.operator
+
+          corrector.insert_after(key, pair_node.inverse_delimiter(true))
           corrector.insert_before(key, ':')
-          corrector.remove(range_with_surrounding_space(op))
+          corrector.remove(range_with_surrounding_space(range: op))
         end
 
-        def autocorrect_no_mixed_keys(corrector, node)
-          if node.colon?
-            autocorrect_hash_rockets(corrector, node)
+        def autocorrect_no_mixed_keys(corrector, pair_node)
+          if pair_node.colon?
+            autocorrect_hash_rockets(corrector, pair_node)
           else
-            autocorrect_ruby19(corrector, node)
+            autocorrect_ruby19(corrector, pair_node)
           end
         end
 
-        def force_hash_rockets?(pairs)
+        def force_hash_rockets?(pairs = [])
           @force_hash_rockets ||= begin
             cop_config['UseHashRocketsWithSymbolValues'] &&
               pairs.map(&:value).any?(&:sym_type?)

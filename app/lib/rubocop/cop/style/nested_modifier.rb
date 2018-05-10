@@ -14,6 +14,8 @@ module RuboCop
       #   # good
       #   something if b && a
       class NestedModifier < Cop
+        include RangeHelp
+
         MSG = 'Avoid using nested modifiers.'.freeze
 
         def on_while(node)
@@ -32,7 +34,7 @@ module RuboCop
           return if part_of_ignored_node?(node)
           return unless modifier?(node) && modifier?(node.parent)
 
-          add_offense(node, :keyword)
+          add_offense(node, location: :keyword)
           ignore_node(node)
         end
 

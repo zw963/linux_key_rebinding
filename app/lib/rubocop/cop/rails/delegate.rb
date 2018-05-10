@@ -3,8 +3,17 @@
 module RuboCop
   module Cop
     module Rails
-      # This cop looks for delegations, that could have been created
-      # automatically with delegate method.
+      # This cop looks for delegations that could have been created
+      # automatically with the `delegate` method.
+      #
+      # Safe navigation `&.` is ignored because Rails' `allow_nil`
+      # option checks not just for nil but also delegates if nil
+      # responds to the delegated method.
+      #
+      # The `EnforceForPrefixed` option (defaulted to `true`) means that
+      # using the target object as a prefix of the method name
+      # without using the `delegate` method will be a violation.
+      # When set to `false`, this case is legal.
       #
       # @example
       #   # bad
@@ -15,6 +24,18 @@ module RuboCop
       #   # good
       #   delegate :bar, to: :foo
       #
+      #   # good
+      #   def bar
+      #     foo&.bar
+      #   end
+      #
+      #   # good
+      #   private
+      #   def bar
+      #     foo.bar
+      #   end
+      #
+      #   # EnforceForPrefixed: true
       #   # bad
       #   def foo_bar
       #     foo.bar
@@ -23,27 +44,34 @@ module RuboCop
       #   # good
       #   delegate :bar, to: :foo, prefix: true
       #
+      #   # EnforceForPrefixed: false
       #   # good
-      #   private
-      #   def bar
+      #   def foo_bar
       #     foo.bar
       #   end
+      #
+      #   # good
+      #   delegate :bar, to: :foo, prefix: true
       class Delegate < Cop
         MSG = 'Use `delegate` to define delegations.'.freeze
 
-        def on_def(node)
-          method_name, args, body = *node
-          return unless trivial_delegate?(method_name, args, body)
-          return if private_or_protected_delegation(node)
-          add_offense(node, :keyword, MSG)
-        end
+        def_node_matcher :delegate?, <<-PATTERN
+          (def _method_name _args
+            (send (send nil? _) _ ...))
+        PATTERN
 
-        private
+        def on_def(node)
+          return unless trivial_delegate?(node)
+          return if private_or_protected_delegation(node)
+
+          add_offense(node, location: :keyword)
+        end
 
         def autocorrect(node)
           method_name, _args, body = *node
-          delegation = ["delegate :#{body.children[1]}",
-                        "to: :#{body.children[0].children[1]}"]
+          delegation = ["delegate :#{body.method_name}",
+                        "to: :#{body.receiver.method_name}"]
+
           if method_name == prefixed_method_name(body)
             delegation << ['prefix: true']
           end
@@ -53,42 +81,38 @@ module RuboCop
           end
         end
 
-        def trivial_delegate?(method_name, args, body)
-          body && delegate?(body) &&
+        private
+
+        def trivial_delegate?(def_node)
+          method_name, args, body = *def_node
+
+          delegate?(def_node) &&
             method_name_matches?(method_name, body) &&
             arguments_match?(args, body)
         end
 
-        def delegate?(body)
-          receiver, = *body
-          receiver.respond_to?(:type) && receiver.send_type? &&
-            receiver.child_nodes.empty?
-        end
+        def arguments_match?(arg_array, body)
+          argument_array = body.arguments
 
-        def arguments_match?(args, body)
-          _receiver, _method_name, *arguments = *body
-          arg_array = Array(args)
-          argument_array = Array(arguments)
-          arg_array.size == argument_array.size && (
-            arg_array == argument_array ||
+          arg_array == argument_array ||
             arg_array.map(&:children) == argument_array.map(&:children)
-          )
         end
 
         def method_name_matches?(method_name, body)
-          _receiver, property_name, *_args = *body
-          method_name == property_name ||
-            method_name == prefixed_method_name(body)
+          method_name == body.method_name ||
+            include_prefix_case? && method_name == prefixed_method_name(body)
+        end
+
+        def include_prefix_case?
+          cop_config['EnforceForPrefixed']
         end
 
         def prefixed_method_name(body)
-          receiver, property_name, *_args = *body
-          _receiver, target, *_args = *receiver
-          [target, property_name].join('_').to_sym
+          [body.receiver.method_name, body.method_name].join('_').to_sym
         end
 
         def private_or_protected_delegation(node)
-          line = node.loc.line
+          line = node.first_line
           private_or_protected_before(line) ||
             private_or_protected_inline(line)
         end

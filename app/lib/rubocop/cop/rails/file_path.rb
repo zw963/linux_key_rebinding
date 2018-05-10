@@ -4,7 +4,8 @@ module RuboCop
   module Cop
     module Rails
       # This cop is used to identify usages of file path joining process
-      # to use `Rails.root.join` clause.
+      # to use `Rails.root.join` clause. This is to avoid bugs on operating
+      # system that don't use '/' as the path separator.
       #
       # @example
       #  # bad
@@ -15,22 +16,27 @@ module RuboCop
       #  # good
       #  Rails.root.join('app', 'models', 'goober')
       class FilePath < Cop
+        include RangeHelp
+
         MSG = 'Please use `Rails.root.join(\'path\', \'to\')` instead.'.freeze
 
         def_node_matcher :file_join_nodes?, <<-PATTERN
-          (send (const nil :File) :join ...)
+          (send (const nil? :File) :join ...)
         PATTERN
 
         def_node_search :rails_root_nodes?, <<-PATTERN
-          (send (const nil :Rails) :root)
+          (send (const nil? :Rails) :root)
         PATTERN
 
         def_node_matcher :rails_root_join_nodes?, <<-PATTERN
-          (send (send (const nil :Rails) :root) :join ...)
+          (send (send (const nil? :Rails) :root) :join ...)
         PATTERN
 
         def on_dstr(node)
           return unless rails_root_nodes?(node)
+          return unless node.children.last.source.start_with?('.') ||
+                        node.children.last.source.include?(File::SEPARATOR)
+
           register_offense(node)
         end
 
@@ -43,7 +49,7 @@ module RuboCop
 
         def check_for_file_join_with_rails_root(node)
           return unless file_join_nodes?(node)
-          return unless node.method_args.any? { |e| rails_root_nodes?(e) }
+          return unless node.arguments.any? { |e| rails_root_nodes?(e) }
 
           register_offense(node)
         end
@@ -51,7 +57,7 @@ module RuboCop
         def check_for_rails_root_join_with_slash_separated_path(node)
           return unless rails_root_nodes?(node)
           return unless rails_root_join_nodes?(node)
-          return unless node.method_args.any? { |arg| string_with_slash?(arg) }
+          return unless node.arguments.any? { |arg| string_with_slash?(arg) }
 
           register_offense(node)
         end
@@ -62,12 +68,9 @@ module RuboCop
 
         def register_offense(node)
           line_range = node.loc.column...node.loc.last_column
-
-          add_offense(
-            node,
-            source_range(processed_source.buffer, node.loc.line, line_range),
-            MSG
-          )
+          source_range = source_range(processed_source.buffer, node.first_line,
+                                      line_range)
+          add_offense(node, location: source_range)
         end
       end
     end

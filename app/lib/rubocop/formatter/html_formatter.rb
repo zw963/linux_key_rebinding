@@ -4,7 +4,7 @@ require 'cgi'
 require 'erb'
 require 'ostruct'
 require 'base64'
-require 'rubocop/formatter/text_util'
+require_relative 'text_util'
 
 module RuboCop
   module Formatter
@@ -12,7 +12,7 @@ module RuboCop
     class HTMLFormatter < BaseFormatter
       ELLIPSES = '<span class="extra-code">...</span>'.freeze
       TEMPLATE_PATH =
-        File.expand_path('../../../../assets/output.html.erb', __FILE__)
+        File.expand_path('../../../assets/output.html.erb', __dir__)
 
       Color = Struct.new(:red, :green, :blue, :alpha) do
         def to_s
@@ -53,7 +53,14 @@ module RuboCop
         context = ERBContext.new(files, summary)
 
         template = File.read(TEMPLATE_PATH, encoding: Encoding::UTF_8)
-        erb = ERB.new(template, nil, '-')
+
+        # The following condition is workaround for until Ruby 2.6 is released.
+        # https://github.com/ruby/ruby/commit/cc777d09f44fa909a336ba14f3aa802ffe16e010
+        erb = if RUBY_VERSION >= '2.6'
+                ERB.new(template, trim_mode: '-')
+              else
+                ERB.new(template, nil, '-')
+              end
         html = erb.result(context.binding)
 
         output.write html
@@ -73,7 +80,7 @@ module RuboCop
         }.freeze
 
         LOGO_IMAGE_PATH =
-          File.expand_path('../../../../assets/logo.png', __FILE__)
+          File.expand_path('../../../assets/logo.png', __dir__)
 
         attr_reader :files, :summary
 
@@ -120,8 +127,8 @@ module RuboCop
           location.first_line == location.last_line ? '' : " #{ELLIPSES}"
         end
 
-        def escape(s)
-          CGI.escapeHTML(s)
+        def escape(string)
+          CGI.escapeHTML(string)
         end
 
         def base64_encoded_logo_image

@@ -6,27 +6,22 @@ module RuboCop
       # This cop checks for spaces between -> and opening parameter
       # brace in lambda literals.
       #
-      # @example
-      #
-      #   EnforcedStyle: require_no_space (default)
-      #
-      #     @bad
+      # @example EnforcedStyle: require_no_space (default)
+      #     # bad
       #     a = -> (x, y) { x + y }
       #
-      #     @good
+      #     # good
       #     a = ->(x, y) { x + y }
       #
-      # @example
-      #
-      #   EnforcedStyle: require_space
-      #
-      #     @bad
+      # @example EnforcedStyle: require_space
+      #     # bad
       #     a = ->(x, y) { x + y }
       #
-      #     @good
+      #     # good
       #     a = -> (x, y) { x + y }
       class SpaceInLambdaLiteral < Cop
         include ConfigurableEnforcedStyle
+        include RangeHelp
 
         ARROW = '->'.freeze
         MSG_REQUIRE_SPACE = 'Use a space between `->` and opening brace ' \
@@ -37,9 +32,13 @@ module RuboCop
         def on_send(node)
           return unless arrow_lambda_with_args?(node)
           if style == :require_space && !space_after_arrow?(node)
-            add_offense(node, node.parent.loc.expression, MSG_REQUIRE_SPACE)
+            add_offense(node,
+                        location: node.parent.loc.expression,
+                        message: MSG_REQUIRE_SPACE)
           elsif style == :require_no_space && space_after_arrow?(node)
-            add_offense(node, node.parent.loc.expression, MSG_REQUIRE_NO_SPACE)
+            add_offense(node,
+                        location: node.parent.loc.expression,
+                        message: MSG_REQUIRE_NO_SPACE)
           end
         end
 

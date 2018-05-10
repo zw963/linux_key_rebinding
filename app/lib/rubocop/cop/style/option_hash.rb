@@ -7,43 +7,31 @@ module RuboCop
       # current Ruby version supports keyword arguments.
       #
       # @example
-      #   Instead of:
       #
+      #   # bad
       #   def fry(options = {})
       #     temperature = options.fetch(:temperature, 300)
-      #     ...
+      #     # ...
       #   end
       #
-      #   Prefer:
       #
+      #   # good
       #   def fry(temperature: 300)
-      #     ...
+      #     # ...
       #   end
       class OptionHash < Cop
         MSG = 'Prefer keyword arguments to options hashes.'.freeze
 
+        def_node_matcher :option_hash, <<-PATTERN
+          (args ... $(optarg [#suspicious_name? _] (hash)))
+        PATTERN
+
         def on_args(node)
-          *_but_last, last_arg = *node
+          return if super_used?(node)
 
-          return unless last_arg && last_arg.optarg_type?
-
-          arg, default_value = *last_arg
-
-          return unless default_value.hash_type? && default_value.pairs.empty?
-          return unless suspicious_name?(arg)
-
-          add_offense(last_arg, :expression, MSG)
-        end
-
-        def validate_config
-          return unless target_ruby_version < 2.0
-
-          raise ValidationError, 'The `Style/OptionHash` cop is only ' \
-                                'compatible with Ruby 2.0 and up, but the ' \
-                                'target Ruby version for your project is ' \
-                                "1.9.\nPlease disable this cop or adjust " \
-                                'the `TargetRubyVersion` parameter in your ' \
-                                'configuration.'
+          option_hash(node) do |options|
+            add_offense(options)
+          end
         end
 
         private
@@ -51,6 +39,10 @@ module RuboCop
         def suspicious_name?(arg_name)
           cop_config.key?('SuspiciousParamNames') &&
             cop_config['SuspiciousParamNames'].include?(arg_name.to_s)
+        end
+
+        def super_used?(node)
+          node.parent.each_node(:zsuper).any?
         end
       end
     end

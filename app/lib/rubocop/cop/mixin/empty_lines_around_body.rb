@@ -8,27 +8,18 @@ module RuboCop
       module EmptyLinesAroundBody
         extend NodePattern::Macros
         include ConfigurableEnforcedStyle
+        include RangeHelp
 
-        MSG_EXTRA = 'Extra empty line detected at %s body %s.'.freeze
-        MSG_MISSING = 'Empty line missing at %s body %s.'.freeze
-        MSG_DEFERRED = 'Empty line missing before first %s definition'.freeze
+        MSG_EXTRA = 'Extra empty line detected at %<kind>s body ' \
+                    '%<location>s.'.freeze
+        MSG_MISSING = 'Empty line missing at %<kind>s body %<location>s.'.freeze
+        MSG_DEFERRED = 'Empty line missing before first %<type>s ' \
+                       'definition'.freeze
+
+        private
 
         def_node_matcher :constant_definition?, '{class module}'
         def_node_matcher :empty_line_required?, '{def defs class module}'
-
-        def autocorrect(args)
-          offense_style, range = args
-          lambda do |corrector|
-            case offense_style
-            when :no_empty_lines then
-              corrector.remove(range)
-            when :empty_lines then
-              corrector.insert_before(range, "\n")
-            end
-          end
-        end
-
-        private
 
         def check(node, body)
           # When style is `empty_lines`, if the body is empty, we don't enforce
@@ -74,8 +65,17 @@ module RuboCop
         end
 
         def check_both(style, first_line, last_line)
-          check_beginning(style, first_line)
-          check_ending(style, last_line)
+          case style
+          when :beginning_only
+            check_beginning(:empty_lines, first_line)
+            check_ending(:no_empty_lines, last_line)
+          when :ending_only
+            check_beginning(:no_empty_lines, first_line)
+            check_ending(:empty_lines, last_line)
+          else
+            check_beginning(style, first_line)
+            check_ending(style, last_line)
+          end
         end
 
         def check_beginning(style, first_line)
@@ -102,18 +102,23 @@ module RuboCop
 
           offset = style == :empty_lines && msg.include?('end.') ? 2 : 1
           range = source_range(processed_source.buffer, line + offset, 0)
-          add_offense([style, range], range, msg)
+          add_offense([style, range], location: range, message: msg)
         end
 
         def check_deferred_empty_line(body)
           node = first_empty_line_required_child(body)
           return unless node
 
-          line = previous_line_ignoring_comments(node.loc.first_line)
+          line = previous_line_ignoring_comments(node.first_line)
           return if processed_source[line].empty?
 
           range = source_range(processed_source.buffer, line + 2, 0)
-          add_offense([:empty_lines, range], range, deferred_message(node))
+
+          add_offense(
+            [:empty_lines, range],
+            location: range,
+            message: deferred_message(node)
+          )
         end
 
         def namespace?(body, with_one_child: false)
@@ -149,11 +154,11 @@ module RuboCop
         end
 
         def message(type, desc)
-          format(type, self.class::KIND, desc)
+          format(type, kind: self.class::KIND, location: desc)
         end
 
         def deferred_message(node)
-          format(MSG_DEFERRED, node.type)
+          format(MSG_DEFERRED, type: node.type)
         end
       end
     end

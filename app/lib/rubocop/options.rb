@@ -4,6 +4,8 @@ require 'optparse'
 require 'shellwords'
 
 module RuboCop
+  class IncorrectCopNameError < StandardError; end
+
   # This class handles command line options.
   class Options
     EXITING_OPTIONS = %i[version verbose_version show_cops].freeze
@@ -16,10 +18,7 @@ module RuboCop
 
     def parse(command_line_args)
       args = args_from_file.concat(args_from_env).concat(command_line_args)
-      define_options(args).parse!(args)
-      # The --no-color CLI option sets `color: false` so we don't want the
-      # `no_color` key, which is created automatically.
-      @options.delete(:no_color)
+      define_options.parse!(args)
 
       @validator.validate_compatibility
 
@@ -52,13 +51,13 @@ module RuboCop
       Shellwords.split(ENV.fetch('RUBOCOP_OPTS', ''))
     end
 
-    def define_options(args)
+    def define_options
       OptionParser.new do |opts|
         opts.banner = 'Usage: rubocop [options] [file1, file2, ...]'
 
         add_list_options(opts)
         add_only_options(opts)
-        add_configuration_options(opts, args)
+        add_configuration_options(opts)
         add_formatting_options(opts)
 
         option(opts, '-r', '--require FILE') { |f| require f }
@@ -90,21 +89,26 @@ module RuboCop
       end
     end
 
-    def add_configuration_options(opts, args)
+    def add_configuration_options(opts)
       option(opts, '-c', '--config FILE')
 
       option(opts, '--auto-gen-config')
 
       option(opts, '--exclude-limit COUNT') do
-        @validator.validate_exclude_limit_option(args)
+        @validator.validate_exclude_limit_option
       end
 
       option(opts, '--force-exclusion')
+      option(opts, '--ignore-parent-exclusion')
 
       option(opts, '--force-default-config')
 
       option(opts, '--no-offense-counts') do
         @options[:no_offense_counts] = true
+      end
+
+      option(opts, '--no-auto-gen-timestamp') do
+        @options[:no_auto_gen_timestamp] = true
       end
     end
 
@@ -142,7 +146,7 @@ module RuboCop
       option(opts, '-F', '--fail-fast')
       option(opts, '-C', '--cache FLAG')
       option(opts, '-d', '--debug')
-      option(opts, '-D', '--display-cop-names')
+      option(opts, '-D', '--[no-]display-cop-names')
       option(opts, '-E', '--extra-details')
       option(opts, '-S', '--display-style-guide')
       option(opts, '-R', '--rails')
@@ -152,7 +156,7 @@ module RuboCop
       end
       option(opts, '-a', '--auto-correct')
 
-      option(opts, '--[no-]color') { |c| @options[:color] = c }
+      option(opts, '--[no-]color')
 
       option(opts, '-v', '--version')
       option(opts, '-V', '--verbose-version')
@@ -178,25 +182,47 @@ module RuboCop
     # e.g. [..., '--auto-correct', ...] to :auto_correct.
     def long_opt_symbol(args)
       long_opt = args.find { |arg| arg.start_with?('--') }
-      long_opt[2..-1].sub(/ .*/, '').tr('-', '_').gsub(/[\[\]]/, '').to_sym
+      long_opt[2..-1].sub('[no-]', '').sub(/ .*/, '')
+                     .tr('-', '_').gsub(/[\[\]]/, '').to_sym
     end
   end
 
   # Validates option arguments and the options' compatibility with each other.
   class OptionsValidator
-    # Cop name validation must be done later than option parsing, so it's not
-    # called from within Options.
-    def self.validate_cop_list(names)
-      return unless names
+    class << self
+      # Cop name validation must be done later than option parsing, so it's not
+      # called from within Options.
+      def validate_cop_list(names)
+        return unless names
 
-      departments = Cop::Cop.registry.departments.map(&:to_s)
+        cop_names = Cop::Cop.registry.names
+        departments = Cop::Cop.registry.departments.map(&:to_s)
 
-      names.each do |name|
-        next if Cop::Cop.registry.names.include?(name)
-        next if departments.include?(name)
-        next if %w[Syntax Lint/Syntax].include?(name)
+        names.each do |name|
+          next if cop_names.include?(name)
+          next if departments.include?(name)
+          next if %w[Syntax Lint/Syntax].include?(name)
 
-        raise ArgumentError, "Unrecognized cop or department: #{name}."
+          raise IncorrectCopNameError, format_message_from(name, cop_names)
+        end
+      end
+
+      private
+
+      def format_message_from(name, cop_names)
+        message = 'Unrecognized cop or department: %<name>s.'
+        message_with_candidate = "%<message>s\nDid you mean? %<candidate>s"
+        corrections = cop_names.select do |cn|
+          score = StringUtil.similarity(cn, name)
+          score >= NameSimilarity::MINIMUM_SIMILARITY_TO_SUGGEST
+        end.sort
+
+        if corrections.empty?
+          format(message, name: name)
+        else
+          format(message_with_candidate, message: format(message, name: name),
+                                         candidate: corrections.join(', '))
+        end
       end
     end
 
@@ -206,7 +232,8 @@ module RuboCop
 
     def validate_compatibility # rubocop:disable Metrics/MethodLength
       if only_includes_unneeded_disable?
-        raise ArgumentError, 'Lint/UnneededDisable can not be used with --only.'
+        raise ArgumentError, 'Lint/UnneededCopDisableDirective can not ' \
+                             'be used with --only.'
       end
       if except_syntax?
         raise ArgumentError, 'Syntax checking can not be turned off.'
@@ -214,15 +241,24 @@ module RuboCop
       unless boolean_or_empty_cache?
         raise ArgumentError, '-C/--cache argument must be true or false'
       end
-      if no_offense_counts_without_auto_gen_config?
-        raise ArgumentError, '--no-offense-counts can only be used together ' \
-                             'with --auto-gen-config.'
-      end
+      validate_auto_gen_config
       validate_parallel
 
       return if incompatible_options.size <= 1
       raise ArgumentError, 'Incompatible cli options: ' \
                            "#{incompatible_options.inspect}"
+    end
+
+    def validate_auto_gen_config
+      return if @options.key?(:auto_gen_config)
+
+      message = '--%<flag>s can only be used together with --auto-gen-config.'
+
+      %i[exclude_limit no_offense_counts no_auto_gen_timestamp].each do |option|
+        if @options.key?(option)
+          raise ArgumentError, format(message, flag: option.to_s.tr('_', '-'))
+        end
+      end
     end
 
     def validate_parallel
@@ -247,7 +283,8 @@ module RuboCop
 
     def only_includes_unneeded_disable?
       @options.key?(:only) &&
-        (@options[:only] & %w[Lint/UnneededDisable UnneededDisable]).any?
+        (@options[:only] & %w[Lint/UnneededCopDisableDirective
+                              UnneededCopDisableDirective]).any?
     end
 
     def except_syntax?
@@ -259,27 +296,15 @@ module RuboCop
       !@options.key?(:cache) || %w[true false].include?(@options[:cache])
     end
 
-    def no_offense_counts_without_auto_gen_config?
-      @options.key?(:no_offense_counts) && !@options.key?(:auto_gen_config)
-    end
-
     def incompatible_options
       @incompatible_options ||= @options.keys & Options::EXITING_OPTIONS
     end
 
-    def validate_exclude_limit_option(args)
-      if @options[:exclude_limit] !~ /^\d+$/
-        # Emulate OptionParser's behavior to make failures consistent regardless
-        # of option order.
-        raise OptionParser::MissingArgument
-      end
-
-      # --exclude-limit is valid if there's a parsed or yet unparsed
-      # --auto-gen-config.
-      return if @options[:auto_gen_config] || args.include?('--auto-gen-config')
-
-      raise ArgumentError,
-            '--exclude-limit can only be used with --auto-gen-config.'
+    def validate_exclude_limit_option
+      return if @options[:exclude_limit] =~ /^\d+$/
+      # Emulate OptionParser's behavior to make failures consistent regardless
+      # of option order.
+      raise OptionParser::MissingArgument
     end
   end
 
@@ -297,12 +322,19 @@ module RuboCop
                              'TODO list.'],
       no_offense_counts:    ['Do not include offense counts in configuration',
                              'file generated by --auto-gen-config.'],
+      no_auto_gen_timestamp:
+                            ['Do not include the date and time when',
+                             'the --auto-gen-config was run in the file it',
+                             'generates.'],
       exclude_limit:        ['Used together with --auto-gen-config to',
                              'set the limit for how many Exclude',
                              "properties to generate. Default is #{MAX_EXCL}."],
       force_exclusion:      ['Force excluding files specified in the',
                              'configuration `Exclude` even if they are',
                              'explicitly passed as arguments.'],
+      ignore_parent_exclusion:
+                            ['Prevent from inheriting AllCops/Exclude from',
+                             'parent folders.'],
       force_default_config: ['Use default configuration even if configuration',
                              'files are present in the directory tree.'],
       format:               ['Choose an output formatter. This option',
@@ -319,6 +351,9 @@ module RuboCop
                              '  [fi]les',
                              '  [o]ffenses',
                              '  [w]orst',
+                             '  [t]ap',
+                             '  [q]uiet',
+                             '  [a]utogenconf',
                              '  custom formatter class name'],
       out:                  ['Write output to a file instead of STDOUT.',
                              'This option applies to the previously',
@@ -336,14 +371,15 @@ module RuboCop
                              '(FLAG=false), default determined by',
                              'configuration parameter AllCops: UseCache.'],
       debug:                 'Display debug info.',
-      display_cop_names:     'Display cop names in offense messages.',
+      display_cop_names:     ['Display cop names in offense messages.',
+                              'Default is true.'],
       display_style_guide:   'Display style guide URLs in offense messages.',
       extra_details:         'Display extra details in offense messages.',
       rails:                 'Run extra Rails cops.',
       lint:                  'Run only lint cops.',
       list_target_files:     'List all files RuboCop will inspect.',
       auto_correct:          'Auto-correct offenses.',
-      no_color:              'Force color output on or off.',
+      color:                 'Force color output on or off.',
       version:               'Display version.',
       verbose_version:       'Display verbose version.',
       parallel:             ['Use available CPUs to execute inspection in',

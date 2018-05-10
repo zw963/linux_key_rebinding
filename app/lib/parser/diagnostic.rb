@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Parser
 
   ##
@@ -152,9 +154,7 @@ module Parser
     #
     def last_line_only(range)
       if range.line != range.last_line
-        Source::Range.new(range.source_buffer,
-                          range.begin_pos + (range.source =~ /[^\n]*\z/),
-                          range.end_pos)
+        range.adjust(begin_pos: range.source =~ /[^\n]*\z/)
       else
         range
       end

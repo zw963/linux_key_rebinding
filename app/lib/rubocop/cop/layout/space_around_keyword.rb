@@ -25,8 +25,8 @@ module RuboCop
       #
       #   something = 123 if test
       class SpaceAroundKeyword < Cop
-        MSG_BEFORE = 'Space before keyword `%s` is missing.'.freeze
-        MSG_AFTER = 'Space after keyword `%s` is missing.'.freeze
+        MSG_BEFORE = 'Space before keyword `%<range>s` is missing.'.freeze
+        MSG_AFTER = 'Space after keyword `%<range>s` is missing.'.freeze
 
         DO = 'do'.freeze
         SAFE_NAVIGATION = '&.'.freeze
@@ -127,6 +127,14 @@ module RuboCop
           check(node, [:keyword].freeze)
         end
 
+        def autocorrect(range)
+          if space_before_missing?(range)
+            ->(corrector) { corrector.insert_before(range, ' '.freeze) }
+          else
+            ->(corrector) { corrector.insert_after(range, ' '.freeze) }
+          end
+        end
+
         private
 
         def check(node, locations, begin_keyword = DO)
@@ -166,7 +174,9 @@ module RuboCop
         end
 
         def offense(range, msg)
-          add_offense(range, range, msg % range.source)
+          add_offense(range,
+                      location: range,
+                      message: format(msg, range: range.source))
         end
 
         def space_before_missing?(range)
@@ -178,14 +188,18 @@ module RuboCop
         def space_after_missing?(range)
           pos = range.end_pos
           char = range.source_buffer.source[pos]
-          return false unless char
-          return false if accept_left_parenthesis?(range) &&
-                          char == '('.freeze
-          return false if accept_left_square_bracket?(range) &&
-                          char == '['.freeze
+
+          return false if accepted_opening_delimiter?(range, char)
           return false if safe_navigation_call?(range, pos)
 
           char !~ /[\s;,#\\\)\}\]\.]/
+        end
+
+        def accepted_opening_delimiter?(range, char)
+          return true unless char
+
+          accept_left_square_bracket?(range) && char == '[' ||
+            accept_left_parenthesis?(range) && char == '('
         end
 
         def accept_left_parenthesis?(range)
@@ -209,14 +223,6 @@ module RuboCop
             return true if operator?(ancestor.method_name)
           end
           false
-        end
-
-        def autocorrect(range)
-          if space_before_missing?(range)
-            ->(corrector) { corrector.insert_before(range, ' '.freeze) }
-          else
-            ->(corrector) { corrector.insert_after(range, ' '.freeze) }
-          end
         end
       end
     end

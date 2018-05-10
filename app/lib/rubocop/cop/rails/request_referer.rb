@@ -6,15 +6,14 @@ module RuboCop
       # This cop checks for consistent uses of `request.referer` or
       # `request.referrer`, depending on the cop's configuration.
       #
-      # @example
-      #   # EnforcedStyle: referer
+      # @example EnforcedStyle: referer (default)
       #   # bad
       #   request.referrer
       #
       #   # good
       #   request.referer
       #
-      #   # EnforcedStyle: referrer
+      # @example EnforcedStyle: referrer
       #   # bad
       #   request.referer
       #
@@ -23,17 +22,18 @@ module RuboCop
       class RequestReferer < Cop
         include ConfigurableEnforcedStyle
 
-        MSG = 'Use `request.%s` instead of `request.%s`.'.freeze
+        MSG = 'Use `request.%<prefer>s` instead of ' \
+              '`request.%<current>s`.'.freeze
 
         def_node_matcher :referer?, <<-PATTERN
-          (send (send nil :request) {:referer :referrer})
+          (send (send nil? :request) {:referer :referrer})
         PATTERN
 
         def on_send(node)
           referer?(node) do
             return unless node.method?(wrong_method_name)
 
-            add_offense(node.source_range, node.source_range, message)
+            add_offense(node.source_range, location: node.source_range)
           end
         end
 
@@ -43,8 +43,8 @@ module RuboCop
 
         private
 
-        def message
-          format(MSG, style, wrong_method_name)
+        def message(_node)
+          format(MSG, prefer: style, current: wrong_method_name)
         end
 
         def wrong_method_name

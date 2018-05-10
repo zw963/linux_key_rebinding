@@ -21,22 +21,24 @@ module RuboCop
       #   website  = "https://github.com/bbatsov/rubocop"
       class ExtraSpacing < Cop
         include PrecedingFollowingAlignment
+        include RangeHelp
 
         MSG_UNNECESSARY = 'Unnecessary spacing detected.'.freeze
-        MSG_UNALIGNED_ASGN = '`=` is not aligned with the %s assignment.'.freeze
+        MSG_UNALIGNED_ASGN = '`=` is not aligned with the %<location>s ' \
+                             'assignment.'.freeze
 
         def investigate(processed_source)
-          return if processed_source.ast.nil?
+          return if processed_source.blank?
 
           if force_equal_sign_alignment?
             @asgn_tokens = assignment_tokens
-            @asgn_lines  = @asgn_tokens.map { |t| t.pos.line }
+            @asgn_lines  = @asgn_tokens.map(&:line)
             # Don't attempt to correct the same = more than once
             @corrected   = Set.new
           end
 
-          processed_source.tokens.each_cons(2) do |t1, t2|
-            check_tokens(processed_source.ast, t1, t2)
+          processed_source.tokens.each_cons(2) do |token1, token2|
+            check_tokens(processed_source.ast, token1, token2)
           end
         end
 
@@ -53,26 +55,26 @@ module RuboCop
         private
 
         def assignment_tokens
-          tokens = processed_source.tokens.select { |t| equal_sign?(t) }
+          tokens = processed_source.tokens.select(&:equal_sign?)
           # we don't want to operate on equals signs which are part of an
           #   optarg in a method definition
           # e.g.: def method(optarg = default_val); end
           tokens = remove_optarg_equals(tokens, processed_source)
 
           # Only attempt to align the first = on each line
-          Set.new(tokens.uniq { |t| t.pos.line })
+          Set.new(tokens.uniq(&:line))
         end
 
-        def check_tokens(ast, t1, t2)
-          return if t2.type == :tNL
+        def check_tokens(ast, token1, token2)
+          return if token2.type == :tNL
 
           if force_equal_sign_alignment? &&
-             @asgn_tokens.include?(t2) &&
-             (@asgn_lines.include?(t2.pos.line - 1) ||
-              @asgn_lines.include?(t2.pos.line + 1))
-            check_assignment(t2)
+             @asgn_tokens.include?(token2) &&
+             (@asgn_lines.include?(token2.line - 1) ||
+              @asgn_lines.include?(token2.line + 1))
+            check_assignment(token2)
           else
-            check_other(t1, t2, ast)
+            check_other(token1, token2, ast)
           end
         end
 
@@ -80,52 +82,44 @@ module RuboCop
           assignment_line = ''
           message = ''
           if should_aligned_with_preceding_line?(token)
-            assignment_line = preceding_line(token)
-            message = format(MSG_UNALIGNED_ASGN, 'preceding')
+            assignment_line = processed_source.preceding_line(token)
+            message = format(MSG_UNALIGNED_ASGN, location: 'preceding')
           else
-            assignment_line = following_line(token)
-            message = format(MSG_UNALIGNED_ASGN, 'following')
+            assignment_line = processed_source.following_line(token)
+            message = format(MSG_UNALIGNED_ASGN, location: 'following')
           end
           return if aligned_assignment?(token.pos, assignment_line)
-          add_offense(token.pos, token.pos, message)
+          add_offense(token.pos, location: token.pos, message: message)
         end
 
         def should_aligned_with_preceding_line?(token)
-          @asgn_lines.include?(token.pos.line - 1)
+          @asgn_lines.include?(token.line - 1)
         end
 
-        def preceding_line(token)
-          processed_source.lines[token.pos.line - 2]
-        end
-
-        def following_line(token)
-          processed_source.lines[token.pos.line]
-        end
-
-        def check_other(t1, t2, ast)
-          extra_space_range(t1, t2) do |range|
+        def check_other(token1, token2, ast)
+          extra_space_range(token1, token2) do |range|
             # Unary + doesn't appear as a token and needs special handling.
             next if ignored_range?(ast, range.begin_pos)
             next if unary_plus_non_offense?(range)
 
-            add_offense(range, range, MSG_UNNECESSARY)
+            add_offense(range, location: range, message: MSG_UNNECESSARY)
           end
         end
 
-        def extra_space_range(t1, t2)
-          return if t1.pos.line != t2.pos.line
+        def extra_space_range(token1, token2)
+          return if token1.line != token2.line
 
-          start_pos = t1.pos.end_pos
-          end_pos = t2.pos.begin_pos - 1
+          start_pos = token1.end_pos
+          end_pos = token2.begin_pos - 1
           return if end_pos <= start_pos
 
-          return if allow_for_alignment? && aligned_tok?(t2)
+          return if allow_for_alignment? && aligned_tok?(token2)
 
           yield range_between(start_pos, end_pos)
         end
 
         def aligned_tok?(token)
-          if token.type == :tCOMMENT
+          if token.comment?
             aligned_comments?(token)
           else
             aligned_with_something?(token.pos)
@@ -154,37 +148,33 @@ module RuboCop
           end.compact
         end
 
-        def aligned_comments?(token)
-          ix = processed_source.comments.index do |c|
-            c.loc.expression.begin_pos == token.pos.begin_pos
+        def aligned_comments?(comment_token)
+          ix = processed_source.comments.index do |comment|
+            comment.loc.expression.begin_pos == comment_token.begin_pos
           end
           aligned_with_previous_comment?(ix) || aligned_with_next_comment?(ix)
         end
 
-        def aligned_with_previous_comment?(ix)
-          ix > 0 && comment_column(ix - 1) == comment_column(ix)
+        def aligned_with_previous_comment?(index)
+          index > 0 && comment_column(index - 1) == comment_column(index)
         end
 
-        def aligned_with_next_comment?(ix)
-          ix < processed_source.comments.length - 1 &&
-            comment_column(ix + 1) == comment_column(ix)
+        def aligned_with_next_comment?(index)
+          index < processed_source.comments.length - 1 &&
+            comment_column(index + 1) == comment_column(index)
         end
 
-        def comment_column(ix)
-          processed_source.comments[ix].loc.column
+        def comment_column(index)
+          processed_source.comments[index].loc.column
         end
 
         def force_equal_sign_alignment?
           cop_config['ForceEqualSignAlignment']
         end
 
-        def equal_sign?(token)
-          token.type == :tEQL || token.type == :tOP_ASGN
-        end
-
         def align_equal_signs(range, corrector)
           lines  = contiguous_assignment_lines(range)
-          tokens = @asgn_tokens.select { |t| lines.include?(t.pos.line) }
+          tokens = @asgn_tokens.select { |t| lines.include?(t.line) }
 
           columns  = tokens.map { |t| align_column(t) }
           align_to = columns.max
@@ -220,8 +210,8 @@ module RuboCop
         def align_column(asgn_token)
           # if we removed unneeded spaces from the beginning of this =,
           # what column would it end from?
-          line    = processed_source.lines[asgn_token.pos.line - 1]
-          leading = line[0...asgn_token.pos.column]
+          line    = processed_source.lines[asgn_token.line - 1]
+          leading = line[0...asgn_token.column]
           spaces  = leading.size - (leading =~ / *\Z/)
           asgn_token.pos.last_column - spaces + 1
         end
@@ -229,7 +219,7 @@ module RuboCop
         def remove_optarg_equals(asgn_tokens, processed_source)
           optargs    = processed_source.ast.each_node(:optarg)
           optarg_eql = optargs.map { |o| o.loc.operator.begin_pos }.to_set
-          asgn_tokens.reject { |t| optarg_eql.include?(t.pos.begin_pos) }
+          asgn_tokens.reject { |t| optarg_eql.include?(t.begin_pos) }
         end
       end
     end

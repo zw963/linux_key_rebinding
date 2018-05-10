@@ -24,7 +24,13 @@ module RuboCop
       class AssignmentInCondition < Cop
         include SafeAssignment
 
-        MSG = 'Assignment in condition - you probably meant to use `==`.'.freeze
+        MSG_WITH_SAFE_ASSIGNMENT_ALLOWED =
+          'Use `==` if you meant to do a comparison or wrap the expression ' \
+          'in parentheses to indicate you meant to assign in a ' \
+          'condition.'.freeze
+        MSG_WITHOUT_SAFE_ASSIGNMENT_ALLOWED =
+          'Use `==` if you meant to do a comparison or move the assignment ' \
+          'up out of the condition.'.freeze
         ASGN_TYPES = [:begin, *EQUALS_ASGN_NODES, :send].freeze
 
         def on_if(node)
@@ -41,6 +47,14 @@ module RuboCop
 
         private
 
+        def message(_node)
+          if safe_assignment_allowed?
+            MSG_WITH_SAFE_ASSIGNMENT_ALLOWED
+          else
+            MSG_WITHOUT_SAFE_ASSIGNMENT_ALLOWED
+          end
+        end
+
         def check(node)
           return if node.condition.block_type?
 
@@ -48,7 +62,7 @@ module RuboCop
             next :skip_children if skip_children?(asgn_node)
             next if allowed_construct?(asgn_node)
 
-            add_offense(asgn_node, :operator)
+            add_offense(asgn_node, location: :operator)
           end
         end
 

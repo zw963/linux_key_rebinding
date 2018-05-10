@@ -10,8 +10,9 @@ module RuboCop
       class LineLength < Cop
         include ConfigurableMax
         include IgnoredPattern
+        include RangeHelp
 
-        MSG = 'Line is too long. [%d/%d]'.freeze
+        MSG = 'Line is too long. [%<length>d/%<max>d]'.freeze
 
         def investigate(processed_source)
           heredocs = extract_heredocs(processed_source.ast) if allow_heredoc?
@@ -43,8 +44,11 @@ module RuboCop
         end
 
         def register_offense(loc, line)
-          message = format(MSG, line.length, max)
-          add_offense(nil, loc, message) { self.max = line.length }
+          message = format(MSG, length: line.length, max: max)
+
+          add_offense(nil, location: loc, message: message) do
+            self.max = line.length
+          end
         end
 
         def excess_range(uri_range, line, index)
@@ -72,11 +76,10 @@ module RuboCop
 
         def extract_heredocs(ast)
           return [] unless ast
-          ast.each_node.with_object([]) do |node, heredocs|
-            next unless node.location.is_a?(Parser::Source::Map::Heredoc)
+          ast.each_node(:str, :dstr, :xstr).select(&:heredoc?).map do |node|
             body = node.location.heredoc_body
             delimiter = node.location.heredoc_end.source.strip
-            heredocs << [body.first_line...body.last_line, delimiter]
+            [body.first_line...body.last_line, delimiter]
           end
         end
 
@@ -96,7 +99,8 @@ module RuboCop
         end
 
         def allowed_uri_position?(line, uri_range)
-          uri_range.begin < max && uri_range.end == line.length
+          uri_range.begin < max &&
+            (uri_range.end == line.length || uri_range.end == line.length - 1)
         end
 
         def find_excessive_uri_range(line)
@@ -118,12 +122,13 @@ module RuboCop
         def valid_uri?(uri_ish_string)
           URI.parse(uri_ish_string)
           true
-        rescue
+        rescue URI::InvalidURIError, NoMethodError
           false
         end
 
         def uri_regexp
-          @regexp ||= URI::Parser.new.make_regexp(cop_config['URISchemes'])
+          @uri_regexp ||=
+            URI::DEFAULT_PARSER.make_regexp(cop_config['URISchemes'])
         end
 
         def check_directive_line(line, index)

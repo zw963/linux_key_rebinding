@@ -7,30 +7,26 @@ module RuboCop
       # By default it enforces mixins to be placed in separate declarations,
       # but it can be configured to enforce grouping them in one declaration.
       #
-      # @example
-      #
-      #   EnforcedStyle: separated (default)
-      #
-      #   @bad
+      # @example EnforcedStyle: separated (default)
+      #   # bad
       #   class Foo
       #     include Bar, Qox
       #   end
       #
-      #   @good
+      #   # good
       #   class Foo
       #     include Qox
       #     include Bar
       #   end
       #
-      #   EnforcedStyle: grouped
-      #
-      #   @bad
+      # @example EnforcedStyle: grouped
+      #   # bad
       #   class Foo
       #     extend Bar
       #     extend Qox
       #   end
       #
-      #   @good
+      #   # good
       #   class Foo
       #     extend Qox, Bar
       #   end
@@ -38,7 +34,7 @@ module RuboCop
         include ConfigurableEnforcedStyle
 
         MIXIN_METHODS = %i[extend include prepend].freeze
-        MSG = 'Put `%s` mixins in %s.'.freeze
+        MSG = 'Put `%<mixin>s` mixins in %<suffix>s.'.freeze
 
         def on_send(node)
           return unless node.macro? && MIXIN_METHODS.include?(node.method_name)
@@ -47,21 +43,35 @@ module RuboCop
         end
 
         def autocorrect(node)
+          range = node.loc.expression
           if separated_style?
-            range = node.loc.expression
             correction = separate_mixins(node)
           else
             mixins = sibling_mixins(node)
-            mixins.unshift(node)
-
-            range = node.loc.expression.join(mixins.last.loc.expression)
-            correction = group_mixins(node, mixins)
+            if node == mixins.first
+              correction = group_mixins(node, mixins)
+            else
+              range = range_to_remove_for_subsequent_mixin(mixins, node)
+              correction = ''
+            end
           end
 
           ->(corrector) { corrector.replace(range, correction) }
         end
 
         private
+
+        def range_to_remove_for_subsequent_mixin(mixins, node)
+          range = node.loc.expression
+          prev_mixin = mixins.each_cons(2) { |m, n| break m if n == node }
+          between = prev_mixin.loc.expression.end
+                              .join(range.begin)
+          # if separated from previous mixin with only whitespace?
+          if between.source !~ /\S/
+            range = range.join(between) # then remove that too
+          end
+          range
+        end
 
         def check(send_node)
           if separated_style?
@@ -72,20 +82,20 @@ module RuboCop
         end
 
         def check_grouped_style(send_node)
-          return if sibling_mixins(send_node).empty?
+          return if sibling_mixins(send_node).size == 1
 
-          add_offense(send_node, :expression)
+          add_offense(send_node)
         end
 
         def check_separated_style(send_node)
           return if send_node.arguments.one?
 
-          add_offense(send_node, :expression)
+          add_offense(send_node)
         end
 
         def sibling_mixins(send_node)
           siblings = send_node.parent.each_child_node(:send)
-                              .reject { |sibling| sibling == send_node }
+                              .select(&:macro?)
 
           siblings.select do |sibling_node|
             sibling_node.method_name == send_node.method_name
@@ -96,7 +106,7 @@ module RuboCop
           suffix =
             separated_style? ? 'separate statements' : 'a single statement'
 
-          format(MSG, send_node.method_name, suffix)
+          format(MSG, mixin: send_node.method_name, suffix: suffix)
         end
 
         def grouped_style?

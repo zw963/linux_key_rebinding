@@ -4,10 +4,29 @@ module RuboCop
   module Cop
     module Style
       # This cop enforces consistent use of `Object#is_a?` or `Object#kind_of?`.
+      #
+      # @example EnforcedStyle: is_a? (default)
+      #   # bad
+      #   var.kind_of?(Date)
+      #   var.kind_of?(Integer)
+      #
+      #   # good
+      #   var.is_a?(Date)
+      #   var.is_a?(Integer)
+      #
+      # @example EnforcedStyle: kind_of?
+      #   # bad
+      #   var.is_a?(Time)
+      #   var.is_a?(String)
+      #
+      #   # good
+      #   var.kind_of?(Time)
+      #   var.kind_of?(String)
+      #
       class ClassCheck < Cop
         include ConfigurableEnforcedStyle
 
-        MSG = 'Prefer `Object#%s` over `Object#%s`.'.freeze
+        MSG = 'Prefer `Object#%<prefer>s` over `Object#%<current>s`.'.freeze
 
         def_node_matcher :class_check?, '(send _ ${:is_a? :kind_of?} _)'
 
@@ -15,15 +34,7 @@ module RuboCop
           class_check?(node) do |method_name|
             return if style == method_name
 
-            add_offense(node, :selector)
-          end
-        end
-
-        def message(node)
-          if node.method?(:is_a?)
-            format(MSG, 'kind_of?', 'is_a?')
-          else
-            format(MSG, 'is_a?', 'kind_of?')
+            add_offense(node, location: :selector)
           end
         end
 
@@ -32,6 +43,14 @@ module RuboCop
             replacement = node.method?(:is_a?) ? 'kind_of?' : 'is_a?'
 
             corrector.replace(node.loc.selector, replacement)
+          end
+        end
+
+        def message(node)
+          if node.method?(:is_a?)
+            format(MSG, prefer: 'kind_of?', current: 'is_a?')
+          else
+            format(MSG, prefer: 'is_a?', current: 'kind_of?')
           end
         end
       end

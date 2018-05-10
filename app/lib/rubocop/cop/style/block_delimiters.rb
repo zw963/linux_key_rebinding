@@ -5,6 +5,72 @@ module RuboCop
     module Style
       # Check for uses of braces or do/end around single line or
       # multi-line blocks.
+      #
+      # @example EnforcedStyle: line_count_based (default)
+      #   # bad - single line block
+      #   items.each do |item| item / 5 end
+      #
+      #   # good - single line block
+      #   items.each { |item| item / 5 }
+      #
+      #   # bad - multi-line block
+      #   things.map { |thing|
+      #     something = thing.some_method
+      #     process(something)
+      #   }
+      #
+      #   # good - multi-line block
+      #   things.map do |thing|
+      #     something = thing.some_method
+      #     process(something)
+      #   end
+      #
+      # @example EnforcedStyle: semantic
+      #   # Prefer `do...end` over `{...}` for procedural blocks.
+      #
+      #   # return value is used/assigned
+      #   # bad
+      #   foo = map do |x|
+      #     x
+      #   end
+      #   puts (map do |x|
+      #     x
+      #   end)
+      #
+      #   # return value is not used out of scope
+      #   # good
+      #   map do |x|
+      #     x
+      #   end
+      #
+      #   # Prefer `{...}` over `do...end` for functional blocks.
+      #
+      #   # return value is not used out of scope
+      #   # bad
+      #   each { |x|
+      #     x
+      #   }
+      #
+      #   # return value is used/assigned
+      #   # good
+      #   foo = map { |x|
+      #     x
+      #   }
+      #   map { |x|
+      #     x
+      #   }.inspect
+      #
+      # @example EnforcedStyle: braces_for_chaining
+      #   # bad
+      #   words.each do |word|
+      #     word.flip.flop
+      #   end.join("-")
+      #
+      #   # good
+      #   words.each { |word|
+      #     word.flip.flop
+      #   }.join("-")
+      #
       class BlockDelimiters < Cop
         include ConfigurableEnforcedStyle
 
@@ -25,13 +91,23 @@ module RuboCop
         def on_block(node)
           return if ignored_node?(node)
 
-          add_offense(node, :begin) unless proper_block_style?(node)
+          add_offense(node, location: :begin) unless proper_block_style?(node)
+        end
+
+        def autocorrect(node)
+          return if correction_would_break_code?(node)
+
+          if node.braces?
+            replace_braces_with_do_end(node.loc)
+          else
+            replace_do_end_with_braces(node.loc)
+          end
         end
 
         private
 
         def line_count_based_message(node)
-          if block_length(node) > 0
+          if node.multiline?
             'Avoid using `{...}` for multi-line blocks.'
           else
             'Prefer `{...}` over `do...end` for single-line blocks.'
@@ -49,7 +125,7 @@ module RuboCop
         end
 
         def braces_for_chaining_message(node)
-          if block_length(node) > 0
+          if node.multiline?
             if return_value_chaining?(node)
               'Prefer `{...}` over `do...end` for multi-line chained blocks.'
             else
@@ -65,16 +141,6 @@ module RuboCop
           when :line_count_based    then line_count_based_message(node)
           when :semantic            then semantic_message(node)
           when :braces_for_chaining then braces_for_chaining_message(node)
-          end
-        end
-
-        def autocorrect(node)
-          return if correction_would_break_code?(node)
-
-          if node.braces?
-            replace_braces_with_do_end(node.loc)
-          else
-            replace_do_end_with_braces(node.loc)
           end
         end
 
@@ -111,6 +177,7 @@ module RuboCop
           range.source_buffer.source[range.begin_pos + length, 1] =~ /\s/
         end
 
+        # rubocop:disable Metrics/CyclomaticComplexity
         def get_blocks(node, &block)
           case node.type
           when :block
@@ -126,8 +193,8 @@ module RuboCop
           when :pair
             node.each_child_node { |child| get_blocks(child, &block) }
           end
-          nil
         end
+        # rubocop:enable Metrics/CyclomaticComplexity
 
         def proper_block_style?(node)
           return true if ignored_method?(node.method_name)
@@ -154,10 +221,9 @@ module RuboCop
         end
 
         def braces_for_chaining_style?(node)
-          block_length = block_length(node)
           block_begin = node.loc.begin.source
 
-          block_begin == if block_length > 0
+          block_begin == if node.multiline?
                            (return_value_chaining?(node) ? '{' : 'do')
                          else
                            '{'

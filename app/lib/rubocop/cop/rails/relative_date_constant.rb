@@ -19,8 +19,8 @@ module RuboCop
       #     end
       #   end
       class RelativeDateConstant < Cop
-        MSG = 'Do not assign %s to constants as it will be evaluated only ' \
-              'once.'.freeze
+        MSG = 'Do not assign %<method_name>s to constants as it ' \
+              'will be evaluated only once.'.freeze
 
         RELATIVE_DATE_METHODS = %i[ago from_now since until].freeze
 
@@ -51,6 +51,15 @@ module RuboCop
           check_node(rhs)
         end
 
+        def autocorrect(node)
+          _scope, const_name, value = *node
+          indent = ' ' * node.loc.column
+          new_code = ["def self.#{const_name.downcase}",
+                      "#{indent}#{value.source}",
+                      'end'].join("\n#{indent}")
+          ->(corrector) { corrector.replace(node.source_range, new_code) }
+        end
+
         private
 
         def check_node(node)
@@ -63,7 +72,8 @@ module RuboCop
 
           nodes.each do |n|
             if relative_date_method?(n)
-              add_offense(node.parent, :expression, format(MSG, n.method_name))
+              add_offense(node.parent,
+                          message: format(MSG, method_name: n.method_name))
             end
           end
         end
@@ -71,16 +81,7 @@ module RuboCop
         def relative_date_method?(node)
           node.send_type? &&
             RELATIVE_DATE_METHODS.include?(node.method_name) &&
-            node.method_args.empty?
-        end
-
-        def autocorrect(node)
-          _scope, const_name, value = *node
-          indent = ' ' * node.loc.column
-          new_code = ["def self.#{const_name.downcase}",
-                      "#{indent}#{value.source}",
-                      'end'].join("\n#{indent}")
-          ->(corrector) { corrector.replace(node.source_range, new_code) }
+            !node.arguments?
         end
       end
     end

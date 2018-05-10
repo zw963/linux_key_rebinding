@@ -30,12 +30,10 @@ module RuboCop
       #     y / 3
       #   end
       #
-      # @example
+      # @example EnforcedStyle: case (default)
       #   # if EndAlignment is set to other style such as
       #   # start_of_line (as shown below), then *when* alignment
       #   # configuration does have an effect.
-      #
-      #   # EnforcedStyle: case (default)
       #
       #   # bad
       #   a = case n
@@ -53,8 +51,7 @@ module RuboCop
       #         y / 3
       #   end
       #
-      #   # EnforcedStyle: end
-      #
+      # @example EnforcedStyle: end
       #   # bad
       #   a = case n
       #       when 0
@@ -71,16 +68,27 @@ module RuboCop
       #     y / 3
       #   end
       class CaseIndentation < Cop
-        include AutocorrectAlignment
+        include Alignment
         include ConfigurableEnforcedStyle
+        include RangeHelp
 
-        MSG = 'Indent `when` %s `%s`.'.freeze
+        MSG = 'Indent `when` %<depth>s `%<base>s`.'.freeze
 
         def on_case(case_node)
           return if case_node.single_line?
 
           case_node.each_when do |when_node|
             check_when(when_node)
+          end
+        end
+
+        def autocorrect(node)
+          whitespace = whitespace_range(node)
+
+          return false unless whitespace.source.strip.empty?
+
+          lambda do |corrector|
+            corrector.replace(whitespace, replacement(node))
           end
         end
 
@@ -109,7 +117,7 @@ module RuboCop
           when_column = when_node.loc.keyword.column
           base_column = base_column(when_node.parent, alternative_style)
 
-          add_offense(when_node, :keyword, message(style)) do
+          add_offense(when_node, location: :keyword, message: message(style)) do
             if when_column == base_column
               opposite_style_detected
             else
@@ -121,23 +129,13 @@ module RuboCop
         def message(base)
           depth = indent_one_step? ? 'one step more than' : 'as deep as'
 
-          format(MSG, depth, base)
+          format(MSG, depth: depth, base: base)
         end
 
         def base_column(case_node, base)
           case base
           when :case then case_node.location.keyword.column
           when :end  then case_node.location.end.column
-          end
-        end
-
-        def autocorrect(node)
-          whitespace = whitespace_range(node)
-
-          return false unless whitespace.source.strip.empty?
-
-          lambda do |corrector|
-            corrector.replace(whitespace, replacement(node))
           end
         end
 

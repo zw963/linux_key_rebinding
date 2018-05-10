@@ -8,26 +8,38 @@ module RuboCop
       #
       # For instance one can configure `reduce`(`inject`) to use |a, e| as
       # parameters.
+      #
+      # Configuration option: Methods
+      # Should be set to use this cop. Array of hashes, where each key is the
+      # method name and value - array of argument names.
+      #
+      # @example Methods: [{reduce: %w[a b]}]
+      #   # bad
+      #   foo.reduce { |c, d| c + d }
+      #   foo.reduce { |_, _d| 1 }
+      #
+      #   # good
+      #   foo.reduce { |a, b| a + b }
+      #   foo.reduce { |a, _b| a }
+      #   foo.reduce { |a, (id, _)| a + id }
+      #   foo.reduce { true }
+      #
+      #   # good
+      #   foo.reduce do |c, d|
+      #     c + d
+      #   end
       class SingleLineBlockParams < Cop
-        MSG = 'Name `%s` block params `|%s|`.'.freeze
+        MSG = 'Name `%<method>s` block params `|%<params>s|`.'.freeze
 
         def on_block(node)
           return unless node.single_line?
 
-          send_node = node.send_node
+          return unless eligible_method?(node)
+          return unless eligible_arguments?(node)
 
-          return unless send_node.receiver
-          return unless method_names.include?(send_node.method_name)
+          return if args_match?(node.send_node.method_name, node.arguments)
 
-          return unless node.arguments?
-
-          arguments = node.arguments.to_a
-
-          # discard cases with argument destructuring
-          return true unless arguments.all?(&:arg_type?)
-          return if args_match?(send_node.method_name, arguments)
-
-          add_offense(node.arguments, :expression)
+          add_offense(node.arguments)
         end
 
         private
@@ -36,7 +48,16 @@ module RuboCop
           method_name = node.parent.send_node.method_name
           arguments   = target_args(method_name).join(', ')
 
-          format(MSG, method_name, arguments)
+          format(MSG, method: method_name, params: arguments)
+        end
+
+        def eligible_arguments?(node)
+          node.arguments? && node.arguments.to_a.all?(&:arg_type?)
+        end
+
+        def eligible_method?(node)
+          node.send_node.receiver &&
+            method_names.include?(node.send_node.method_name)
         end
 
         def methods
@@ -58,7 +79,7 @@ module RuboCop
         end
 
         def args_match?(method_name, args)
-          actual_args = args.flat_map(&:to_a)
+          actual_args = args.to_a.flat_map(&:to_a)
 
           # Prepending an underscore to mark an unused parameter is allowed, so
           # we remove any leading underscores before comparing.

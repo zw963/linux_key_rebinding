@@ -5,8 +5,8 @@ module RuboCop
     module Style
       # This cop checks for usage of the %q/%Q syntax when '' or "" would do.
       class UnneededPercentQ < Cop
-        MSG = 'Use `%s` only for strings that contain both single quotes and ' \
-              'double quotes%s.'.freeze
+        MSG = 'Use `%<q_type>s` only for strings that contain both ' \
+              'single quotes and double quotes%<extra>s.'.freeze
         DYNAMIC_MSG = ', or for dynamic strings that contain ' \
                       'double quotes'.freeze
         SINGLE_QUOTE = "'".freeze
@@ -18,6 +18,7 @@ module RuboCop
         ESCAPED_NON_BACKSLASH = /\\[^\\]/
 
         def on_dstr(node)
+          return unless string_literal?(node)
           check(node)
         end
 
@@ -29,13 +30,22 @@ module RuboCop
           check(node)
         end
 
+        def autocorrect(node)
+          delimiter =
+            node.source =~ /^%Q[^"]+$|'/ ? QUOTE : SINGLE_QUOTE
+          lambda do |corrector|
+            corrector.replace(node.loc.begin, delimiter)
+            corrector.replace(node.loc.end, delimiter)
+          end
+        end
+
         private
 
         def check(node)
           return unless start_with_percent_q_variant?(node)
           return if interpolated_quotes?(node) || allowed_percent_q?(node)
 
-          add_offense(node, :expression)
+          add_offense(node)
         end
 
         def interpolated_quotes?(node)
@@ -55,16 +65,7 @@ module RuboCop
                   else
                     EMPTY
                   end
-          format(MSG, src[0, 2], extra)
-        end
-
-        def autocorrect(node)
-          delimiter =
-            node.source =~ /^%Q[^"]+$|'/ ? QUOTE : SINGLE_QUOTE
-          lambda do |corrector|
-            corrector.replace(node.loc.begin, delimiter)
-            corrector.replace(node.loc.end, delimiter)
-          end
+          format(MSG, q_type: src[0, 2], extra: extra)
         end
 
         def string_literal?(node)

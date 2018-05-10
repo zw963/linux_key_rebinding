@@ -46,19 +46,15 @@ module RuboCop
       #     end
       #   end
       class IneffectiveAccessModifier < Cop
-        MSG = '`%s` (on line %d) does not make singleton methods %s. ' \
-              'Use %s instead.'.freeze
+        MSG = '`%<modifier>s` (on line %<line>d) does not make singleton ' \
+              'methods %<modifier>s. Use %<alternative>s instead.'.freeze
         ALTERNATIVE_PRIVATE = '`private_class_method` or `private` inside a ' \
                               '`class << self` block'.freeze
         ALTERNATIVE_PROTECTED = '`protected` inside a `class << self` ' \
                                 'block'.freeze
 
-        def_node_matcher :access_modifier, <<-PATTERN
-          (send nil ${:public :protected :private})
-        PATTERN
-
         def_node_matcher :private_class_method, <<-PATTERN
-          (send nil :private_class_method $...)
+          (send nil? :private_class_method $...)
         PATTERN
 
         def on_class(node)
@@ -83,8 +79,9 @@ module RuboCop
           check_scope(node)
 
           @useless.each do |_name, (defs_node, visibility, modifier)|
-            add_offense(defs_node, :keyword,
-                        format_message(visibility, modifier))
+            add_offense(defs_node,
+                        location: :keyword,
+                        message: format_message(visibility, modifier))
           end
         end
 
@@ -94,47 +91,56 @@ module RuboCop
                         else
                           ALTERNATIVE_PROTECTED
                         end
-          format(MSG, visibility, modifier.location.expression.line, visibility,
-                 alternative)
+          format(MSG, modifier: visibility,
+                      line: modifier.location.expression.line,
+                      alternative: alternative)
         end
 
         def check_scope(node, cur_vis = :public)
-          node.children.reduce(cur_vis) do |visibility, child|
+          node.each_child_node.reduce(cur_vis) do |visibility, child|
             check_child_scope(child, visibility)
           end
         end
 
         def check_child_scope(node, cur_vis)
-          if (new_vis = access_modifier(node))
-            cur_vis = change_visibility(node, new_vis)
-          elsif node.defs_type?
-            mark_method_as_useless(node, cur_vis) if cur_vis != :public
-          elsif (methods = private_class_method(node))
-            # don't warn about defs nodes which are followed by a call to
-            # `private_class_method :name`
-            # obviously the programmer knows what they are doing
-            revert_method_uselessness(methods)
-          elsif node.kwbegin_type?
-            cur_vis = check_scope(node, cur_vis)
+          case node.type
+          when :send
+            cur_vis = check_send(node, cur_vis)
+          when :defs
+            check_defs(node, cur_vis)
+          when :kwbegin
+            check_scope(node, cur_vis)
           end
 
           cur_vis
         end
 
-        def change_visibility(node, new_vis)
-          @last_access_modifier = node
-          new_vis
+        def check_send(node, cur_vis)
+          if node.access_modifier? && !node.method?(:module_function)
+            @last_access_modifier = node
+            return node.method_name
+          elsif (methods = private_class_method(node))
+            # don't warn about defs nodes which are followed by a call to
+            # `private_class_method :name`
+            # obviously the programmer knows what they are doing
+            revert_method_uselessness(methods)
+          end
+
+          cur_vis
+        end
+
+        def check_defs(node, cur_vis)
+          mark_method_as_useless(node, cur_vis) if cur_vis != :public
         end
 
         def mark_method_as_useless(node, cur_vis)
-          _, method_name, = *node
-          @useless[method_name] = [node, cur_vis, @last_access_modifier]
+          @useless[node.method_name] = [node, cur_vis, @last_access_modifier]
         end
 
         def revert_method_uselessness(methods)
           methods.each do |sym|
             next unless sym.sym_type?
-            @useless.delete(sym.children[0])
+            @useless.delete(sym.value)
           end
         end
       end

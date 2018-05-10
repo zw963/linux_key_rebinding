@@ -23,15 +23,17 @@ module RuboCop
       #   JSON.parse("{}")
       #
       class JSONLoad < Cop
-        MSG = 'Prefer `JSON.parse` over `JSON.%s`.'.freeze
+        MSG = 'Prefer `JSON.parse` over `JSON.%<method>s`.'.freeze
 
-        def_node_matcher :json_load, <<-END
-          (send (const {nil cbase} :JSON) ${:load :restore} ...)
-        END
+        def_node_matcher :json_load, <<-PATTERN
+          (send (const {nil? cbase} :JSON) ${:load :restore} ...)
+        PATTERN
 
         def on_send(node)
           json_load(node) do |method|
-            add_offense(node, :selector, format(MSG, method))
+            add_offense(node,
+                        location: :selector,
+                        message: format(MSG, method: method))
           end
         end
 

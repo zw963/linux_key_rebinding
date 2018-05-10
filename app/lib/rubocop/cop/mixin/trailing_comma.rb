@@ -6,8 +6,11 @@ module RuboCop
     # Style/TrailingCommaInLiteral
     module TrailingComma
       include ConfigurableEnforcedStyle
+      include RangeHelp
 
-      MSG = '%s comma after the last %s'.freeze
+      MSG = '%<command>s comma after the last %<unit>s.'.freeze
+
+      private
 
       def style_parameter_name
         'EnforcedStyleForMultiline'
@@ -31,6 +34,17 @@ module RuboCop
         return if should_have_comma?(style, node)
 
         avoid_comma(kind, comma_pos, extra_avoid_comma_info)
+      end
+
+      def check_literal(node, kind)
+        return if node.children.empty?
+        # A braceless hash is the last parameter of a method call and will be
+        # checked as such.
+        return unless brackets?(node)
+
+        check(node, node.children, kind,
+              node.children.last.source_range.end_pos,
+              node.loc.end.begin_pos)
       end
 
       def extra_avoid_comma_info
@@ -109,16 +123,20 @@ module RuboCop
         items.each_cons(2).none? { |a, b| on_same_line?(a, b) }
       end
 
-      def on_same_line?(a, b)
-        a.last_line == b.line
+      def on_same_line?(range1, range2)
+        range1.last_line == range2.line
       end
 
       def avoid_comma(kind, comma_begin_pos, extra_info)
         range = range_between(comma_begin_pos, comma_begin_pos + 1)
         article = kind =~ /array/ ? 'an' : 'a'
-        add_offense(range, range,
-                    format(MSG, 'Avoid', format(kind, article)) +
-                    "#{extra_info}.")
+        msg = format(
+          MSG,
+          command: 'Avoid',
+          unit: format(kind, article: article) + extra_info.to_s
+        )
+
+        add_offense(range, location: range, message: msg)
       end
 
       def put_comma(node, items, kind)
@@ -128,9 +146,13 @@ module RuboCop
         return if last_item.block_pass_type?
 
         range = autocorrect_range(last_item)
+        msg = format(
+          MSG,
+          command: 'Put a',
+          unit: format(kind, article: 'a multiline')
+        )
 
-        add_offense(range, range,
-                    format(MSG, 'Put a', format(kind, 'a multiline') + '.'))
+        add_offense(range, location: range, message: msg)
       end
 
       def autocorrect_range(item)
@@ -142,19 +164,8 @@ module RuboCop
       end
 
       # By default, there's no reason to avoid auto-correct.
-      def avoid_autocorrect?(_)
+      def avoid_autocorrect?(_nodes)
         false
-      end
-
-      def autocorrect(range)
-        return unless range
-
-        lambda do |corrector|
-          case range.source
-          when ',' then corrector.remove(range)
-          else          corrector.insert_after(range, ',')
-          end
-        end
       end
     end
   end

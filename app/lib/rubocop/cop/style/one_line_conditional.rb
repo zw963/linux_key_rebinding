@@ -5,22 +5,45 @@ module RuboCop
     module Style
       # TODO: Make configurable.
       # Checks for uses of if/then/else/end on a single line.
+      #
+      # @example
+      #   # bad
+      #   if foo then boo else doo end
+      #   unless foo then boo else goo end
+      #
+      #   # good
+      #   foo ? boo : doo
+      #   boo if foo
+      #   if foo then boo end
+      #
+      #   # good
+      #   if foo
+      #     boo
+      #   else
+      #     doo
+      #   end
       class OneLineConditional < Cop
         include OnNormalIfUnless
 
         MSG = 'Favor the ternary operator (`?:`) ' \
-              'over `%s/then/else/end` constructs.'.freeze
+              'over `%<keyword>s/then/else/end` constructs.'.freeze
 
         def on_normal_if_unless(node)
           return unless node.single_line? && node.else_branch
 
-          add_offense(node, :expression, format(MSG, node.keyword))
+          add_offense(node)
         end
 
         def autocorrect(node)
           lambda do |corrector|
             corrector.replace(node.source_range, replacement(node))
           end
+        end
+
+        private
+
+        def message(node)
+          format(MSG, keyword: node.keyword)
         end
 
         def replacement(node)
@@ -56,9 +79,8 @@ module RuboCop
         end
 
         def method_call_with_changed_precedence?(node)
-          return false unless node.send_type?
-          return false if node.method_args.empty?
-          return false if parenthesized_call?(node)
+          return false unless node.send_type? && node.arguments?
+          return false if node.parenthesized_call?
 
           !operator?(node.method_name)
         end
@@ -67,7 +89,7 @@ module RuboCop
           return false unless node.keyword?
           return true if node.keyword_not?
 
-          !parenthesized_call?(node)
+          !node.parenthesized_call?
         end
       end
     end

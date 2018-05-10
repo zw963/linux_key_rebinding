@@ -320,7 +320,7 @@ module RuboCop
             next if assignment_nodes_in_loop.none? do |assignment_node|
                       assignment_node.equal?(assignment.node)
                     end
-            assignment.reference!
+            assignment.reference!(node)
           end
         end
       end
@@ -432,7 +432,7 @@ module RuboCop
       #     (send nil :puts
       #       (lvar :foo)))
       #
-      # So the the method argument nodes need to be processed
+      # So the method argument nodes need to be processed
       # in current scope.
       #
       # Same thing.

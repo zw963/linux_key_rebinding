@@ -11,18 +11,19 @@ module RuboCop
       # config parameter is true.
       #
       # @example
-      #   @bad
+      #   # bad
       #   something  x
       #   something   y, z
       #   something'hello'
       #
-      #   @good
+      #   # good
       #   something x
       #   something y, z
       #   something 'hello'
       #
       class SpaceBeforeFirstArg < Cop
         include PrecedingFollowingAlignment
+        include RangeHelp
 
         MSG = 'Put one space between the method name and ' \
               'the first argument.'.freeze
@@ -32,11 +33,12 @@ module RuboCop
           return unless expect_params_after_method_name?(node)
 
           first_arg = node.first_argument.source_range
-          first_arg_with_space = range_with_surrounding_space(first_arg, :left)
+          first_arg_with_space = range_with_surrounding_space(range: first_arg,
+                                                              side: :left)
           space = range_between(first_arg_with_space.begin_pos,
                                 first_arg.begin_pos)
 
-          add_offense(space, space) if space.length != 1
+          add_offense(space, location: space) if space.length != 1
         end
 
         def autocorrect(range)

@@ -8,44 +8,35 @@ module RuboCop
       # parentheses using `EnforcedStyle`. Omission is only enforced when
       # removing the parentheses won't cause a different behavior.
       #
-      # @example
-      #
-      #   EnforcedStyle: require_no_parentheses (default)
-      #
-      #   @bad
+      # @example EnforcedStyle: require_no_parentheses (default)
+      #   # bad
       #   foo = (bar?) ? a : b
       #   foo = (bar.baz?) ? a : b
       #   foo = (bar && baz) ? a : b
       #
-      #   @good
+      #   # good
       #   foo = bar? ? a : b
       #   foo = bar.baz? ? a : b
       #   foo = bar && baz ? a : b
       #
-      # @example
-      #
-      #   EnforcedStyle: require_parentheses
-      #
-      #   @bad
+      # @example EnforcedStyle: require_parentheses
+      #   # bad
       #   foo = bar? ? a : b
       #   foo = bar.baz? ? a : b
       #   foo = bar && baz ? a : b
       #
-      #   @good
+      #   # good
       #   foo = (bar?) ? a : b
       #   foo = (bar.baz?) ? a : b
       #   foo = (bar && baz) ? a : b
       #
-      # @example
-      #
-      #   EnforcedStyle: require_parentheses_when_complex
-      #
-      #   @bad
+      # @example EnforcedStyle: require_parentheses_when_complex
+      #   # bad
       #   foo = (bar?) ? a : b
       #   foo = (bar.baz?) ? a : b
       #   foo = bar && baz ? a : b
       #
-      #   @good
+      #   # good
       #   foo = bar? ? a : b
       #   foo = bar.baz? ? a : b
       #   foo = (bar && baz) ? a : b
@@ -54,14 +45,31 @@ module RuboCop
         include ConfigurableEnforcedStyle
         include SurroundingSpace
 
-        MSG = '%s parentheses for ternary conditions.'.freeze
-        MSG_COMPLEX = '%s parentheses for ternary expressions with' \
+        VARIABLE_TYPES = AST::Node::VARIABLES
+        NON_COMPLEX_TYPES = [*VARIABLE_TYPES, :const, :defined?, :yield].freeze
+
+        MSG = '%<command>s parentheses for ternary conditions.'.freeze
+        MSG_COMPLEX = '%<command>s parentheses for ternary expressions with' \
           ' complex conditions.'.freeze
 
         def on_if(node)
           return unless node.ternary? && !infinite_loop? && offense?(node)
 
-          add_offense(node, node.source_range, message(node))
+          add_offense(node, location: node.source_range)
+        end
+
+        def autocorrect(node)
+          condition = node.condition
+
+          return nil if parenthesized?(condition) &&
+                        (safe_assignment?(condition) ||
+                        unsafe_autocorrect?(condition))
+
+          if parenthesized?(condition)
+            correct_parenthesized(condition)
+          else
+            correct_unparenthesized(condition)
+          end
         end
 
         private
@@ -82,46 +90,36 @@ module RuboCop
           end
         end
 
-        def autocorrect(node)
-          condition = node.condition
-
-          return nil if parenthesized?(condition) &&
-                        (safe_assignment?(condition) ||
-                        unsafe_autocorrect?(condition))
-
-          if parenthesized?(condition)
-            correct_parenthesized(condition)
-          else
-            correct_unparenthesized(condition)
-          end
-        end
-
         # If the condition is parenthesized we recurse and check for any
         # complex expressions within it.
         def complex_condition?(condition)
           if condition.begin_type?
             condition.to_a.any? { |x| complex_condition?(x) }
           else
-            non_complex_type?(condition) ? false : true
+            non_complex_expression?(condition) ? false : true
           end
         end
 
         # Anything that is not a variable, constant, or method/.method call
         # will be counted as a complex expression.
-        def non_complex_type?(condition)
-          condition.variable? || condition.const_type? ||
-            (condition.send_type? && !operator?(condition.method_name)) ||
-            condition.defined_type? || condition.yield_type? ||
-            square_brackets?(condition)
+        def non_complex_expression?(condition)
+          NON_COMPLEX_TYPES.include?(condition.type) ||
+            non_complex_send?(condition)
+        end
+
+        def non_complex_send?(node)
+          return false unless node.send_type?
+
+          !node.operator_method? || node.method?(:[])
         end
 
         def message(node)
           if require_parentheses_when_complex?
-            omit = parenthesized?(node.condition) ? 'Only use' : 'Use'
-            format(MSG_COMPLEX, omit)
+            command = parenthesized?(node.condition) ? 'Only use' : 'Use'
+            format(MSG_COMPLEX, command: command)
           else
-            verb = require_parentheses? ? 'Use' : 'Omit'
-            format(MSG, verb)
+            command = require_parentheses? ? 'Use' : 'Omit'
+            format(MSG, command: command)
           end
         end
 
@@ -162,11 +160,8 @@ module RuboCop
 
         def_node_matcher :method_call_argument, <<-PATTERN
           {(:defined? $...)
-           (send {_ nil} _ $(send nil _)...)}
+           (send {_ nil?} _ $(send nil? _)...)}
         PATTERN
-
-        def_node_matcher :square_brackets?,
-                         '(send {(send _recv _msg) str array hash} :[] ...)'
 
         def correct_parenthesized(condition)
           lambda do |corrector|
@@ -191,8 +186,8 @@ module RuboCop
 
         def whitespace_after?(node)
           index = index_of_last_token(node)
-          last_token, next_token = processed_source.tokens[index, 2]
-          space_between?(last_token, next_token)
+          last_token = processed_source.tokens[index]
+          last_token.space_after?
         end
       end
     end

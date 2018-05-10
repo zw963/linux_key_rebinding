@@ -17,7 +17,9 @@ module RuboCop
       #   # good
       #   [1, 2].each_with_object({}) { |e, a| a[e] = e }
       class EachWithObject < Cop
-        MSG = 'Use `each_with_object` instead of `%s`.'.freeze
+        include RangeHelp
+
+        MSG = 'Use `each_with_object` instead of `%<method>s`.'.freeze
         METHODS = %i[inject reduce].freeze
 
         def_node_matcher :each_with_object_candidate?, <<-PATTERN
@@ -34,11 +36,10 @@ module RuboCop
             return unless first_argument_returned?(args, return_value)
             return if accumulator_param_assigned_to?(body, args)
 
-            add_offense(node, method.loc.selector, format(MSG, method_name))
+            add_offense(node, location: method.loc.selector,
+                              message: format(MSG, method: method_name))
           end
         end
-
-        private
 
         # rubocop:disable Metrics/AbcSize
         def autocorrect(node)
@@ -52,10 +53,16 @@ module RuboCop
 
             return_value = return_value(node.body)
 
-            corrector.remove(return_value.loc.expression)
+            if return_value_occupies_whole_line?(return_value)
+              corrector.remove(whole_line_expression(return_value))
+            else
+              corrector.remove(return_value.loc.expression)
+            end
           end
         end
-        # rubocop:endable Metrics/AbcSize
+        # rubocop:enable Metrics/AbcSize
+
+        private
 
         def simple_method_arg?(method_arg)
           method_arg && method_arg.basic_literal?
@@ -88,6 +95,14 @@ module RuboCop
           return_var, = *return_value
 
           accumulator_var == return_var
+        end
+
+        def return_value_occupies_whole_line?(node)
+          whole_line_expression(node).source.strip == node.source
+        end
+
+        def whole_line_expression(node)
+          range_by_whole_lines(node.loc.expression, include_final_newline: true)
         end
       end
     end

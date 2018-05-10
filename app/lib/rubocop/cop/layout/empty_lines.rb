@@ -6,7 +6,23 @@ module RuboCop
   module Cop
     module Layout
       # This cops checks for two or more consecutive blank lines.
+      #
+      # @example
+      #
+      #   # bad - It has two empty lines.
+      #   some_method
+      #   # one empty line
+      #   # two empty lines
+      #   some_method
+      #
+      #   # good
+      #   some_method
+      #   # one empty line
+      #   some_method
+      #
       class EmptyLines < Cop
+        include RangeHelp
+
         MSG = 'Extra blank line detected.'.freeze
         LINE_OFFSET = 2
 
@@ -14,12 +30,12 @@ module RuboCop
           return if processed_source.tokens.empty?
 
           lines = Set.new
-          processed_source.tokens.each do |token|
-            lines << token.pos.line
+          processed_source.each_token do |token|
+            lines << token.line
           end
 
           each_extra_empty_line(lines.sort) do |range|
-            add_offense(range, range)
+            add_offense(range, location: range)
           end
         end
 

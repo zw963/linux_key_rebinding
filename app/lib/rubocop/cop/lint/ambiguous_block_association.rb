@@ -25,41 +25,36 @@ module RuboCop
       #   # Lambda arguments require no disambiguation
       #   foo = ->(bar) { bar.baz }
       class AmbiguousBlockAssociation < Cop
-        MSG = 'Parenthesize the param `%s` to make sure that the block will be'\
-              ' associated with the `%s` method call.'.freeze
+        MSG = 'Parenthesize the param `%<param>s` to make sure that the ' \
+              'block will be associated with the `%<method>s` method ' \
+              'call.'.freeze
 
         def on_send(node)
-          return if node.parenthesized? || allowed_method?(node)
-          return if lambda_argument?(node.last_argument)
+          return if !node.arguments? || node.parenthesized? ||
+                    node.last_argument.lambda? || allowed_method?(node)
 
-          return unless method_with_block?(node.last_argument)
-          last_param = node.last_argument.children.first
-          return unless method_as_param?(last_param)
+          return unless ambiguous_block_association?(node)
 
-          add_offense(node, :expression, message(node.last_argument))
+          add_offense(node)
         end
 
         private
+
+        def ambiguous_block_association?(send_node)
+          send_node.last_argument.block_type? &&
+            !send_node.last_argument.send_node.arguments?
+        end
 
         def allowed_method?(node)
           node.assignment? || node.operator_method? || node.method?(:[])
         end
 
-        def method_with_block?(param)
-          param && param.block_type?
-        end
+        def message(send_node)
+          block_param = send_node.last_argument
 
-        def method_as_param?(param)
-          param && param.send_type? && !param.arguments?
+          format(MSG, param: block_param.source,
+                      method: block_param.send_node.source)
         end
-
-        def message(param)
-          format(MSG, param.source, param.children.first.source)
-        end
-
-        def_node_matcher :lambda_argument?, <<-PATTERN
-          (block (send _ :lambda) ...)
-        PATTERN
       end
     end
   end

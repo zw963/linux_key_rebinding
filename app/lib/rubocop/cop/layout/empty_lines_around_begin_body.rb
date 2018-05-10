@@ -12,14 +12,14 @@ module RuboCop
       #   # good
       #
       #   begin
-      #     ...
+      #     # ...
       #   end
       #
       #   # bad
       #
       #   begin
       #
-      #     ...
+      #     # ...
       #
       #   end
       class EmptyLinesAroundBeginBody < Cop
@@ -29,6 +29,10 @@ module RuboCop
 
         def on_kwbegin(node)
           check(node, nil)
+        end
+
+        def autocorrect(node)
+          EmptyLineCorrector.correct(node)
         end
 
         private

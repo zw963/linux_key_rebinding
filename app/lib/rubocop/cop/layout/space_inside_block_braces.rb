@@ -7,9 +7,79 @@ module RuboCop
       # them on configuration. For blocks taking parameters, it checks that the
       # left brace has or doesn't have trailing space depending on
       # configuration.
+      #
+      # @example EnforcedStyle: space (default)
+      #   # The `space` style enforces that block braces have
+      #   # surrounding space.
+      #
+      #   # bad
+      #   some_array.each {puts e}
+      #
+      #   # good
+      #   some_array.each { puts e }
+      #
+      # @example EnforcedStyle: no_space
+      #   # The `no_space` style enforces that block braces don't
+      #   # have surrounding space.
+      #
+      #   # bad
+      #   some_array.each { puts e }
+      #
+      #   # good
+      #   some_array.each {puts e}
+      #
+      #
+      # @example EnforcedStyleForEmptyBraces: no_space (default)
+      #   # The `no_space` EnforcedStyleForEmptyBraces style enforces that
+      #   # block braces don't have a space in between when empty.
+      #
+      #   # bad
+      #   some_array.each {   }
+      #   some_array.each {  }
+      #   some_array.each { }
+      #
+      #   # good
+      #   some_array.each {}
+      #
+      # @example EnforcedStyleForEmptyBraces: space
+      #   # The `space` EnforcedStyleForEmptyBraces style enforces that
+      #   # block braces have at least a space in between when empty.
+      #
+      #   # bad
+      #   some_array.each {}
+      #
+      #   # good
+      #   some_array.each { }
+      #   some_array.each {  }
+      #   some_array.each {   }
+      #
+      #
+      # @example SpaceBeforeBlockParameters: true (default)
+      #   # The SpaceBeforeBlockParameters style set to `true` enforces that
+      #   # there is a space between `{` and `|`. Overrides `EnforcedStyle`
+      #   # if there is a conflict.
+      #
+      #   # bad
+      #   [1, 2, 3].each {|n| n * 2 }
+      #
+      #   # good
+      #   [1, 2, 3].each { |n| n * 2 }
+      #
+      # @example SpaceBeforeBlockParameters: false
+      #   # The SpaceBeforeBlockParameters style set to `false` enforces that
+      #   # there is no space between `{` and `|`. Overrides `EnforcedStyle`
+      #   # if there is a conflict.
+      #
+      #   # bad
+      #   [1, 2, 3].each { |n| n * 2 }
+      #
+      #   # good
+      #   [1, 2, 3].each {|n| n * 2 }
+      #
       class SpaceInsideBlockBraces < Cop
         include ConfigurableEnforcedStyle
         include SurroundingSpace
+        include RangeHelp
 
         def on_block(node)
           return if node.keywords?
@@ -18,6 +88,17 @@ module RuboCop
           right_brace = node.loc.end
 
           check_inside(node, left_brace, right_brace)
+        end
+
+        def autocorrect(range)
+          lambda do |corrector|
+            case range.source
+            when /\s/ then corrector.remove(range)
+            when '{}' then corrector.replace(range, '{ }')
+            when '{|' then corrector.replace(range, '{ |')
+            else           corrector.insert_before(range, ' ')
+            end
+          end
         end
 
         private
@@ -49,7 +130,7 @@ module RuboCop
           args_delimiter = node.arguments.loc.begin # Can be ( | or nil.
 
           check_left_brace(inner, node.loc.begin, args_delimiter)
-          check_right_brace(inner, node.loc.end, block_length(node))
+          check_right_brace(inner, node.loc.end, node.single_line?)
         end
 
         def check_left_brace(inner, left_brace, args_delimiter)
@@ -60,8 +141,8 @@ module RuboCop
           end
         end
 
-        def check_right_brace(inner, right_brace, block_length)
-          if inner =~ /\S$/ && block_length.zero?
+        def check_right_brace(inner, right_brace, single_line)
+          if single_line && inner =~ /\S$/
             no_space(right_brace.begin_pos, right_brace.end_pos,
                      'Space missing inside }.')
           else
@@ -96,7 +177,8 @@ module RuboCop
               end
             end
           else
-            brace_with_space = range_with_surrounding_space(left_brace, :right)
+            brace_with_space = range_with_surrounding_space(range: left_brace,
+                                                            side: :right)
             space(brace_with_space.begin_pos + 1, brace_with_space.end_pos,
                   'Space inside { detected.')
           end
@@ -107,7 +189,8 @@ module RuboCop
         end
 
         def space_inside_right_brace(right_brace)
-          brace_with_space = range_with_surrounding_space(right_brace, :left)
+          brace_with_space = range_with_surrounding_space(range: right_brace,
+                                                          side: :left)
           space(brace_with_space.begin_pos, brace_with_space.end_pos - 1,
                 'Space inside } detected.')
         end
@@ -128,9 +211,9 @@ module RuboCop
           end
         end
 
-        def offense(begin_pos, end_pos, msg)
+        def offense(begin_pos, end_pos, msg, &block)
           range = range_between(begin_pos, end_pos)
-          add_offense(range, range, msg) { yield if block_given? }
+          add_offense(range, location: range, message: msg, &block)
         end
 
         def style_for_empty_braces
@@ -138,17 +221,6 @@ module RuboCop
           when 'space'    then :space
           when 'no_space' then :no_space
           else raise 'Unknown EnforcedStyleForEmptyBraces selected!'
-          end
-        end
-
-        def autocorrect(range)
-          lambda do |corrector|
-            case range.source
-            when /\s/ then corrector.remove(range)
-            when '{}' then corrector.replace(range, '{ }')
-            when '{|' then corrector.replace(range, '{ |')
-            else           corrector.insert_before(range, ' ')
-            end
           end
         end
       end

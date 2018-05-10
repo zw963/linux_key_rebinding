@@ -12,12 +12,14 @@ module RuboCop
       #   # good
       #   !something
       class SpaceAfterNot < Cop
+        include RangeHelp
+
         MSG = 'Do not leave space between `!` and its argument.'.freeze
 
         def on_send(node)
           return unless node.keyword_bang? && whitespace_after_operator?(node)
 
-          add_offense(node, :expression)
+          add_offense(node)
         end
 
         def whitespace_after_operator?(node)

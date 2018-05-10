@@ -4,18 +4,32 @@ module RuboCop
   module Cop
     module Style
       # This cop looks for uses of block comments (=begin...=end).
+      #
+      # @example
+      #   # bad
+      #   =begin
+      #   Multiple lines
+      #   of comments...
+      #   =end
+      #
+      #   # good
+      #   # Multiple lines
+      #   # of comments...
+      #
       class BlockComments < Cop
+        include RangeHelp
+
         MSG = 'Do not use block comments.'.freeze
         BEGIN_LENGTH = "=begin\n".length
         END_LENGTH = "\n=end".length
 
         def investigate(processed_source)
-          processed_source.comments.each do |comment|
-            add_offense(comment, :expression) if comment.document?
+          processed_source.each_comment do |comment|
+            next unless comment.document?
+
+            add_offense(comment)
           end
         end
-
-        private
 
         def autocorrect(comment)
           eq_begin, eq_end, contents = parts(comment)
@@ -32,6 +46,8 @@ module RuboCop
             corrector.remove(eq_end)
           end
         end
+
+        private
 
         def parts(comment)
           expr = comment.loc.expression

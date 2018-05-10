@@ -13,11 +13,11 @@ module RuboCop
       #   f = File.open('file')
       #
       #   # good
-      #   f = File.open('file') do
-      #     ...
+      #   File.open('file') do |f|
+      #     # ...
       #   end
       class AutoResourceCleanup < Cop
-        MSG = 'Use the block version of `%s.%s`.'.freeze
+        MSG = 'Use the block version of `%<class>s.%<method>s`.'.freeze
 
         TARGET_METHODS = {
           File: :open
@@ -29,12 +29,21 @@ module RuboCop
 
             next if node.receiver != target_receiver
             next if node.method_name != target_method
-            next if node.parent && node.parent.block_type?
-            next if node.block_argument?
+            next if cleanup?(node)
 
-            add_offense(node, :expression,
-                        format(MSG, target_class, target_method))
+            add_offense(node,
+                        message: format(MSG,
+                                        class: target_class,
+                                        method: target_method))
           end
+        end
+
+        private
+
+        def cleanup?(node)
+          parent = node.parent
+          node.block_argument? ||
+            (parent && (parent.block_type? || !parent.lvasgn_type?))
         end
       end
     end

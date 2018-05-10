@@ -8,14 +8,15 @@ module RuboCop
       # These can be replaced by their respective predicate methods.
       # The cop can also be configured to do the reverse.
       #
-      # The cop disregards `nonzero?` as it its value is truthy or falsey,
+      # The cop disregards `#nonzero?` as it its value is truthy or falsey,
       # but not `true` and `false`, and thus not always interchangeable with
       # `!= 0`.
       #
-      # @example
+      # The cop ignores comparisons to global variables, since they are often
+      # populated with objects which can be compared with integers, but are
+      # not themselves `Integer` polymorphic.
       #
-      #   # EnforcedStyle: predicate (default)
-      #
+      # @example EnforcedStyle: predicate (default)
       #   # bad
       #
       #   foo == 0
@@ -28,10 +29,7 @@ module RuboCop
       #   foo.negative?
       #   bar.baz.positive?
       #
-      # @example
-      #
-      #   # EnforcedStyle: comparison
-      #
+      # @example EnforcedStyle: comparison
       #   # bad
       #
       #   foo.zero?
@@ -46,7 +44,7 @@ module RuboCop
       class NumericPredicate < Cop
         include ConfigurableEnforcedStyle
 
-        MSG = 'Use `%s` instead of `%s`.'.freeze
+        MSG = 'Use `%<prefer>s` instead of `%<current>s`.'.freeze
 
         REPLACEMENTS = {
           'zero?' => '==',
@@ -59,8 +57,18 @@ module RuboCop
 
           return unless numeric
 
-          add_offense(node, node.loc.expression,
-                      format(MSG, replacement, node.source))
+          add_offense(node,
+                      message: format(MSG,
+                                      prefer: replacement,
+                                      current: node.source))
+        end
+
+        def autocorrect(node)
+          _, replacement = check(node)
+
+          lambda do |corrector|
+            corrector.replace(node.loc.expression, replacement)
+          end
         end
 
         private
@@ -76,14 +84,6 @@ module RuboCop
           return unless numeric && operator && replacement_supported?(operator)
 
           [numeric, replacement(numeric, operator)]
-        end
-
-        def autocorrect(node)
-          _, replacement = check(node)
-
-          lambda do |corrector|
-            corrector.replace(node.loc.expression, replacement)
-          end
         end
 
         def replacement(numeric, operation)
@@ -128,11 +128,11 @@ module RuboCop
         PATTERN
 
         def_node_matcher :comparison, <<-PATTERN
-          (send $(...) ${:== :> :<} (int 0))
+          (send [$(...) !gvar_type?] ${:== :> :<} (int 0))
         PATTERN
 
         def_node_matcher :inverted_comparison, <<-PATTERN
-          (send (int 0) ${:== :> :<} $(...))
+          (send (int 0) ${:== :> :<} [$(...) !gvar_type?])
         PATTERN
       end
     end

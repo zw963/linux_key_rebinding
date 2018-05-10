@@ -6,8 +6,10 @@ module RuboCop
       # Helper module to provide common methods to classes needed for the
       # ConditionalAssignment Cop.
       module ConditionalAssignmentHelper
+        extend NodePattern::Macros
+
         EQUAL = '='.freeze
-        END_ALIGNMENT = 'Lint/EndAlignment'.freeze
+        END_ALIGNMENT = 'Layout/EndAlignment'.freeze
         ALIGN_WITH = 'EnforcedStyleAlignWith'.freeze
         KEYWORD = 'keyword'.freeze
 
@@ -31,6 +33,7 @@ module RuboCop
           branch.begin_type? ? [*branch].last : branch
         end
 
+        # rubocop:disable Metrics/AbcSize
         def lhs(node)
           case node.type
           when :send
@@ -47,6 +50,7 @@ module RuboCop
             node.source
           end
         end
+        # rubocop:enable Metrics/AbcSize
 
         def indent(cop, source)
           conf = cop.config.for_cop(END_ALIGNMENT)
@@ -104,9 +108,7 @@ module RuboCop
       # assignment to the same variable when using the return of the
       # condition can be used instead.
       #
-      # @example
-      #   EnforcedStyle: assign_to_condition
-      #
+      # @example EnforcedStyle: assign_to_condition (default)
       #   # bad
       #   if foo
       #     bar = 1
@@ -151,7 +153,7 @@ module RuboCop
       #            2
       #          end
       #
-      #   EnforcedStyle: assign_inside_condition
+      # @example EnforcedStyle: assign_inside_condition
       #   # bad
       #   bar = if foo
       #           1
@@ -219,12 +221,12 @@ module RuboCop
 
         # The shovel operator `<<` does not have its own type. It is a `send`
         # type.
-        def_node_matcher :assignment_type?, <<-END
+        def_node_matcher :assignment_type?, <<-PATTERN
           {
             #{ASSIGNMENT_TYPES.join(' ')}
             (send _recv {:[]= :<< :=~ :!~ :<=> #end_with_eq?} ...)
           }
-        END
+        PATTERN
 
         ASSIGNMENT_TYPES.each do |type|
           define_method "on_#{type}" do |node|
@@ -264,23 +266,37 @@ module RuboCop
           check_node(node, branches)
         end
 
+        def autocorrect(node)
+          if assignment_type?(node)
+            move_assignment_inside_condition(node)
+          else
+            move_assignment_outside_condition(node)
+          end
+        end
+
         private
 
         def check_assignment_to_condition(node)
-          return unless style == :assign_inside_condition
-          return unless assignment_rhs_exist?(node)
+          return unless candidate_node?(node)
+
           ignore_node(node)
 
           assignment = assignment_node(node)
-          return unless condition?(assignment)
-          return if allowed_ternary?(assignment)
+          return unless candidate_condition?(assignment)
 
           _condition, *branches, else_branch = *assignment
-          return unless else_branch # empty else
+
+          return unless else_branch
           return if allowed_single_line?([*branches, else_branch])
 
-          add_offense(node, :expression, ASSIGN_TO_CONDITION_MSG)
+          add_offense(node, message: ASSIGN_TO_CONDITION_MSG)
         end
+
+        def candidate_node?(node)
+          style == :assign_inside_condition && assignment_rhs_exist?(node)
+        end
+
+        def_node_matcher :candidate_condition?, '[{if case} !#allowed_ternary?]'
 
         def allowed_ternary?(assignment)
           assignment.if_type? && assignment.ternary? && !include_ternary?
@@ -288,14 +304,6 @@ module RuboCop
 
         def allowed_single_line?(branches)
           single_line_conditions_only? && branches.any?(&:begin_type?)
-        end
-
-        def autocorrect(node)
-          if assignment_type?(node)
-            move_assignment_inside_condition(node)
-          else
-            move_assignment_outside_condition(node)
-          end
         end
 
         def assignment_node(node)
@@ -356,7 +364,7 @@ module RuboCop
           return if allowed_single_line?(branches)
           return if correction_exceeds_line_limit?(node, branches)
 
-          add_offense(node, :expression)
+          add_offense(node)
         end
 
         def allowed_statements?(branches)
@@ -380,36 +388,20 @@ module RuboCop
 
           assignment = lhs(tail(branches[0]))
 
-          longest_rhs_exceeds_line_limit?(branches, assignment) ||
-            longest_line_exceeds_line_limit?(node, assignment)
-        end
-
-        def longest_rhs_exceeds_line_limit?(branches, assignment)
-          longest_rhs_full_length(branches, assignment) > max_line_length
+          longest_line_exceeds_line_limit?(node, assignment)
         end
 
         def longest_line_exceeds_line_limit?(node, assignment)
           longest_line(node, assignment).length > max_line_length
         end
 
-        def longest_rhs_full_length(branches, assignment)
-          longest_rhs(branches) + indentation_width + assignment.length
-        end
-
         def longest_line(node, assignment)
-          assignment_regex = /#{Regexp.escape(assignment).gsub(' ', '\s*')}/
+          assignment_regex = /\s*#{Regexp.escape(assignment).gsub('\ ', '\s*')}/
           lines = node.source.lines.map do |line|
             line.chomp.sub(assignment_regex, '')
           end
           longest_line = lines.max_by(&:length)
-          longest_line + assignment
-        end
-
-        def longest_rhs(branches)
-          line_lengths = branches.flat_map do |branch|
-            branch.children.last.source.split("\n").map(&:length)
-          end
-          line_lengths.max
+          assignment + longest_line
         end
 
         def line_length_cop_enabled?
@@ -475,7 +467,15 @@ module RuboCop
 
         def replace_branch_assignment(corrector, branch)
           _variable, *_operator, assignment = *branch
-          corrector.replace(branch.source_range, assignment.source)
+          source = assignment.source
+
+          replacement = if assignment.array_type? && !assignment.bracketed?
+                          "[#{source}]"
+                        else
+                          source
+                        end
+
+          corrector.replace(branch.source_range, replacement)
         end
 
         def correct_branches(corrector, branches)

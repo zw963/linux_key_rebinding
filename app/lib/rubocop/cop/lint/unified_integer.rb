@@ -18,17 +18,18 @@ module RuboCop
       #
       #   1.is_a?(Integer)
       class UnifiedInteger < Cop
-        MSG = 'Use `Integer` instead of `%s`.'.freeze
+        MSG = 'Use `Integer` instead of `%<klass>s`.'.freeze
 
-        def_node_matcher :fixnum_or_bignum_const?, <<-PATTERN
-          (:const {nil (:cbase)} ${:Fixnum :Bignum})
+        def_node_matcher :fixnum_or_bignum_const, <<-PATTERN
+          (:const {nil? (:cbase)} ${:Fixnum :Bignum})
         PATTERN
 
         def on_const(node)
-          klass = fixnum_or_bignum_const?(node)
+          klass = fixnum_or_bignum_const(node)
+
           return unless klass
 
-          add_offense(node, :expression, format(MSG, klass))
+          add_offense(node, message: format(MSG, klass: klass))
         end
 
         def autocorrect(node)

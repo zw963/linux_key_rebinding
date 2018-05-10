@@ -7,11 +7,11 @@ module RuboCop
       # (i.e. %i/%w).
       #
       # @example
-      #   @good
-      #   %i(foo bar baz)
       #
-      #   @bad
+      #   # bad
       #   %w(foo  bar  baz)
+      #   # good
+      #   %i(foo bar baz)
       class SpaceInsideArrayPercentLiteral < Cop
         include MatchRange
         include PercentLiteral
@@ -26,7 +26,7 @@ module RuboCop
 
         def on_percent_literal(node)
           each_unnecessary_space_match(node) do |range|
-            add_offense(node, range, MSG)
+            add_offense(node, location: range)
           end
         end
 

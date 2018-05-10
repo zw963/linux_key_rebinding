@@ -7,16 +7,15 @@ module RuboCop
       # of a parenthesized method call.
       #
       # @example
-      #   @good
+      #   # good
       #   method1(method2(arg), method3(arg))
       #
-      #   @bad
+      #   # bad
       #   method1(method2 arg, method3, arg)
       class NestedParenthesizedCalls < Cop
-        MSG = 'Add parentheses to nested method call `%s`.'.freeze
-        RSPEC_MATCHERS = %i[be eq eql equal be_kind_of be_instance_of
-                            respond_to be_between match be_within
-                            start_with end_with include raise_error].freeze
+        include RangeHelp
+
+        MSG = 'Add parentheses to nested method call `%<source>s`.'.freeze
 
         def on_send(node)
           return unless node.parenthesized?
@@ -24,7 +23,23 @@ module RuboCop
           node.each_child_node(:send) do |nested|
             next if allowed_omission?(nested)
 
-            add_offense(nested, nested.source_range, format(MSG, nested.source))
+            add_offense(nested,
+                        location: nested.source_range,
+                        message: format(MSG, source: nested.source))
+          end
+        end
+
+        def autocorrect(nested)
+          first_arg = nested.first_argument.source_range
+          last_arg = nested.last_argument.source_range
+
+          leading_space =
+            range_with_surrounding_space(range: first_arg,
+                                         side: :left).begin.resize(1)
+
+          lambda do |corrector|
+            corrector.replace(leading_space, '(')
+            corrector.insert_after(last_arg, ')')
           end
         end
 
@@ -33,27 +48,17 @@ module RuboCop
         def allowed_omission?(send_node)
           !send_node.arguments? || send_node.parenthesized? ||
             send_node.setter_method? || send_node.operator_method? ||
-            rspec_matcher?(send_node)
+            whitelisted?(send_node)
         end
 
-        # TODO: Relegate this from RuboCop core
-        def rspec_matcher?(send_node)
-          send_node.parent.arguments.one? && # .to, .not_to, etc
-            RSPEC_MATCHERS.include?(send_node.method_name) &&
+        def whitelisted?(send_node)
+          send_node.parent.arguments.one? &&
+            whitelisted_methods.include?(send_node.method_name.to_s) &&
             send_node.arguments.one?
         end
 
-        def autocorrect(nested)
-          first_arg = nested.first_argument.source_range
-          last_arg = nested.last_argument.source_range
-
-          leading_space =
-            range_with_surrounding_space(first_arg, :left).begin.resize(1)
-
-          lambda do |corrector|
-            corrector.replace(leading_space, '(')
-            corrector.insert_after(last_arg, ')')
-          end
+        def whitelisted_methods
+          cop_config['Whitelist'] || []
         end
       end
     end

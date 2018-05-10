@@ -16,6 +16,13 @@ module RuboCop
       # - Usage in application code outside of the web process could result in
       # the program exiting, which could result in the code failing to run and
       # do its job.
+      #
+      # @example
+      #   # bad
+      #   exit(0)
+      #
+      #   # good
+      #   raise 'a bad error has happened'
       class Exit < Cop
         include ConfigurableEnforcedStyle
 
@@ -24,7 +31,7 @@ module RuboCop
         EXPLICIT_RECEIVERS = %i[Kernel Process].freeze
 
         def on_send(node)
-          add_offense(node, :selector) if offending_node?(node)
+          add_offense(node, location: :selector) if offending_node?(node)
         end
 
         private

@@ -20,10 +20,10 @@ module RuboCop
       #   format('A value: %s and another: %i', a_value, another)
       class FormatParameterMismatch < Cop
         # http://rubular.com/r/CvpbxkcTzy
-        MSG = "Number of arguments (%i) to `%s` doesn't match the number of " \
-              'fields (%i).'.freeze
+        MSG = "Number of arguments (%<arg_num>i) to `%<method>s` doesn't " \
+              'match the number of fields (%<field_num>i).'.freeze
         FIELD_REGEX =
-          /(%(([\s#+-0\*]*)(\d*)?(.\d+)?[bBdiouxXeEfgGaAcps]|%))/
+          /(%(([\s#+-0\*]*)(\d*)?(\.\d+)?[bBdiouxXeEfgGaAcps]|%))/
         NAMED_FIELD_REGEX = /%\{[_a-zA-Z][_a-zA-Z]+\}/
         KERNEL = 'Kernel'.freeze
         SHOVEL = '<<'.freeze
@@ -35,7 +35,7 @@ module RuboCop
         def on_send(node)
           return unless offending_node?(node)
 
-          add_offense(node, :selector)
+          add_offense(node, location: :selector)
         end
 
         private
@@ -73,12 +73,10 @@ module RuboCop
         end
 
         def named_mode?(node)
-          receiver_node, _method_name, *args = *node
-
           relevant_node = if sprintf?(node) || format?(node)
-                            args.first
+                            node.first_argument
                           elsif percent?(node)
-                            receiver_node
+                            node.receiver
                           end
 
           !relevant_node.source.scan(NAMED_FIELD_REGEX).empty?
@@ -95,31 +93,38 @@ module RuboCop
         end
 
         def count_matches(node)
-          receiver_node, _method_name, *args = *node
-
-          if (sprintf?(node) || format?(node)) && !heredoc?(node)
-            number_of_args_for_format = arguments_count(args) - 1
-            number_of_expected_fields = expected_fields_count(args.first)
-          elsif percent?(node) && args.first.array_type?
-            number_of_expected_fields = expected_fields_count(receiver_node)
-            number_of_args_for_format = arguments_count(args.first.child_nodes)
+          if countable_format?(node)
+            count_format_matches(node)
+          elsif countable_percent?(node)
+            count_percent_matches(node)
           else
-            number_of_args_for_format = number_of_expected_fields = :unknown
+            [:unknown] * 2
           end
+        end
 
-          [number_of_args_for_format, number_of_expected_fields]
+        def countable_format?(node)
+          (sprintf?(node) || format?(node)) && !heredoc?(node)
+        end
+
+        def countable_percent?(node)
+          percent?(node) && node.first_argument.array_type?
+        end
+
+        def count_format_matches(node)
+          [node.arguments.count - 1, expected_fields_count(node.first_argument)]
+        end
+
+        def count_percent_matches(node)
+          [node.first_argument.child_nodes.count,
+           expected_fields_count(node.receiver)]
         end
 
         def format_method?(name, node)
-          receiver, method_name, *args = *node
+          return false if node.const_receiver? &&
+                          !node.receiver.loc.name.is?(KERNEL)
+          return false unless node.method?(name)
 
-          if receiver && receiver.const_type?
-            return false unless receiver.loc.name.is?(KERNEL)
-          end
-
-          return false unless method_name == name
-
-          args.size > 1 && args.first.str_type?
+          node.arguments.size > 1 && node.first_argument.str_type?
         end
 
         def expected_fields_count(node)
@@ -130,17 +135,12 @@ module RuboCop
             .source
             .scan(FIELD_REGEX)
             .reject { |x| x.first == PERCENT_PERCENT }
-            .reduce(0) { |acc, elem| acc + (elem[2] =~ /\*/ ? 2 : 1) }
+            .reduce(0) { |acc, elem| acc + arguments_count(elem[2]) }
         end
 
-        def arguments_count(args)
-          if args.empty?
-            0
-          elsif args.last.splat_type?
-            -(args.count - 1)
-          else
-            args.count
-          end
+        # number of arguments required for the format sequence
+        def arguments_count(format)
+          format.scan('*').count + 1
         end
 
         def format?(node)
@@ -154,13 +154,12 @@ module RuboCop
         def percent?(node)
           receiver = node.receiver
 
-          percent = node.method_name == :% &&
+          percent = node.method?(:%) &&
                     (STRING_TYPES.include?(receiver.type) ||
                      node.first_argument.array_type?)
 
-          if percent && STRING_TYPES.include?(receiver.type)
-            return false if heredoc?(node)
-          end
+          return false if percent && STRING_TYPES.include?(receiver.type) &&
+                          heredoc?(node)
 
           percent
         end
@@ -168,13 +167,10 @@ module RuboCop
         def message(node)
           num_args_for_format, num_expected_fields = count_matches(node)
 
-          method_name = if node.method_name.to_s == PERCENT
-                          'String#%'
-                        else
-                          node.method_name
-                        end
+          method_name = node.method?(:%) ? 'String#%' : node.method_name
 
-          format(MSG, num_args_for_format, method_name, num_expected_fields)
+          format(MSG, arg_num: num_args_for_format, method: method_name,
+                      field_num: num_expected_fields)
         end
       end
     end

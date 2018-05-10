@@ -26,37 +26,81 @@ module RuboCop
       # The closing brace of a multi-line method definition must be on the same
       # line as the last parameter of the definition.
       #
-      # @example
+      # @example EnforcedStyle: symmetrical (default)
+      #   # bad
+      #   def foo(a,
+      #     b
+      #   )
+      #   end
       #
-      #     # symmetrical: bad
-      #     # new_line: good
-      #     # same_line: bad
-      #     def foo(a,
-      #       b
-      #     )
+      #   # bad
+      #   def foo(
+      #     a,
+      #     b)
+      #   end
       #
-      #     # symmetrical: bad
-      #     # new_line: bad
-      #     # same_line: good
-      #     def foo(
-      #       a,
-      #       b)
+      #   # good
+      #   def foo(a,
+      #     b)
+      #   end
       #
-      #     # symmetrical: good
-      #     # new_line: bad
-      #     # same_line: good
-      #     def foo(a,
-      #       b)
+      #   # good
+      #   def foo(
+      #     a,
+      #     b
+      #   )
+      #   end
       #
-      #     # symmetrical: good
-      #     # new_line: good
-      #     # same_line: bad
-      #     def foo(
-      #       a,
-      #       b
-      #     )
+      # @example EnforcedStyle: new_line
+      #   # bad
+      #   def foo(
+      #     a,
+      #     b)
+      #   end
+      #
+      #   # bad
+      #   def foo(a,
+      #     b)
+      #   end
+      #
+      #   # good
+      #   def foo(a,
+      #     b
+      #   )
+      #   end
+      #
+      #   # good
+      #   def foo(
+      #     a,
+      #     b
+      #   )
+      #   end
+      #
+      # @example EnforcedStyle: same_line
+      #   # bad
+      #   def foo(a,
+      #     b
+      #   )
+      #   end
+      #
+      #   # bad
+      #   def foo(
+      #     a,
+      #     b
+      #   )
+      #   end
+      #
+      #   # good
+      #   def foo(
+      #     a,
+      #     b)
+      #   end
+      #
+      #   # good
+      #   def foo(a,
+      #     b)
+      #   end
       class MultilineMethodDefinitionBraceLayout < Cop
-        include OnMethodDef
         include MultilineLiteralBraceLayout
 
         SAME_LINE_MESSAGE = 'Closing method definition brace must be on the ' \
@@ -73,8 +117,13 @@ module RuboCop
         ALWAYS_SAME_LINE_MESSAGE = 'Closing method definition brace must be ' \
           'on the same line as the last parameter.'.freeze
 
-        def on_method_def(_node, _method_name, args, _body)
-          check_brace_layout(args)
+        def on_def(node)
+          check_brace_layout(node.arguments)
+        end
+        alias on_defs on_def
+
+        def autocorrect(node)
+          MultilineLiteralBraceCorrector.correct(processed_source, node)
         end
       end
     end

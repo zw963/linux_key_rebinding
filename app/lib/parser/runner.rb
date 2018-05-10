@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'benchmark'
 require 'find'
 require 'optparse'
@@ -94,6 +96,16 @@ module Parser
         @parser_class = Parser::Ruby24
       end
 
+      opts.on '--25', 'Parse as Ruby 2.5 would' do
+        require 'parser/ruby25'
+        @parser_class = Parser::Ruby25
+      end
+
+      opts.on '--26', 'Parse as Ruby 2.6 would' do
+        require 'parser/ruby26'
+        @parser_class = Parser::Ruby26
+      end
+
       opts.on '--mac', 'Parse as MacRuby 0.12 would' do
         require 'parser/macruby'
         @parser_class = Parser::MacRuby
@@ -171,9 +183,7 @@ module Parser
 
     def process_fragments
       @fragments.each_with_index do |fragment, index|
-        if fragment.respond_to? :force_encoding
-          fragment = fragment.dup.force_encoding(@parser.default_encoding)
-        end
+        fragment = fragment.dup.force_encoding(@parser.default_encoding)
 
         buffer = Source::Buffer.new("(fragment:#{index})")
         buffer.source = fragment
@@ -184,10 +194,7 @@ module Parser
 
     def process_files
       @files.each do |filename|
-        source = File.read(filename)
-        if source.respond_to? :force_encoding
-          source.force_encoding(@parser.default_encoding)
-        end
+        source = File.read(filename).force_encoding(@parser.default_encoding)
 
         buffer = Parser::Source::Buffer.new(filename)
 

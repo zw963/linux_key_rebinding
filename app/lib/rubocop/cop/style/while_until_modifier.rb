@@ -4,12 +4,31 @@ module RuboCop
   module Cop
     module Style
       # Checks for while and until statements that would fit on one line
-      # if written as a modifier while/until.
-      # The maximum line length is configurable.
+      # if written as a modifier while/until. The maximum line length is
+      # configured in the `Metrics/LineLength` cop.
+      #
+      # @example
+      #   # bad
+      #   while x < 10
+      #     x += 1
+      #   end
+      #
+      #   # good
+      #   x += 1 while x < 10
+      #
+      # @example
+      #   # bad
+      #   until x > 10
+      #     x += 1
+      #   end
+      #
+      #   # good
+      #   x += 1 until x > 10
       class WhileUntilModifier < Cop
         include StatementModifier
 
-        MSG = 'Favor modifier `%s` usage when having a single-line body.'.freeze
+        MSG = 'Favor modifier `%<keyword>s` usage when ' \
+              'having a single-line body.'.freeze
 
         def on_while(node)
           check(node)
@@ -18,8 +37,6 @@ module RuboCop
         def on_until(node)
           check(node)
         end
-
-        private
 
         def autocorrect(node)
           oneline = "#{node.body.source} #{node.keyword} " \
@@ -30,10 +47,13 @@ module RuboCop
           end
         end
 
+        private
+
         def check(node)
           return unless node.multiline? && single_line_as_modifier?(node)
 
-          add_offense(node, :keyword, format(MSG, node.keyword))
+          add_offense(node, location: :keyword,
+                            message: format(MSG, keyword: node.keyword))
         end
       end
     end

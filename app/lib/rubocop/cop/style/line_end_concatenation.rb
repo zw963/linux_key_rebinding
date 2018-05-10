@@ -20,6 +20,8 @@ module RuboCop
       #              'bala'
       #
       class LineEndConcatenation < Cop
+        include RangeHelp
+
         MSG = 'Use `\\` instead of `+` or `<<` to concatenate ' \
               'those strings.'.freeze
         CONCAT_TOKEN_TYPES = %i[tPLUS tLSHFT].freeze
@@ -41,9 +43,9 @@ module RuboCop
 
         def autocorrect(operator_range)
           # Include any trailing whitespace so we don't create a syntax error.
-          operator_range = range_with_surrounding_space(operator_range,
-                                                        :right,
-                                                        false)
+          operator_range = range_with_surrounding_space(range: operator_range,
+                                                        side: :right,
+                                                        newlines: false)
           one_more_char = operator_range.resize(operator_range.size + 1)
           # Don't create a double backslash at the end of the line, in case
           # there already was a backslash after the concatenation operator.
@@ -61,13 +63,13 @@ module RuboCop
                         eligible_operator?(operator) &&
                         eligible_predecessor?(predecessor)
 
-          return if operator.pos.line == successor.pos.line
+          return if operator.line == successor.line
 
           next_successor = token_after_last_string(successor, index)
 
           return unless eligible_next_successor?(next_successor)
 
-          add_offense(operator.pos, operator.pos)
+          add_offense(operator.pos, location: operator.pos)
         end
 
         def eligible_successor?(successor)

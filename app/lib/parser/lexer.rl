@@ -89,8 +89,6 @@ class Parser::Lexer
 
   REGEXP_META_CHARACTERS = Regexp.union(*"\\$()*+.<>?[]^{|}".chars).freeze
 
-  RBRACE_OR_RBRACK = %w"} ]".freeze
-
   attr_reader   :source_buffer
 
   attr_accessor :diagnostics
@@ -174,6 +172,9 @@ class Parser::Lexer
 
     # True at the end of "def foo a:"
     @in_kwarg      = false
+
+    # State before =begin / =end block comment
+    @cs_before_block_comment = self.class.lex_en_line_begin
   end
 
   def source_buffer=(source_buffer)
@@ -182,7 +183,7 @@ class Parser::Lexer
     if @source_buffer
       source = @source_buffer.source
 
-      if defined?(Encoding) && source.encoding == Encoding::UTF_8
+      if source.encoding == Encoding::UTF_8
         @source_pts = source.unpack('U*')
       else
         @source_pts = source.unpack('C*')
@@ -308,14 +309,8 @@ class Parser::Lexer
     @stack[@top]
   end
 
-  if defined?(Encoding)
-    def encode_escape(ord)
-      ord.chr.force_encoding(@source_buffer.source.encoding)
-    end
-  else
-    def encode_escape(ord)
-      ord.chr
-    end
+  def encode_escape(ord)
+    ord.chr.force_encoding(@source_buffer.source.encoding)
   end
 
   def tok(s = @ts, e = @te)
@@ -384,27 +379,30 @@ class Parser::Lexer
   def push_literal(*args)
     new_literal = Literal.new(self, *args)
     @literal_stack.push(new_literal)
+    next_state_for_literal(new_literal)
+  end
 
-    if new_literal.words? && new_literal.backslash_delimited?
-      if new_literal.interpolate?
+  def next_state_for_literal(literal)
+    if literal.words? && literal.backslash_delimited?
+      if literal.interpolate?
         self.class.lex_en_interp_backslash_delimited_words
       else
         self.class.lex_en_plain_backslash_delimited_words
       end
-    elsif new_literal.words? && !new_literal.backslash_delimited?
-      if new_literal.interpolate?
+    elsif literal.words? && !literal.backslash_delimited?
+      if literal.interpolate?
         self.class.lex_en_interp_words
       else
         self.class.lex_en_plain_words
       end
-    elsif !new_literal.words? && new_literal.backslash_delimited?
-      if new_literal.interpolate?
+    elsif !literal.words? && literal.backslash_delimited?
+      if literal.interpolate?
         self.class.lex_en_interp_backslash_delimited
       else
         self.class.lex_en_plain_backslash_delimited
       end
     else
-      if new_literal.interpolate?
+      if literal.interpolate?
         self.class.lex_en_interp_string
       else
         self.class.lex_en_plain_string
@@ -468,6 +466,7 @@ class Parser::Lexer
     'if'     => :kIF,          'unless'   => :kUNLESS,
     'while'  => :kWHILE,       'until'    => :kUNTIL,
     'rescue' => :kRESCUE,      'defined?' => :kDEFINED,
+    'BEGIN'  => :klBEGIN,      'END'      => :klEND,
   }
 
   %w(class module def undef begin end then elsif else ensure case when
@@ -622,19 +621,23 @@ class Parser::Lexer
   flo_pow  = [eE] [+\-]? ( digit+ '_' )* digit+;
 
   int_suffix =
-    ''   % { @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } }
-  | 'r'  % { @num_xfrm = lambda { |chars| emit(:tRATIONAL,  Rational(chars)) } }
-  | 'i'  % { @num_xfrm = lambda { |chars| emit(:tIMAGINARY, Complex(0, chars)) } }
-  | 'ri' % { @num_xfrm = lambda { |chars| emit(:tIMAGINARY, Complex(0, Rational(chars))) } };
+    ''       % { @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars) } }
+  | 'r'      % { @num_xfrm = lambda { |chars| emit(:tRATIONAL,  Rational(chars)) } }
+  | 'i'      % { @num_xfrm = lambda { |chars| emit(:tIMAGINARY, Complex(0, chars)) } }
+  | 'ri'     % { @num_xfrm = lambda { |chars| emit(:tIMAGINARY, Complex(0, Rational(chars))) } }
+  | 'if'     % { @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars, @ts, @te - 2); p -= 2 } }
+  | 'rescue' % { @num_xfrm = lambda { |chars| emit(:tINTEGER,   chars, @ts, @te - 6); p -= 6 } };
 
   flo_pow_suffix =
     ''   % { @num_xfrm = lambda { |chars| emit(:tFLOAT,     Float(chars)) } }
-  | 'i'  % { @num_xfrm = lambda { |chars| emit(:tIMAGINARY, Complex(0, Float(chars))) } };
+  | 'i'  % { @num_xfrm = lambda { |chars| emit(:tIMAGINARY, Complex(0, Float(chars))) } }
+  | 'if' % { @num_xfrm = lambda { |chars| emit(:tFLOAT,     Float(chars), @ts, @te - 2); p -= 2 } };
 
   flo_suffix =
     flo_pow_suffix
-  | 'r'  % { @num_xfrm = lambda { |chars| emit(:tRATIONAL,  Rational(chars)) } }
-  | 'ri' % { @num_xfrm = lambda { |chars| emit(:tIMAGINARY, Complex(0, Rational(chars))) } };
+  | 'r'      % { @num_xfrm = lambda { |chars| emit(:tRATIONAL,  Rational(chars)) } }
+  | 'ri'     % { @num_xfrm = lambda { |chars| emit(:tIMAGINARY, Complex(0, Rational(chars))) } }
+  | 'rescue' % { @num_xfrm = lambda { |chars| emit(:tFLOAT,     Float(chars), @ts, @te - 6); p -= 6 } };
 
   #
   # === ESCAPE SEQUENCE PARSING ===
@@ -655,17 +658,37 @@ class Parser::Lexer
     codepoints  = tok(@escape_s + 2, p - 1)
     codepoint_s = @escape_s + 2
 
-    codepoints.split(/[ \t]/).each do |codepoint_str|
-      codepoint = codepoint_str.to_i(16)
-
-      if codepoint >= 0x110000
-        diagnostic :error, :unicode_point_too_large, nil,
-                   range(codepoint_s, codepoint_s + codepoint_str.length)
-        break
+    if @version < 24
+      if codepoints.start_with?(" ") || codepoints.start_with?("\t")
+        diagnostic :fatal, :invalid_unicode_escape, nil,
+          range(@escape_s + 2, @escape_s + 3)
       end
 
-      @escape     += codepoint.chr(Encoding::UTF_8)
-      codepoint_s += codepoint_str.length + 1
+      if spaces_p = codepoints.index(/[ \t]{2}/)
+        diagnostic :fatal, :invalid_unicode_escape, nil,
+          range(codepoint_s + spaces_p + 1, codepoint_s + spaces_p + 2)
+      end
+
+      if codepoints.end_with?(" ") || codepoints.end_with?("\t")
+        diagnostic :fatal, :invalid_unicode_escape, nil, range(p - 1, p)
+      end
+    end
+
+    codepoints.scan(/([0-9a-fA-F]+)|([ \t]+)/).each do |(codepoint_str, spaces)|
+      if spaces
+        codepoint_s += spaces.length
+      else
+        codepoint = codepoint_str.to_i(16)
+
+        if codepoint >= 0x110000
+          diagnostic :error, :unicode_point_too_large, nil,
+                     range(codepoint_s, codepoint_s + codepoint_str.length)
+          break
+        end
+
+        @escape     += codepoint.chr(Encoding::UTF_8)
+        codepoint_s += codepoint_str.length
+      end
     end
   }
 
@@ -708,35 +731,38 @@ class Parser::Lexer
     | 'x' xdigit{1,2}
         % { @escape = encode_escape(tok(@escape_s + 1, p).to_i(16)) }
 
-      # \u263a
-    | 'u' xdigit{4}
-      % { @escape = tok(@escape_s + 1, p).to_i(16).chr(Encoding::UTF_8) }
-
       # %q[\x]
     | 'x' ( c_any - xdigit )
       % {
         diagnostic :fatal, :invalid_hex_escape, nil, range(@escape_s - 1, p + 2)
       }
 
-      # %q[\u123] %q[\u{12]
-    | 'u' ( c_any{0,4}  -
-            xdigit{4}   -            # \u1234 is valid
-            ( '{' xdigit{1,3}        # \u{1 \u{12 \u{123 are valid
-            | '{' xdigit [ \t}] any? # \u{1. \u{1} are valid
-            | '{' xdigit{2} [ \t}]   # \u{12. \u{12} are valid
-            )
-          )
+      # \u263a
+    | 'u' xdigit{4}
+      % { @escape = tok(@escape_s + 1, p).to_i(16).chr(Encoding::UTF_8) }
+
+      # \u123
+    | 'u' xdigit{0,3}
       % {
         diagnostic :fatal, :invalid_unicode_escape, nil, range(@escape_s - 1, p)
       }
 
-      # \u{123 456}
-    | 'u{' ( xdigit{1,6} [ \t] )*
-      ( xdigit{1,6} '}'
-        %unicode_points
-      | ( xdigit* ( c_any - xdigit - '}' )+ '}'
-        | ( c_any - '}' )* c_eof
-        | xdigit{7,}
+      # u{not hex} or u{}
+    | 'u{' ( c_any - xdigit - [ \t}] )* '}'
+      % {
+        diagnostic :fatal, :invalid_unicode_escape, nil, range(@escape_s - 1, p)
+      }
+
+      # \u{  \t  123  \t 456   \t\t }
+    | 'u{' [ \t]* ( xdigit{1,6} [ \t]+ )*
+      (
+        ( xdigit{1,6} [ \t]* '}'
+          %unicode_points
+        )
+        |
+        ( xdigit* ( c_any - xdigit - [ \t}] )+ '}'
+          | ( c_any - [ \t}] )* c_eof
+          | xdigit{7,}
         ) % {
           diagnostic :fatal, :unterminated_unicode, nil, range(p - 1, p)
         }
@@ -871,6 +897,23 @@ class Parser::Lexer
         # Regular expressions should include escape sequences in their
         # escaped form. On the other hand, escaped newlines are removed.
         current_literal.extend_string(tok.gsub("\\\n".freeze, ''.freeze), @ts, @te)
+      elsif current_literal.heredoc? && escaped_char == "\n".freeze
+        if current_literal.squiggly_heredoc?
+          # Squiggly heredocs like
+          #   <<~-HERE
+          #     1\
+          #     2
+          #   HERE
+          # treat '\' as a line continuation, but still dedent the body, so the heredoc above becomes "12\n".
+          # This information is emitted as is, without escaping,
+          # later this escape sequence (\\n) gets handled manually in the Lexer::Dedenter
+          current_literal.extend_string(tok, @ts, @te)
+        else
+          # Plain heredocs also parse \\n as a line continuation,
+          # but they don't need to know that there was originally a newline in the
+          # code, so we escape it and emit as "  1  2\n"
+          current_literal.extend_string(tok.gsub("\\\n".freeze, ''.freeze), @ts, @te)
+        end
       else
         current_literal.extend_string(@escape || tok, @ts, @te)
       end
@@ -995,6 +1038,13 @@ class Parser::Lexer
       if current_literal.end_interp_brace_and_try_closing
         if version?(18, 19)
           emit(:tRCURLY, '}'.freeze, p - 1, p)
+          if @version < 24
+            @cond.lexpop
+            @cmdarg.lexpop
+          else
+            @cond.pop
+            @cmdarg.pop
+          end
         else
           emit(:tSTRING_DEND, '}'.freeze, p - 1, p)
         end
@@ -1003,8 +1053,9 @@ class Parser::Lexer
           @herebody_s = current_literal.saved_herebody_s
         end
 
+
         fhold;
-        fnext *stack_pop;
+        fnext *next_state_for_literal(current_literal);
         fbreak;
       end
     end
@@ -1023,7 +1074,8 @@ class Parser::Lexer
     end
 
     current_literal.start_interp_brace
-    fcall expr_value;
+    fnext expr_value;
+    fbreak;
   }
 
   # Actual string parsers are simply combined from the primitives defined
@@ -1096,13 +1148,15 @@ class Parser::Lexer
         end
 
         emit(:tREGEXP_OPT)
-        fnext expr_end; fbreak;
+        fnext expr_end;
+        fbreak;
       };
 
       any
       => {
         emit(:tREGEXP_OPT, tok(@ts, @te - 1), @ts, @te - 1)
-        fhold; fgoto expr_end;
+        fhold;
+        fgoto expr_end;
       };
   *|;
 
@@ -1409,12 +1463,12 @@ class Parser::Lexer
       w_space* e_lbrace
       => {
         if @lambda_stack.last == @paren_nest
-          p = @ts - 1
-          fgoto expr_end;
+          @lambda_stack.pop
+          emit(:tLAMBEG, '{'.freeze, @te - 1, @te)
         else
           emit(:tLCURLY, '{'.freeze, @te - 1, @te)
-          fnext expr_value; fbreak;
         end
+        fnext expr_value; fbreak;
       };
 
       #
@@ -1621,16 +1675,11 @@ class Parser::Lexer
   # explodes.
   #
   expr_beg := |*
-      # Numeric processing. Converts:
-      #   +5 to [tINTEGER, 5]
-      #   -5 to [tUMINUS_NUM] [tINTEGER, 5]
-      [+\-][0-9]
+      # +5, -5, -  5
+      [+\-] w_any* [0-9]
       => {
-        fhold;
-        if tok.start_with? '-'.freeze
-          emit(:tUMINUS_NUM, '-'.freeze, @ts, @ts + 1)
-          fnext expr_end; fbreak;
-        end
+        emit(:tUNARY_NUM, tok(@ts, @ts + 1), @ts, @ts + 1)
+        fhold; fnext expr_end; fbreak;
       };
 
       # splat *a
@@ -1674,18 +1723,29 @@ class Parser::Lexer
       # <<-END | <<-'END' | <<-"END" | <<-`END` |
       # <<~END | <<~'END' | <<~"END" | <<~`END`
       '<<' [~\-]?
-        ( '"' ( c_line - '"' )* '"'
-        | "'" ( c_line - "'" )* "'"
-        | "`" ( c_line - "`" )* "`"
+        ( '"' ( any - '"' )* '"'
+        | "'" ( any - "'" )* "'"
+        | "`" ( any - "`" )* "`"
         | bareword ) % { heredoc_e      = p }
         c_line* c_nl % { new_herebody_s = p }
       => {
-        tok(@ts, heredoc_e) =~ /^<<(-?)(~?)(["'`]?)(.*)\3$/
+        tok(@ts, heredoc_e) =~ /^<<(-?)(~?)(["'`]?)(.*)\3$/m
 
         indent      = !$1.empty? || !$2.empty?
         dedent_body = !$2.empty?
         type        =  $3.empty? ? '<<"'.freeze : ('<<'.freeze + $3)
         delimiter   =  $4
+
+        if @version >= 24
+          if delimiter.count("\n") > 0
+            if delimiter.end_with?("\n")
+              diagnostic :warning, :heredoc_id_ends_with_nl, nil, range(@ts, @ts + 1)
+              delimiter = delimiter.rstrip
+            else
+              diagnostic :fatal, :heredoc_id_has_newline, nil, range(@ts, @ts + 1)
+            end
+          end
+        end
 
         if dedent_body && version?(18, 19, 20, 21, 22)
           emit(:tLSHFT, '<<'.freeze, @ts, @ts + 2)
@@ -1703,11 +1763,26 @@ class Parser::Lexer
       # SYMBOL LITERALS
       #
 
+      # :&&, :||
+      ':' ('&&' | '||') => {
+        fhold; fhold;
+        emit(:tSYMBEG, tok(@ts, @ts + 1), @ts, @ts + 1)
+        fgoto expr_fname;
+      };
+
       # :"bar", :'baz'
       ':' ['"] # '
       => {
         type, delimiter = tok, tok[-1].chr
         fgoto *push_literal(type, delimiter, @ts);
+      };
+
+      # :!@ is :!
+      # :~@ is :~
+      ':' [!~] '@'
+      => {
+        emit(:tSYMBOL, tok(@ts + 1, @ts + 2))
+        fnext expr_end; fbreak;
       };
 
       ':' bareword ambiguous_symbol_suffix
@@ -1737,11 +1812,7 @@ class Parser::Lexer
         value = @escape || tok(@ts + 1)
 
         if version?(18)
-          if defined?(Encoding)
-            emit(:tINTEGER, value.dup.force_encoding(Encoding::BINARY)[0].ord)
-          else
-            emit(:tINTEGER, value[0].ord)
-          end
+          emit(:tINTEGER, value.getbyte(0))
         else
           emit(:tCHARACTER, value)
         end
@@ -1858,6 +1929,21 @@ class Parser::Lexer
       call_or_var
       => local_ident;
 
+      (call_or_var - keyword)
+        % { ident_tok = tok; ident_ts = @ts; ident_te = @te; }
+      w_space+ '('
+      => {
+        emit(:tIDENTIFIER, ident_tok, ident_ts, ident_te)
+        p = ident_te - 1
+
+        if !@static_env.nil? && @static_env.declared?(ident_tok) && @version < 25
+          fnext expr_endfn;
+        else
+          fnext expr_cmdarg;
+        end
+        fbreak;
+      };
+
       #
       # WHITESPACE
       #
@@ -1865,8 +1951,11 @@ class Parser::Lexer
       w_any;
 
       e_heredoc_nl '=begin' ( c_space | c_nl_zlen )
-      => { p = @ts - 1
-           fgoto line_begin; };
+      => {
+        p = @ts - 1
+        @cs_before_block_comment = @cs
+        fgoto line_begin;
+      };
 
       #
       # DEFAULT TRANSITION
@@ -2154,20 +2243,37 @@ class Parser::Lexer
       # OPERATORS
       #
 
-      ( e_lparen
-      | operator_arithmetic
-      | operator_rest
-      )
+      # When '|', '~', '!', '=>' are used as operators
+      # they do not accept any symbols (or quoted labels) after.
+      # Other binary operators accept it.
+      ( operator_arithmetic | operator_rest ) - ( '|' | '~' | '!' )
+      => {
+        emit_table(PUNCTUATION);
+        fnext expr_value; fbreak;
+      };
+
+      ( e_lparen | '|' | '~' | '!' )
       => { emit_table(PUNCTUATION)
            fnext expr_beg; fbreak; };
 
       e_rbrace | e_rparen | ']'
       => {
         emit_table(PUNCTUATION)
-        @cond.lexpop; @cmdarg.lexpop
 
-        if RBRACE_OR_RBRACK.include?(tok)
-          fnext expr_endarg;
+        if @version < 24
+          @cond.lexpop
+          @cmdarg.lexpop
+        else
+          @cond.pop
+          @cmdarg.pop
+        end
+
+        if tok == '}'.freeze || tok == ']'.freeze
+          if @version >= 25
+            fnext expr_end;
+          else
+            fnext expr_endarg;
+          end
         else # )
           # fnext expr_endfn; ?
         end
@@ -2237,7 +2343,7 @@ class Parser::Lexer
       '=end' c_line* c_nl_zlen
       => {
         emit_comment(@eq_begin_s, @te)
-        fgoto line_begin;
+        fgoto *@cs_before_block_comment;
       };
 
       c_line* c_nl;

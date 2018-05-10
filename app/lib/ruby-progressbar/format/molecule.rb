@@ -6,6 +6,7 @@ class   Molecule
     :T => [:title_comp,   :title],
     :c => [:progressable, :progress],
     :C => [:progressable, :total],
+    :u => [:progressable, :total_with_unknown_indicator],
     :p => [:percentage,   :percentage],
     :P => [:percentage,   :percentage_with_precision],
     :j => [:percentage,   :justified_percentage],
@@ -19,7 +20,7 @@ class   Molecule
     :w => [:bar,          :bar_with_percentage],
     :i => [:bar,          :incomplete_space],
     :r => [:rate,         :rate_of_change],
-    :R => [:rate,         :rate_of_change_with_precision],
+    :R => [:rate,         :rate_of_change_with_precision]
   }.freeze
 
   BAR_MOLECULES = %w{w B b i}.freeze

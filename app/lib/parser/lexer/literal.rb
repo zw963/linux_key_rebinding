@@ -1,4 +1,5 @@
 # encoding: binary
+# frozen_string_literal: true
 
 module Parser
 
@@ -102,6 +103,14 @@ module Parser
       !!@heredoc_e
     end
 
+    def plain_heredoc?
+      heredoc? && !@dedent_body
+    end
+
+    def squiggly_heredoc?
+      heredoc? && @dedent_body
+    end
+
     def backslash_delimited?
       @end_delim == '\\'.freeze
     end
@@ -187,7 +196,7 @@ module Parser
       @buffer_s ||= ts
       @buffer_e = te
 
-      @buffer += string
+      @buffer << string
     end
 
     def flush_string
@@ -229,21 +238,15 @@ module Parser
     end
 
     def coerce_encoding(string)
-      if defined?(Encoding)
-        string.dup.force_encoding(Encoding::BINARY)
-      else
-        string
-      end
+      string.b
     end
 
     def clear_buffer
-      @buffer = ''
+      @buffer = ''.dup
 
       # Prime the buffer with lexer encoding; otherwise,
       # concatenation will produce varying results.
-      if defined?(Encoding)
-        @buffer.force_encoding(@lexer.source_buffer.source.encoding)
-      end
+      @buffer.force_encoding(@lexer.source_buffer.source.encoding)
 
       @buffer_s = nil
       @buffer_e = nil

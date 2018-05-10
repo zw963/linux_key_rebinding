@@ -24,45 +24,41 @@ module RuboCop
       #   x&.foo&.bar
       #   x&.foo || bar
       class SafeNavigationChain < Cop
+        include NilMethods
         extend TargetRubyVersion
 
         MSG = 'Do not chain ordinary method call' \
               ' after safe navigation operator.'.freeze
 
         def_node_matcher :bad_method?, <<-PATTERN
-          (send (csend ...) $_ ...)
+          (send $(csend ...) $_ ...)
         PATTERN
 
         minimum_target_ruby_version 2.3
 
         def on_send(node)
-          bad_method?(node) do |method|
+          bad_method?(node) do |safe_nav, method|
             return if nil_methods.include?(method)
 
-            loc = node.loc.dot || :selector
-
-            add_offense(node, loc)
-          end
-        end
-
-        def autocorrect(node)
-          dot = node.loc.dot
-
-          return unless dot
-
-          lambda do |corrector|
-            corrector.insert_before(dot, '&')
+            method_chain = method_chain(node)
+            location =
+              Parser::Source::Range.new(node.loc.expression.source_buffer,
+                                        safe_nav.loc.expression.end_pos,
+                                        method_chain.loc.expression.end_pos)
+            add_offense(node, location: location)
           end
         end
 
         private
 
-        def nil_methods
-          nil.methods + whitelist
-        end
-
-        def whitelist
-          cop_config['Whitelist'].map(&:to_sym)
+        def method_chain(node)
+          chain = node
+          while chain.send_type?
+            chain = chain.parent if chain.parent &&
+                                    %i[send csend].include?(chain.parent.type)
+            break
+          end
+          chain
         end
       end
     end

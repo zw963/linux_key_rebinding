@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Parser
   module Source
 
@@ -22,6 +24,8 @@ module Parser
     # @api public
     #
     class Range
+      include Comparable
+
       attr_reader :source_buffer
       attr_reader :begin_pos, :end_pos
 
@@ -49,7 +53,7 @@ module Parser
       #   of this range.
       #
       def begin
-        Range.new(@source_buffer, @begin_pos, @begin_pos)
+        with(end_pos: @begin_pos)
       end
 
       ##
@@ -57,7 +61,7 @@ module Parser
       #   of this range.
       #
       def end
-        Range.new(@source_buffer, @end_pos, @end_pos)
+        with(begin_pos: @end_pos)
       end
 
       ##
@@ -166,11 +170,29 @@ module Parser
       end
 
       ##
+      # @param [Hash] Endpoint(s) to change, any combination of :begin_pos or :end_pos
+      # @return [Range] the same range as this range but with the given end point(s) changed
+      # to the given value(s).
+      #
+      def with(begin_pos: @begin_pos, end_pos: @end_pos)
+        Range.new(@source_buffer, begin_pos, end_pos)
+      end
+
+      ##
+      # @param [Hash] Endpoint(s) to change, any combination of :begin_pos or :end_pos
+      # @return [Range] the same range as this range but with the given end point(s) adjusted
+      # by the given amount(s)
+      #
+      def adjust(begin_pos: 0, end_pos: 0)
+        Range.new(@source_buffer, @begin_pos + begin_pos, @end_pos + end_pos)
+      end
+
+      ##
       # @param [Integer] new_size
       # @return [Range] a range beginning at the same point as this range and length `new_size`.
       #
       def resize(new_size)
-        Range.new(@source_buffer, @begin_pos, @begin_pos + new_size)
+        with(end_pos: @begin_pos + new_size)
       end
 
       ##
@@ -197,19 +219,66 @@ module Parser
       end
 
       ##
+      # Return `true` iff this range and `other` are disjoint.
+      #
+      # Two ranges must be one and only one of ==, disjoint?, contains?, contained? or crossing?
+      #
       # @param [Range] other
-      # @return [Boolean] `true` if this range and `other` do not overlap
+      # @return [Boolean]
       #
       def disjoint?(other)
-        @begin_pos >= other.end_pos || other.begin_pos >= @end_pos
+        if empty? && other.empty?
+          @begin_pos != other.begin_pos
+        else
+          @begin_pos >= other.end_pos || other.begin_pos >= @end_pos
+        end
       end
 
       ##
+      # Return `true` iff this range is not disjoint from `other`.
+      #
       # @param [Range] other
       # @return [Boolean] `true` if this range and `other` overlap
       #
       def overlaps?(other)
-        @begin_pos < other.end_pos && other.begin_pos < @end_pos
+        !disjoint?(other)
+      end
+
+      ##
+      # Returns true iff this range contains (strictly) `other`.
+      #
+      # Two ranges must be one and only one of ==, disjoint?, contains?, contained? or crossing?
+      #
+      # @param [Range] other
+      # @return [Boolean]
+      #
+      def contains?(other)
+        (other.begin_pos <=> @begin_pos) + (@end_pos <=> other.end_pos) >= (other.empty? ? 2 : 1)
+      end
+
+      ##
+      # Return `other.contains?(self)`
+      #
+      # Two ranges must be one and only one of ==, disjoint?, contains?, contained? or crossing?
+      #
+      # @param [Range] other
+      # @return [Boolean]
+      #
+      def contained?(other)
+        other.contains?(self)
+      end
+
+      ##
+      # Returns true iff both ranges intersect and also have different elements from one another.
+      #
+      # Two ranges must be one and only one of ==, disjoint?, contains?, contained? or crossing?
+      #
+      # @param [Range] other
+      # @return [Boolean]
+      #
+      def crossing?(other)
+        return false unless overlaps?(other)
+        (@begin_pos <=> other.begin_pos) * (@end_pos <=> other.end_pos) == 1
       end
 
       ##
@@ -220,14 +289,13 @@ module Parser
       end
 
       ##
-      # Compares ranges.
-      # @return [Boolean]
+      # Compare ranges, first by begin_pos, then by end_pos.
       #
-      def ==(other)
-        other.is_a?(Range) &&
-          @source_buffer == other.source_buffer &&
-          @begin_pos     == other.begin_pos     &&
-          @end_pos       == other.end_pos
+      def <=>(other)
+        return nil unless other.is_a?(::Parser::Source::Range) &&
+          @source_buffer == other.source_buffer
+        (@begin_pos <=> other.begin_pos).nonzero? ||
+        (@end_pos <=> other.end_pos)
       end
 
       ##

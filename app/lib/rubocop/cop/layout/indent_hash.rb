@@ -19,29 +19,71 @@ module RuboCop
       # This default style is called 'special_inside_parentheses'. Alternative
       # styles are 'consistent' and 'align_braces'. Here are examples:
       #
-      #     # special_inside_parentheses
-      #     hash = {
-      #       key: :value
-      #     }
-      #     but_in_a_method_call({
-      #                            its_like: :this
-      #                          })
-      #     # consistent
-      #     hash = {
-      #       key: :value
-      #     }
-      #     and_in_a_method_call({
-      #       no: :difference
-      #     })
-      #     # align_braces
-      #     and_now_for_something = {
-      #                               completely: :different
-      #                             }
+      # @example EnforcedStyle: special_inside_parentheses (default)
+      #   # The `special_inside_parentheses` style enforces that the first key
+      #   # in a hash literal where the opening brace and the first key are on
+      #   # separate lines is indented one step (two spaces) more than the
+      #   # position inside the opening parentheses.
       #
+      #   # bad
+      #   hash = {
+      #     key: :value
+      #   }
+      #   and_in_a_method_call({
+      #     no: :difference
+      #                        })
+      #
+      #   # good
+      #   special_inside_parentheses
+      #   hash = {
+      #     key: :value
+      #   }
+      #   but_in_a_method_call({
+      #                          its_like: :this
+      #                        })
+      #
+      # @example EnforcedStyle: consistent
+      #   # The `consistent` style enforces that the first key in a hash
+      #   # literal where the opening brace and the first key are on
+      #   # seprate lines is indented the same as a hash literal which is not
+      #   # defined inside a method call.
+      #
+      #   # bad
+      #   hash = {
+      #     key: :value
+      #   }
+      #   but_in_a_method_call({
+      #                          its_like: :this
+      #                         })
+      #
+      #   # good
+      #   hash = {
+      #     key: :value
+      #   }
+      #   and_in_a_method_call({
+      #     no: :difference
+      #   })
+      #
+      # @example EnforcedStyle: align_braces
+      #   # The `align_brackets` style enforces that the opening and closing
+      #   # braces are indented to the same position.
+      #
+      #   # bad
+      #   and_now_for_something = {
+      #                             completely: :different
+      #   }
+      #
+      #   # good
+      #   and_now_for_something = {
+      #                             completely: :different
+      #                           }
       class IndentHash < Cop
-        include AutocorrectAlignment
+        include Alignment
         include ConfigurableEnforcedStyle
         include ArrayHashIndentation
+
+        MSG = 'Use %<configured_indentation_width>d spaces for indentation ' \
+              'in a hash, relative to %<base_description>s.'.freeze
 
         def on_hash(node)
           check(node, nil) if node.loc.begin
@@ -51,6 +93,10 @@ module RuboCop
           each_argument_node(node, :hash) do |hash_node, left_parenthesis|
             check(hash_node, left_parenthesis)
           end
+        end
+
+        def autocorrect(node)
+          AlignmentCorrector.correct(processed_source, node, @column_delta)
         end
 
         private
@@ -69,7 +115,7 @@ module RuboCop
             return if first_pair.source_range.line == left_brace.line
 
             if separator_style?(first_pair)
-              check_based_on_longest_key(hash_node.children, left_brace,
+              check_based_on_longest_key(hash_node, left_brace,
                                          left_parenthesis)
             else
               check_first(first_pair, left_brace, left_parenthesis, 0)
@@ -96,7 +142,7 @@ module RuboCop
                   'Indent the right brace the same as the start of the line ' \
                   'where the left brace is.'
                 end
-          add_offense(right_brace, right_brace, msg)
+          add_offense(right_brace, location: right_brace, message: msg)
         end
 
         def separator_style?(first_pair)
@@ -105,11 +151,11 @@ module RuboCop
           config.for_cop('Layout/AlignHash')[key] == 'separator'
         end
 
-        def check_based_on_longest_key(pairs, left_brace, left_parenthesis)
-          key_lengths = pairs.map do |pair|
-            pair.children.first.source_range.length
+        def check_based_on_longest_key(hash_node, left_brace, left_parenthesis)
+          key_lengths = hash_node.keys.map do |key|
+            key.source_range.length
           end
-          check_first(pairs.first, left_brace, left_parenthesis,
+          check_first(hash_node.pairs.first, left_brace, left_parenthesis,
                       key_lengths.max - key_lengths.first)
         end
 
@@ -125,8 +171,11 @@ module RuboCop
         end
 
         def message(base_description)
-          format('Use %d spaces for indentation in a hash, relative to %s.',
-                 configured_indentation_width, base_description)
+          format(
+            MSG,
+            configured_indentation_width: configured_indentation_width,
+            base_description: base_description
+          )
         end
       end
     end

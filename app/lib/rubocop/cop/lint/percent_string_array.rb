@@ -37,20 +37,7 @@ module RuboCop
         def on_percent_literal(node)
           return unless contains_quotes_or_commas?(node)
 
-          add_offense(node, :expression, MSG)
-        end
-
-        private
-
-        def contains_quotes_or_commas?(node)
-          node.values.any? do |value|
-            literal = scrub_string(value.children.first.to_s)
-
-            # To avoid likely false positives (e.g. a single ' or ")
-            next if literal.gsub(/[^\p{Alnum}]/, '').empty?
-
-            QUOTES_AND_COMMAS.any? { |pat| literal =~ pat }
-          end
+          add_offense(node)
         end
 
         def autocorrect(node)
@@ -68,14 +55,16 @@ module RuboCop
           end
         end
 
-        def scrub_string(string)
-          if string.respond_to?(:scrub)
-            string.scrub
-          else
-            string
-              .encode('UTF-16BE', 'UTF-8',
-                      invalid: :replace, undef: :replace, replace: '?')
-              .encode('UTF-8')
+        private
+
+        def contains_quotes_or_commas?(node)
+          node.values.any? do |value|
+            literal = value.children.first.to_s.scrub
+
+            # To avoid likely false positives (e.g. a single ' or ")
+            next if literal.gsub(/[^\p{Alnum}]/, '').empty?
+
+            QUOTES_AND_COMMAS.any? { |pat| literal =~ pat }
           end
         end
       end

@@ -5,6 +5,8 @@ module RuboCop
     module Lint
       # Common functionality for cops handling unused arguments.
       module UnusedArgument
+        extend NodePattern::Macros
+
         def join_force?(force_class)
           force_class == VariableForce
         end
@@ -15,26 +17,15 @@ module RuboCop
           end
         end
 
+        private
+
         def check_argument(variable)
           return if variable.should_be_unused?
           return if variable.referenced?
 
           message = message(variable)
-          add_offense(variable.declaration_node, :name, message)
-        end
-
-        def autocorrect(node)
-          return if %i[kwarg kwoptarg].include?(node.type)
-
-          if node.blockarg_type?
-            lambda do |corrector|
-              range = range_with_surrounding_space(node.source_range, :left)
-              range = range_with_surrounding_comma(range, :left)
-              corrector.remove(range)
-            end
-          else
-            ->(corrector) { corrector.insert_before(node.loc.name, '_') }
-          end
+          add_offense(variable.declaration_node, location: :name,
+                                                 message: message)
         end
       end
     end

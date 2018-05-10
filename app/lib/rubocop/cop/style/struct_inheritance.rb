@@ -19,12 +19,12 @@ module RuboCop
           _name, superclass, _body = *node
           return unless struct_constructor?(superclass)
 
-          add_offense(node, superclass.source_range, MSG)
+          add_offense(node, location: superclass.source_range)
         end
 
         def_node_matcher :struct_constructor?, <<-PATTERN
-           {(send (const nil :Struct) :new ...)
-            (block (send (const nil :Struct) :new ...) ...)}
+           {(send (const nil? :Struct) :new ...)
+            (block (send (const nil? :Struct) :new ...) ...)}
         PATTERN
       end
     end

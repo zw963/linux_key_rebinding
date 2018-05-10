@@ -3,8 +3,19 @@
 module RuboCop
   module Cop
     module Style
-      # This cop checks for uses if the keyword *not* instead of !.
+      # This cop checks for uses of the keyword `not` instead of `!`.
+      #
+      # @example
+      #
+      #   # bad - parentheses are required because of op precedence
+      #   x = (not something)
+      #
+      #   # good
+      #   x = !something
+      #
       class Not < Cop
+        include RangeHelp
+
         MSG = 'Use `!` instead of `not`.'.freeze
 
         OPPOSITE_METHODS = {
@@ -19,13 +30,12 @@ module RuboCop
         def on_send(node)
           return unless node.keyword_not?
 
-          add_offense(node, :selector)
+          add_offense(node, location: :selector)
         end
 
-        private
-
         def autocorrect(node)
-          range = range_with_surrounding_space(node.loc.selector, :right)
+          range = range_with_surrounding_space(range: node.loc.selector,
+                                               side: :right)
 
           if opposite_method?(node.receiver)
             correct_opposite_method(range, node.receiver)
@@ -35,6 +45,8 @@ module RuboCop
             correct_without_parens(range)
           end
         end
+
+        private
 
         def opposite_method?(child)
           child.send_type? && OPPOSITE_METHODS.key?(child.method_name)

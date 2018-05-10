@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Parser
   ##
   # Diagnostic messages (errors, warnings and notices) that can be generated.
@@ -26,6 +28,8 @@ module Parser
     :bare_backslash          => 'bare backslash only allowed before newline',
     :unexpected              => "unexpected `%{character}'",
     :embedded_document       => 'embedded document meets end of file (and they embark on a romantic journey)',
+    :heredoc_id_has_newline  => 'here document identifier across newlines, never match',
+    :heredoc_id_ends_with_nl => 'here document identifier ends with a newline',
 
     # Lexer warnings
     :invalid_escape_use      => 'invalid character syntax; use ?%{escape}',
@@ -56,6 +60,7 @@ module Parser
     :masgn_as_condition      => 'multiple assignment in conditional context',
     :block_given_to_yield    => 'block given to yield',
     :invalid_regexp          => '%{message}',
+    :invalid_return          => 'Invalid return in class/module body',
 
     # Parser warnings
     :useless_else            => 'else without rescue is useless',
@@ -66,5 +71,14 @@ module Parser
     # Rewriter diagnostics
     :invalid_action          => 'cannot %{action}',
     :clobbered               => 'clobbered by: %{action}',
+
+    # Rewriter diagnostics
+    :different_replacements        => 'different replacements: %{replacement} vs %{other_replacement}',
+    :swallowed_insertions          => 'this replacement:',
+    :swallowed_insertions_conflict => 'swallows some inner rewriting actions:',
+    :crossing_deletions            => 'the deletion of:',
+    :crossing_deletions_conflict   => 'is crossing:',
+    :crossing_insertions           => 'the rewriting action on:',
+    :crossing_insertions_conflict  => 'is crossing that on:',
   }.freeze
 end

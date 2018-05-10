@@ -9,12 +9,12 @@ module RuboCop
       #
       #  # good
       #  class Rails5Model < ApplicationRecord
-      #    ...
+      #    # ...
       #  end
       #
       #  # bad
       #  class Rails4Model < ActiveRecord::Base
-      #    ...
+      #    # ...
       #  end
       class ApplicationRecord < Cop
         extend TargetRailsVersion
@@ -23,9 +23,17 @@ module RuboCop
 
         MSG = 'Models should subclass `ApplicationRecord`.'.freeze
         SUPERCLASS = 'ApplicationRecord'.freeze
-        BASE_PATTERN = '(const (const nil :ActiveRecord) :Base)'.freeze
+        BASE_PATTERN = '(const (const nil? :ActiveRecord) :Base)'.freeze
 
+        # rubocop:disable Layout/ClassStructure
         include RuboCop::Cop::EnforceSuperclass
+        # rubocop:enable Layout/ClassStructure
+
+        def autocorrect(node)
+          lambda do |corrector|
+            corrector.replace(node.source_range, self.class::SUPERCLASS)
+          end
+        end
       end
     end
   end

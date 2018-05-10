@@ -10,11 +10,33 @@ module RuboCop
       #
       # If the TargetRailsVersion is set to less than 4.0, the cop will enforce
       # the use of filter methods.
+      #
+      # @example EnforcedStyle: action (default)
+      #   # bad
+      #   after_filter :do_stuff
+      #   append_around_filter :do_stuff
+      #   skip_after_filter :do_stuff
+      #
+      #   # good
+      #   after_action :do_stuff
+      #   append_around_action :do_stuff
+      #   skip_after_action :do_stuff
+      #
+      # @example EnforcedStyle: filter
+      #   # bad
+      #   after_action :do_stuff
+      #   append_around_action :do_stuff
+      #   skip_after_action :do_stuff
+      #
+      #   # good
+      #   after_filter :do_stuff
+      #   append_around_filter :do_stuff
+      #   skip_after_filter :do_stuff
       class ActionFilter < Cop
         extend TargetRailsVersion
         include ConfigurableEnforcedStyle
 
-        MSG = 'Prefer `%s` over `%s`.'.freeze
+        MSG = 'Prefer `%<prefer>s` over `%<current>s`.'.freeze
 
         FILTER_METHODS = %i[
           after_filter
@@ -70,11 +92,12 @@ module RuboCop
         def check_method_node(node)
           return unless bad_methods.include?(node.method_name)
 
-          add_offense(node, :selector)
+          add_offense(node, location: :selector)
         end
 
         def message(node)
-          format(MSG, preferred_method(node.method_name), node.method_name)
+          format(MSG, prefer: preferred_method(node.method_name),
+                      current: node.method_name)
         end
 
         def bad_methods

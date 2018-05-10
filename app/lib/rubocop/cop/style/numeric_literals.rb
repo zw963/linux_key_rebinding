@@ -41,6 +41,12 @@ module RuboCop
           check(node)
         end
 
+        def autocorrect(node)
+          lambda do |corrector|
+            corrector.replace(node.source_range, format_number(node))
+          end
+        end
+
         private
 
         def max_parameter_name
@@ -56,9 +62,9 @@ module RuboCop
 
           case int
           when /^\d+$/
-            add_offense(node, :expression) { self.max = int.size + 1 }
+            add_offense(node) { self.max = int.size + 1 }
           when /\d{4}/, short_group_regex
-            add_offense(node, :expression) do
+            add_offense(node) do
               self.config_to_allow_offenses = { 'Enabled' => false }
             end
           end
@@ -68,15 +74,9 @@ module RuboCop
           cop_config['Strict'] ? /_\d{1,2}(_|$)/ : /_\d{1,2}_/
         end
 
-        def autocorrect(node)
-          lambda do |corrector|
-            corrector.replace(node.source_range, format_number(node))
-          end
-        end
-
         def format_number(node)
           int_part, float_part = node.source.split('.')
-          int_part = int_part.to_i
+          int_part = Integer(int_part)
           formatted_int = int_part
                           .abs
                           .to_s
@@ -86,7 +86,7 @@ module RuboCop
           formatted_int.insert(0, '-') if int_part < 0
 
           if float_part
-            format('%s.%s', formatted_int, float_part)
+            format('%<int>s.%<float>s', int: formatted_int, float: float_part)
           else
             formatted_int
           end

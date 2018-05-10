@@ -27,13 +27,11 @@ module RuboCop
 
         def on_int(node)
           type = literal_type(node)
+
           return unless type
 
-          msg = self.class.const_get("#{type.upcase}_MSG")
-          add_offense(node, :expression, msg)
+          add_offense(node)
         end
-
-        private
 
         def autocorrect(node)
           lambda do |corrector|
@@ -41,6 +39,12 @@ module RuboCop
             corrector.replace(node.source_range,
                               send(:"format_#{type}", node.source))
           end
+        end
+
+        private
+
+        def message(node)
+          self.class.const_get("#{literal_type(node).upcase}_MSG")
         end
 
         def literal_type(node)

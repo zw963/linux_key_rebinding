@@ -10,16 +10,41 @@ module RuboCop
       # manner for all cases, so only two scenarios are considered -
       # if the first argument is a string literal and if the second
       # argument is an array literal.
+      #
+      # @example EnforcedStyle: format (default)
+      #   # bad
+      #   puts sprintf('%10s', 'hoge')
+      #   puts '%10s' % 'hoge'
+      #
+      #   # good
+      #   puts format('%10s', 'hoge')
+      #
+      # @example EnforcedStyle: sprintf
+      #   # bad
+      #   puts format('%10s', 'hoge')
+      #   puts '%10s' % 'hoge'
+      #
+      #   # good
+      #   puts sprintf('%10s', 'hoge')
+      #
+      # @example EnforcedStyle: percent
+      #   # bad
+      #   puts format('%10s', 'hoge')
+      #   puts sprintf('%10s', 'hoge')
+      #
+      #   # good
+      #   puts '%10s' % 'hoge'
+      #
       class FormatString < Cop
         include ConfigurableEnforcedStyle
 
-        MSG = 'Favor `%s` over `%s`.'.freeze
+        MSG = 'Favor `%<prefer>s` over `%<current>s`.'.freeze
 
         def_node_matcher :formatter, <<-PATTERN
         {
-          (send nil ${:sprintf :format} _ _ ...)
+          (send nil? ${:sprintf :format} _ _ ...)
           (send {str dstr} $:% ... )
-          (send !nil $:% {array hash})
+          (send !nil? $:% {array hash})
         }
         PATTERN
 
@@ -29,12 +54,15 @@ module RuboCop
 
             return if detected_style == style
 
-            add_offense(node, :selector, message(detected_style))
+            add_offense(node, location: :selector,
+                              message: message(detected_style))
           end
         end
 
         def message(detected_style)
-          format(MSG, method_name(style), method_name(detected_style))
+          format(MSG,
+                 prefer: method_name(style),
+                 current: method_name(detected_style))
         end
 
         def method_name(style_name)

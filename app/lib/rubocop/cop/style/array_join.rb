@@ -8,13 +8,22 @@ module RuboCop
       # Not all cases can reliably checked, due to Ruby's dynamic
       # types, so we consider only cases when the first argument is an
       # array literal or the second is a string literal.
+      #
+      # @example
+      #
+      #   # bad
+      #   %w(foo bar baz) * ","
+      #
+      #   # good
+      #   %w(foo bar baz).join(",")
+      #
       class ArrayJoin < Cop
         MSG = 'Favor `Array#join` over `Array#*`.'.freeze
 
         def_node_matcher :join_candidate?, '(send $array :* $str)'
 
         def on_send(node)
-          join_candidate?(node) { add_offense(node, :selector) }
+          join_candidate?(node) { add_offense(node, location: :selector) }
         end
 
         def autocorrect(node)

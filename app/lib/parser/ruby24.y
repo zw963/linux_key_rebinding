@@ -7,7 +7,7 @@ token kCLASS kMODULE kDEF kUNDEF kBEGIN kRESCUE kENSURE kEND kIF kUNLESS
       kUNTIL_MOD kRESCUE_MOD kALIAS kDEFINED klBEGIN klEND k__LINE__
       k__FILE__ k__ENCODING__ tIDENTIFIER tFID tGVAR tIVAR tCONSTANT
       tLABEL tCVAR tNTH_REF tBACK_REF tSTRING_CONTENT tINTEGER tFLOAT
-      tUPLUS tUMINUS tUMINUS_NUM tPOW tCMP tEQ tEQQ tNEQ
+      tUPLUS tUMINUS tUNARY_NUM tPOW tCMP tEQ tEQQ tNEQ
       tGEQ tLEQ tANDOP tOROP tMATCH tNMATCH tDOT tDOT2 tDOT3 tAREF
       tASET tLSHFT tRSHFT tCOLON2 tCOLON3 tOP_ASGN tASSOC tLPAREN
       tLPAREN2 tRPAREN tLPAREN_ARG tLBRACK tLBRACK2 tRBRACK tLBRACE
@@ -22,7 +22,7 @@ token kCLASS kMODULE kDEF kUNDEF kBEGIN kRESCUE kENSURE kEND kIF kUNLESS
 prechigh
   right    tBANG tTILDE tUPLUS
   right    tPOW
-  right    tUMINUS_NUM tUMINUS
+  right    tUNARY_NUM tUMINUS
   left     tSTAR2 tDIVIDE tPERCENT
   left     tPLUS tMINUS
   left     tLSHFT tRSHFT
@@ -283,9 +283,14 @@ rule
                                   nil, val[3], nil)
                     }
 
- cmd_brace_block: tLBRACE_ARG brace_body tRCURLY
+ cmd_brace_block: tLBRACE_ARG
                     {
-                      result = [ val[0], *val[1], val[2] ]
+                      @context.push(:block)
+                    }
+                  brace_body tRCURLY
+                    {
+                      result = [ val[0], *val[2], val[3] ]
+                      @context.pop
                     }
 
            fcall: operation
@@ -670,7 +675,7 @@ rule
                     {
                       result = @builder.binary_op(val[0], val[1], val[2])
                     }
-                | tUMINUS_NUM simple_numeric tPOW arg
+                | tUNARY_NUM simple_numeric tPOW arg
                     {
                       result = @builder.unary_op(val[0],
                                   @builder.binary_op(
@@ -845,12 +850,32 @@ rule
                     }
 
     command_args:   {
-                      result = @lexer.cmdarg.dup
-                      @lexer.cmdarg.push(true)
+                      # When branch gets invoked by RACC's lookahead
+                      # and command args start with '[' or '('
+                      # we need to put `true` to the cmdarg stack
+                      # **before** `false` pushed by lexer
+                      #   m [], n
+                      #     ^
+                      # Right here we have cmdarg [...0] because
+                      # lexer pushed it on '['
+                      # We need to modify cmdarg stack to [...10]
+                      #
+                      # For all other cases (like `m n` or `m n, []`) we simply put 1 to the stack
+                      # and later lexer pushes corresponding bits on top of it.
+                      last_token = @last_token[0]
+                      lookahead = last_token == :tLBRACK || last_token == :tLPAREN_ARG
+
+                      if lookahead
+                        top = @lexer.cmdarg.pop
+                        @lexer.cmdarg.push(true)
+                        @lexer.cmdarg.push(top)
+                      else
+                        @lexer.cmdarg.push(true)
+                      end
                     }
                   call_args
                     {
-                      @lexer.cmdarg = val[0]
+                      @lexer.cmdarg.pop
 
                       result = val[1]
                     }
@@ -921,29 +946,21 @@ rule
                     }
                 | kBEGIN
                     {
-                      result = @lexer.cmdarg.dup
-                      @lexer.cmdarg.clear
+                      @lexer.cmdarg.push(false)
                     }
                     bodystmt kEND
                     {
-                      @lexer.cmdarg = val[1]
+                      @lexer.cmdarg.pop
 
                       result = @builder.begin_keyword(val[0], val[2], val[3])
                     }
-                | tLPAREN_ARG
-                    {
-                      result = @lexer.cmdarg.dup
-                      @lexer.cmdarg.clear
-                    }
-                    stmt
+                | tLPAREN_ARG stmt
                     {
                       @lexer.state = :expr_endarg
                     }
                     rparen
                     {
-                      @lexer.cmdarg = val[1]
-
-                      result = @builder.begin(val[0], val[2], val[4])
+                      result = @builder.begin(val[0], val[1], val[3])
                     }
                 | tLPAREN_ARG
                     {
@@ -1098,11 +1115,12 @@ rule
                 | kCLASS cpath superclass
                     {
                       @static_env.extend_static
-                      @lexer.push_cmdarg
+                      @lexer.cmdarg.push(false)
+                      @context.push(:class)
                     }
                     bodystmt kEND
                     {
-                      if in_def?
+                      unless @context.class_definition_allowed?
                         diagnostic :error, :class_in_def, nil, val[0]
                       end
 
@@ -1111,58 +1129,56 @@ rule
                                                   lt_t, superclass,
                                                   val[4], val[5])
 
-                      @lexer.pop_cmdarg
+                      @lexer.cmdarg.pop
                       @static_env.unextend
+                      @context.pop
                     }
                 | kCLASS tLSHFT expr term
                     {
-                      result = @def_level
-                      @def_level = 0
-
                       @static_env.extend_static
-                      @lexer.push_cmdarg
+                      @lexer.cmdarg.push(false)
+                      @context.push(:sclass)
                     }
                     bodystmt kEND
                     {
                       result = @builder.def_sclass(val[0], val[1], val[2],
                                                    val[5], val[6])
 
-                      @lexer.pop_cmdarg
+                      @lexer.cmdarg.pop
                       @static_env.unextend
-
-                      @def_level = val[4]
+                      @context.pop
                     }
                 | kMODULE cpath
                     {
                       @static_env.extend_static
-                      @lexer.push_cmdarg
+                      @lexer.cmdarg.push(false)
                     }
                     bodystmt kEND
                     {
-                      if in_def?
+                      unless @context.module_definition_allowed?
                         diagnostic :error, :module_in_def, nil, val[0]
                       end
 
                       result = @builder.def_module(val[0], val[1],
                                                    val[3], val[4])
 
-                      @lexer.pop_cmdarg
+                      @lexer.cmdarg.pop
                       @static_env.unextend
                     }
                 | kDEF fname
                     {
-                      @def_level += 1
                       @static_env.extend_static
-                      @lexer.push_cmdarg
+                      @lexer.cmdarg.push(false)
+                      @context.push(:def)
                     }
                     f_arglist bodystmt kEND
                     {
                       result = @builder.def_method(val[0], val[1],
                                   val[3], val[4], val[5])
 
-                      @lexer.pop_cmdarg
+                      @lexer.cmdarg.pop
                       @static_env.unextend
-                      @def_level -= 1
+                      @context.pop
                     }
                 | kDEF singleton dot_or_colon
                     {
@@ -1170,18 +1186,18 @@ rule
                     }
                     fname
                     {
-                      @def_level += 1
                       @static_env.extend_static
-                      @lexer.push_cmdarg
+                      @lexer.cmdarg.push(false)
+                      @context.push(:defs)
                     }
                     f_arglist bodystmt kEND
                     {
                       result = @builder.def_singleton(val[0], val[1], val[2],
                                   val[4], val[6], val[7], val[8])
 
-                      @lexer.pop_cmdarg
+                      @lexer.cmdarg.pop
                       @static_env.unextend
-                      @def_level -= 1
+                      @context.pop
                     }
                 | kBREAK
                     {
@@ -1458,13 +1474,11 @@ opt_block_args_tail:
                     }
                   f_larglist
                     {
-                      result = @lexer.cmdarg.dup
-                      @lexer.cmdarg.clear
+                      @lexer.cmdarg.push(false)
                     }
                   lambda_body
                     {
-                      @lexer.cmdarg = val[2]
-                      @lexer.cmdarg.lexpop
+                      @lexer.cmdarg.pop
 
                       result = [ val[1], val[3] ]
 
@@ -1480,18 +1494,33 @@ opt_block_args_tail:
                       result = @builder.args(nil, val[0], nil)
                     }
 
-     lambda_body: tLAMBEG compstmt tRCURLY
+     lambda_body: tLAMBEG
                     {
-                      result = [ val[0], val[1], val[2] ]
+                      @context.push(:lambda)
                     }
-                | kDO_LAMBDA compstmt kEND
+                  compstmt tRCURLY
                     {
-                      result = [ val[0], val[1], val[2] ]
+                      result = [ val[0], val[2], val[3] ]
+                      @context.pop
+                    }
+                | kDO_LAMBDA
+                    {
+                      @context.push(:lambda)
+                    }
+                  compstmt kEND
+                    {
+                      result = [ val[0], val[2], val[3] ]
+                      @context.pop
                     }
 
-        do_block: kDO_BLOCK do_body kEND
+        do_block: kDO_BLOCK
                     {
-                      result = [ val[0], *val[1], val[2] ]
+                      @context.push(:block)
+                    }
+                  do_body kEND
+                    {
+                      result = [ val[0], *val[2], val[3] ]
+                      @context.pop
                     }
 
       block_call: command do_block
@@ -1575,44 +1604,46 @@ opt_block_args_tail:
                       result = @builder.index(val[0], val[1], val[2], val[3])
                     }
 
-     brace_block: tLCURLY brace_body tRCURLY
+     brace_block: tLCURLY
                     {
-                      result = [ val[0], *val[1], val[2] ]
+                      @context.push(:block)
                     }
-                | kDO do_body kEND
+                  brace_body tRCURLY
                     {
-                      result = [ val[0], *val[1], val[2] ]
+                      result = [ val[0], *val[2], val[3] ]
+                      @context.pop
+                    }
+                | kDO
+                    {
+                      @context.push(:block)
+                    }
+                  do_body kEND
+                    {
+                      result = [ val[0], *val[2], val[3] ]
+                      @context.pop
                     }
 
       brace_body:   {
                       @static_env.extend_dynamic
                     }
-                    {
-                      result = @lexer.cmdarg.dup
-                      @lexer.cmdarg.clear
-                    }
                     opt_block_param compstmt
                     {
-                      result = [ val[2], val[3] ]
+                      result = [ val[1], val[2] ]
 
                       @static_env.unextend
-                      @lexer.cmdarg = val[1]
-                      @lexer.cmdarg.pop
                     }
 
          do_body:   {
                       @static_env.extend_dynamic
                     }
                     {
-                      result = @lexer.cmdarg.dup
-                      @lexer.cmdarg.clear
+                      @lexer.cmdarg.push(false)
                     }
                     opt_block_param compstmt
                     {
                       result = [ val[2], val[3] ]
 
                       @static_env.unextend
-                      @lexer.cmdarg = val[1]
                       @lexer.cmdarg.pop
                     }
 
@@ -1812,13 +1843,13 @@ regexp_contents: # nothing
                     }
                 | tSTRING_DBEG
                     {
-                      @lexer.cond.push(false)
                       @lexer.cmdarg.push(false)
+                      @lexer.cond.push(false)
                     }
                     compstmt tSTRING_DEND
                     {
-                      @lexer.cond.lexpop
-                      @lexer.cmdarg.lexpop
+                      @lexer.cmdarg.pop
+                      @lexer.cond.pop
 
                       result = @builder.begin(val[0], val[2], val[3])
                     }
@@ -1840,13 +1871,13 @@ regexp_contents: # nothing
 
           symbol: tSYMBOL
                     {
-                      @lexer.state = :expr_endarg
+                      @lexer.state = :expr_end
                       result = @builder.symbol(val[0])
                     }
 
             dsym: tSYMBEG xstring_contents tSTRING_END
                     {
-                      @lexer.state = :expr_endarg
+                      @lexer.state = :expr_end
                       result = @builder.symbol_compose(val[0], val[1], val[2])
                     }
 
@@ -1854,29 +1885,34 @@ regexp_contents: # nothing
                     {
                       result = val[0]
                     }
-                | tUMINUS_NUM simple_numeric =tLOWEST
+                | tUNARY_NUM simple_numeric =tLOWEST
                     {
-                      result = @builder.negate(val[0], val[1])
+                      if @builder.respond_to? :negate
+                        # AST builder interface compatibility
+                        result = @builder.negate(val[0], val[1])
+                      else
+                        result = @builder.unary_num(val[0], val[1])
+                      end
                     }
 
   simple_numeric: tINTEGER
                     {
-                      @lexer.state = :expr_endarg
+                      @lexer.state = :expr_end
                       result = @builder.integer(val[0])
                     }
                 | tFLOAT
                     {
-                      @lexer.state = :expr_endarg
+                      @lexer.state = :expr_end
                       result = @builder.float(val[0])
                     }
                 | tRATIONAL
                     {
-                      @lexer.state = :expr_endarg
+                      @lexer.state = :expr_end
                       result = @builder.rational(val[0])
                     }
                 | tIMAGINARY
                     {
-                      @lexer.state = :expr_endarg
+                      @lexer.state = :expr_end
                       result = @builder.complex(val[0])
                     }
 
@@ -2347,8 +2383,6 @@ end
 ---- header
 
 require 'parser'
-
-Parser.check_for_encoding_support
 
 ---- inner
 

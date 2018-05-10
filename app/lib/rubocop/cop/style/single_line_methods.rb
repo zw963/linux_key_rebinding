@@ -3,48 +3,55 @@
 module RuboCop
   module Cop
     module Style
-      # This cop checks for single-line method definitions.
-      # It can optionally accept single-line methods with no body.
+      # This cop checks for single-line method definitions that contain a body.
+      # It will accept single-line methods with no body.
+      #
+      # @example
+      #   # bad
+      #   def some_method; body end
+      #   def link_to(url); {:name => url}; end
+      #   def @table.columns; super; end
+      #
+      #   # good
+      #   def no_op; end
+      #   def self.resource_class=(klass); end
+      #   def @table.columns; end
+      #
       class SingleLineMethods < Cop
-        include AutocorrectAlignment
-        include OnMethodDef
+        include Alignment
 
         MSG = 'Avoid single-line method definitions.'.freeze
 
-        def allow_empty?
-          cop_config['AllowIfMethodIsEmpty']
+        def on_def(node)
+          return unless node.single_line?
+          return if allow_empty? && !node.body
+
+          add_offense(node)
+        end
+        alias on_defs on_def
+
+        def autocorrect(node)
+          lambda do |corrector|
+            each_part(node.body) do |part|
+              LineBreakCorrector.break_line_before(
+                range: part, node: node, corrector: corrector,
+                configured_width: configured_indentation_width
+              )
+            end
+
+            LineBreakCorrector.break_line_before(
+              range: node.loc.end, node: node, corrector: corrector,
+              indent_steps: 0, configured_width: configured_indentation_width
+            )
+
+            move_comment(node, corrector)
+          end
         end
 
         private
 
-        def on_method_def(node, _method_name, _args, body)
-          start_line = node.loc.keyword.line
-          end_line = node.loc.end.line
-
-          empty_body = body.nil?
-          return unless start_line == end_line && !(allow_empty? && empty_body)
-
-          @body = body
-          add_offense(node, :expression)
-        end
-
-        def autocorrect(node)
-          body = @body
-
-          lambda do |corrector|
-            each_part(body) do |part|
-              break_line_before(part, node, corrector, 1)
-            end
-
-            break_line_before(node.loc.end, node, corrector, 0)
-
-            eol_comment = end_of_line_comment(node.source_range.line)
-            move_comment(eol_comment, node, corrector) if eol_comment
-          end
-        end
-
-        def end_of_line_comment(line)
-          processed_source.comments.find { |c| c.loc.line == line }
+        def allow_empty?
+          cop_config['AllowIfMethodIsEmpty']
         end
 
         def each_part(body)
@@ -57,19 +64,11 @@ module RuboCop
           end
         end
 
-        def break_line_before(range, node, corrector, indent_steps)
-          corrector.insert_before(
-            range,
-            "\n" + ' ' * (node.loc.keyword.column +
-                          indent_steps * configured_indentation_width)
+        def move_comment(node, corrector)
+          LineBreakCorrector.move_comment(
+            eol_comment: end_of_line_comment(node.source_range.line),
+            node: node, corrector: corrector
           )
-        end
-
-        def move_comment(eol_comment, node, corrector)
-          text = eol_comment.loc.expression.source
-          corrector.insert_before(node.source_range,
-                                  text + "\n" + (' ' * node.loc.keyword.column))
-          corrector.remove(eol_comment.loc.expression)
         end
       end
     end

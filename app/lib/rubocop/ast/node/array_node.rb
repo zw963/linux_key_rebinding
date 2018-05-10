@@ -31,7 +31,7 @@ module RuboCop
       #   Check for any percent literal.
       #
       # @overload percent_literal?(type)
-      #   Check for percent literaly of type `type`.
+      #   Check for percent literal of type `type`.
       #
       #   @param type [Symbol] an optional percent literal type
       #
@@ -42,6 +42,15 @@ module RuboCop
         else
           loc.begin && loc.begin.source.start_with?('%')
         end
+      end
+
+      # Checks whether the `array` literal is delimited by either percent or
+      # square brackets
+      #
+      # @return [Boolean] whether the array is enclosed in percent or square
+      # brackets
+      def bracketed?
+        square_brackets? || percent_literal?
       end
     end
   end

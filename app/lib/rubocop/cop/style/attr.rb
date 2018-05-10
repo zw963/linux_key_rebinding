@@ -4,16 +4,26 @@ module RuboCop
   module Cop
     module Style
       # This cop checks for uses of Module#attr.
+      #
+      # @example
+      #   # bad - creates a single attribute accessor (deprecated in Ruby 1.9)
+      #   attr :something, true
+      #   attr :one, :two, :three # behaves as attr_reader
+      #
+      #   # good
+      #   attr_accessor :something
+      #   attr_reader :one, :two, :three
+      #
       class Attr < Cop
-        MSG = 'Do not use `attr`. Use `%s` instead.'.freeze
+        include RangeHelp
+
+        MSG = 'Do not use `attr`. Use `%<replacement>s` instead.'.freeze
 
         def on_send(node)
           return unless node.command?(:attr) && node.arguments?
 
-          add_offense(node, :selector)
+          add_offense(node, location: :selector)
         end
-
-        private
 
         def autocorrect(node)
           attr_name, setter = *node.arguments
@@ -31,8 +41,10 @@ module RuboCop
           end
         end
 
+        private
+
         def message(node)
-          format(MSG, replacement_method(node))
+          format(MSG, replacement: replacement_method(node))
         end
 
         def replacement_method(node)

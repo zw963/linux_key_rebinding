@@ -1,5 +1,9 @@
+# frozen_string_literal: true
+
 require 'parser/runner'
+require 'parser/color'
 require 'parser/lexer/explanation'
+require 'json'
 
 module Parser
 
@@ -17,15 +21,15 @@ module Parser
           print_line = lambda do
             unless hilight_line.empty?
               puts hilight_line.
-                gsub(/[a-z_]+/) { |m| "\e[1;33m#{m}\e[0m" }.
-                gsub(/[~.]+/)   { |m| "\e[1;35m#{m}\e[0m" }
+                gsub(/[a-z_]+/) { |m| Color.yellow(m, bold: true) }.
+                gsub(/[~.]+/)   { |m| Color.magenta(m, bold: true) }
               hilight_line = ''
             end
           end
 
           print_source = lambda do |range|
             source_line = range.source_line
-            puts "\e[32m#{source_line}\e[0m"
+            puts Color.green(source_line)
             source_line
           end
 
@@ -94,6 +98,7 @@ module Parser
 
       @locate = false
       @emit_ruby = false
+      @emit_json = false
     end
 
     private
@@ -118,6 +123,10 @@ module Parser
       opts.on '--emit-ruby', 'Emit S-expressions as valid Ruby code' do
         @emit_ruby = true
       end
+      
+      opts.on '--emit-json', 'Emit S-expressions as valid JSON' do
+        @emit_json = true
+      end
     end
 
     def process_all_input
@@ -136,6 +145,8 @@ module Parser
       elsif !@benchmark
         if @emit_ruby
           puts ast.inspect
+        elsif @emit_json
+          puts JSON.generate(ast.to_sexp_array)
         else
           puts ast.to_s
         end

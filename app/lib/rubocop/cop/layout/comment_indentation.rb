@@ -4,13 +4,46 @@ module RuboCop
   module Cop
     module Layout
       # This cops checks the indentation of comments.
+      #
+      # @example
+      #   # bad
+      #     # comment here
+      #   def method_name
+      #   end
+      #
+      #     # comment here
+      #   a = 'hello'
+      #
+      #   # yet another comment
+      #     if true
+      #       true
+      #     end
+      #
+      #   # good
+      #   # comment here
+      #   def method_name
+      #   end
+      #
+      #   # comment here
+      #   a = 'hello'
+      #
+      #   # yet another comment
+      #   if true
+      #     true
+      #   end
+      #
       class CommentIndentation < Cop
-        include AutocorrectAlignment
+        include Alignment
 
-        MSG = 'Incorrect indentation detected (column %d instead of %d).'.freeze
+        MSG = 'Incorrect indentation detected (column %<column>d ' \
+          'instead of %<correct_comment_indentation>d).'.freeze
 
         def investigate(processed_source)
-          processed_source.comments.each { |comment| check(comment) }
+          processed_source.each_comment { |comment| check(comment) }
+        end
+
+        def autocorrect(node)
+          AlignmentCorrector.correct(processed_source, node, @column_delta)
         end
 
         private
@@ -33,8 +66,18 @@ module RuboCop
             return if column == correct_comment_indentation
           end
 
-          add_offense(comment, comment.loc.expression,
-                      format(MSG, column, correct_comment_indentation))
+          add_offense(
+            comment,
+            message: message(column, correct_comment_indentation)
+          )
+        end
+
+        def message(column, correct_comment_indentation)
+          format(
+            MSG,
+            column: column,
+            correct_comment_indentation: correct_comment_indentation
+          )
         end
 
         def own_line_comment?(comment)

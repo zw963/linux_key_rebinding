@@ -26,18 +26,20 @@ module RuboCop
       #   # good
       #   gem 'rubocop', groups: [:development, :test]
       class DuplicatedGem < Cop
-        MSG = 'Gem `%s` requirements already given on line %d ' \
-              'of the Gemfile.'.freeze
+        include RangeHelp
+
+        MSG = 'Gem `%<gem_name>s` requirements already given on line '\
+          '%<line_of_first_occurrence>d of the Gemfile.'.freeze
 
         def investigate(processed_source)
-          return unless processed_source.ast
+          return if processed_source.blank?
 
           duplicated_gem_nodes.each do |nodes|
             nodes[1..-1].each do |node|
               register_offense(
                 node,
-                node.method_args.first.to_a.first,
-                nodes.first.loc.line
+                node.first_argument.to_a.first,
+                nodes.first.first_line
               )
             end
           end
@@ -45,23 +47,25 @@ module RuboCop
 
         private
 
-        def_node_search :gem_declarations, '(send nil :gem str ...)'
+        def_node_search :gem_declarations, '(send nil? :gem str ...)'
 
         def duplicated_gem_nodes
           gem_declarations(processed_source.ast)
-            .group_by { |e| e.method_args.first }
-            .keep_if { |_, nodes| nodes.length > 1 }
+            .group_by(&:first_argument)
             .values
+            .select { |nodes| nodes.size > 1 }
         end
 
         def register_offense(node, gem_name, line_of_first_occurrence)
           line_range = node.loc.column...node.loc.last_column
-
-          add_offense(
-            node,
-            source_range(processed_source.buffer, node.loc.line, line_range),
-            format(MSG, gem_name, line_of_first_occurrence)
+          offense_location =
+            source_range(processed_source.buffer, node.first_line, line_range)
+          message = format(
+            MSG,
+            gem_name: gem_name,
+            line_of_first_occurrence: line_of_first_occurrence
           )
+          add_offense(node, location: offense_location, message: message)
         end
       end
     end

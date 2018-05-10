@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module AST
   # Node is an immutable class, instances of which represent abstract
   # syntax tree nodes. It combines semantic information (i.e. anything
@@ -42,8 +44,17 @@ module AST
 
     # Returns the children of this node.
     # The returned value is frozen.
+    # The to_a alias is useful for decomposing nodes concisely.
+    # For example:
+    #
+    #     node = s(:gasgn, :$foo, s(:integer, 1))
+    #     var_name, value = *node
+    #     p var_name # => :$foo
+    #     p value    # => (integer 1)
+    #
     # @return [Array]
     attr_reader :children
+    alias to_a children
 
     # Returns the precomputed hash value for this node
     # @return [Fixnum]
@@ -167,20 +178,6 @@ module AST
 
     alias << append
 
-    # Returns {#children}. This is very useful in order to decompose nodes
-    # concisely. For example:
-    #
-    #     node = s(:gasgn, :$foo, s(:integer, 1))
-    #     s
-    #     var_name, value = *node
-    #     p var_name # => :$foo
-    #     p value    # => (integer 1)
-    #
-    # @return [Array]
-    def to_a
-      children
-    end
-
     # Converts `self` to a pretty-printed s-expression.
     #
     # @param  [Integer] indent Base indentation level.
@@ -189,12 +186,8 @@ module AST
       indented = "  " * indent
       sexp = "#{indented}(#{fancy_type}"
 
-      first_node_child = children.index do |child|
-        child.is_a?(Node) || child.is_a?(Array)
-      end || children.count
-
-      children.each_with_index do |child, idx|
-        if child.is_a?(Node) && idx >= first_node_child
+      children.each do |child|
+        if child.is_a?(Node)
           sexp += "\n#{child.to_sexp(indent + 1)}"
         else
           sexp += " #{child.inspect}"
@@ -217,12 +210,8 @@ module AST
       indented = "  " * indent
       sexp = "#{indented}s(:#{@type}"
 
-      first_node_child = children.index do |child|
-        child.is_a?(Node) || child.is_a?(Array)
-      end || children.count
-
-      children.each_with_index do |child, idx|
-        if child.is_a?(Node) && idx >= first_node_child
+      children.each do |child|
+        if child.is_a?(Node)
           sexp += ",\n#{child.inspect(indent + 1)}"
         else
           sexp += ", #{child.inspect}"
@@ -237,6 +226,22 @@ module AST
     # @return [AST::Node] self
     def to_ast
       self
+    end
+    
+    # Converts `self` to an Array where the first element is the type as a Symbol,
+    # and subsequent elements are the same representation of its children. 
+    #
+    # @return [Array<Symbol, [...Array]>]
+    def to_sexp_array
+      children_sexp_arrs = children.map do |child|
+        if child.is_a?(Node)
+          child.to_sexp_array
+        else
+          child
+        end
+      end
+
+      [type, *children_sexp_arrs]
     end
 
     protected

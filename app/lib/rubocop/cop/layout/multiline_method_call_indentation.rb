@@ -6,34 +6,34 @@ module RuboCop
       # This cop checks the indentation of the method name part in method calls
       # that span more than one line.
       #
-      # @example
+      # @example EnforcedStyle: aligned (default)
       #   # bad
       #   while myvariable
       #   .b
       #     # do something
       #   end
       #
-      #   # good, EnforcedStyle: aligned
+      #   # good
       #   while myvariable
       #         .b
       #     # do something
       #   end
       #
-      #   # good, EnforcedStyle: aligned
+      #   # good
       #   Thing.a
       #        .b
       #        .c
       #
-      #   # good, EnforcedStyle:    indented,
-      #           IndentationWidth: 2
+      # @example EnforcedStyle: indented
+      #   # good
       #   while myvariable
       #     .b
       #
       #     # do something
       #   end
       #
-      #   # good, EnforcedStyle:    indented_relative_to_receiver,
-      #           IndentationWidth: 2
+      # @example EnforcedStyle: indented_relative_to_receiver
+      #   # good
       #   while myvariable
       #           .a
       #           .b
@@ -41,15 +41,14 @@ module RuboCop
       #     # do something
       #   end
       #
-      #   # good, EnforcedStyle:    indented_relative_to_receiver,
-      #           IndentationWidth: 2
+      #   # good
       #   myvariable = Thing
       #                  .a
       #                  .b
       #                  .c
       class MultilineMethodCallIndentation < Cop
         include ConfigurableEnforcedStyle
-        include AutocorrectAlignment
+        include Alignment
         include MultilineExpressionIndentation
 
         def validate_config
@@ -60,6 +59,10 @@ module RuboCop
                 ' cop only accepts an `IndentationWidth` ' \
                 'configuration parameter when ' \
                 '`EnforcedStyle` is `indented`.'
+        end
+
+        def autocorrect(node)
+          AlignmentCorrector.correct(processed_source, node, @column_delta)
         end
 
         private
@@ -144,25 +147,21 @@ module RuboCop
         def syntactic_alignment_base(lhs, rhs)
           # a if b
           #      .c
-          n = kw_node_with_special_indentation(lhs)
-          if n
-            case n.type
-            when :for            then _, expression, = *n
-            when :return         then expression, = *n
-            when *MODIFIER_NODES then expression, = *n
-            end
-            return expression.source_range
+          kw_node_with_special_indentation(lhs) do |base|
+            return indented_keyword_expression(base).source_range
           end
 
           # a = b
           #     .c
-          n = part_of_assignment_rhs(lhs, rhs)
-          return assignment_rhs(n).source_range if n
+          part_of_assignment_rhs(lhs, rhs) do |base|
+            return assignment_rhs(base).source_range
+          end
 
           # a + b
           #     .c
-          n = operation_rhs(lhs)
-          return n.source_range if n
+          operation_rhs(lhs) do |base|
+            return base.source_range
+          end
         end
 
         # a.b
@@ -171,7 +170,7 @@ module RuboCop
           return unless rhs.source.start_with?('.')
 
           node = semantic_alignment_node(node)
-          return unless node
+          return unless node && node.loc.selector
 
           node.loc.dot.join(node.loc.selector)
         end
@@ -196,18 +195,25 @@ module RuboCop
           node = node.parent
           node = node.parent until node.loc.dot
 
-          return if node.loc.dot.line != node.loc.line
+          return if node.loc.dot.line != node.first_line
           node
         end
 
         def operation_rhs(node)
           receiver, = *node
-          receiver.each_ancestor(:send) do |a|
-            _, method, args = *a
-            return args if operator?(method) && args &&
-                           within_node?(receiver, args)
+
+          operation_rhs = receiver.each_ancestor(:send).find do |rhs|
+            operator_rhs?(rhs, receiver)
           end
-          nil
+
+          return unless operation_rhs
+
+          yield operation_rhs.first_argument
+        end
+
+        def operator_rhs?(node, receiver)
+          node.operator_method? && node.arguments? &&
+            within_node?(receiver, node.first_argument)
         end
       end
     end

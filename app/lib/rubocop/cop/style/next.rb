@@ -5,7 +5,35 @@ module RuboCop
     module Style
       # Use `next` to skip iteration instead of a condition at the end.
       #
-      # @example
+      # @example EnforcedStyle: skip_modifier_ifs (default)
+      #   # bad
+      #   [1, 2].each do |a|
+      #     if a == 1
+      #       puts a
+      #     end
+      #   end
+      #
+      #   # good
+      #   [1, 2].each do |a|
+      #     next unless a == 1
+      #     puts a
+      #   end
+      #
+      #   # good
+      #   [1, 2].each do |o|
+      #     puts o unless o == 1
+      #   end
+      #
+      # @example EnforcedStyle: always
+      #   # With `always` all conditions at the end of an iteration needs to be
+      #   # replaced by next - with `skip_modifier_ifs` the modifier if like
+      #   # this one are ignored: `[1, 2].each { |a| return 'yes' if a == 1 }`
+      #
+      #   # bad
+      #   [1, 2].each do |o|
+      #     puts o unless o == 1
+      #   end
+      #
       #   # bad
       #   [1, 2].each do |a|
       #     if a == 1
@@ -21,6 +49,7 @@ module RuboCop
       class Next < Cop
         include ConfigurableEnforcedStyle
         include MinBodyLength
+        include RangeHelp
 
         MSG = 'Use `next` to skip iteration.'.freeze
         EXIT_TYPES = %i[break return].freeze
@@ -44,6 +73,16 @@ module RuboCop
         alias on_until on_while
         alias on_for on_while
 
+        def autocorrect(node)
+          lambda do |corrector|
+            if node.modifier_form?
+              autocorrect_modifier(corrector, node)
+            else
+              autocorrect_block(corrector, node)
+            end
+          end
+        end
+
         private
 
         def check(node)
@@ -51,7 +90,8 @@ module RuboCop
 
           offending_node = offense_node(node.body)
 
-          add_offense(offending_node, offense_location(offending_node))
+          add_offense(offending_node,
+                      location: offense_location(offending_node))
         end
 
         def ends_with_condition?(body)
@@ -99,16 +139,6 @@ module RuboCop
           condition_expression, = *offense_node
           offense_begin_pos = offense_node.source_range.begin
           offense_begin_pos.join(condition_expression.source_range)
-        end
-
-        def autocorrect(node)
-          lambda do |corrector|
-            if node.modifier_form?
-              autocorrect_modifier(corrector, node)
-            else
-              autocorrect_block(corrector, node)
-            end
-          end
         end
 
         def autocorrect_modifier(corrector, node)

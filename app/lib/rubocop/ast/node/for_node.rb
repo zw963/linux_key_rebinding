@@ -20,6 +20,14 @@ module RuboCop
         loc.begin && loc.begin.is?('do')
       end
 
+      # Checks whether this node body is a void context.
+      # Always `true` for `for`.
+      #
+      # @return [true] whether the `for` node body is a void context
+      def void_context?
+        true
+      end
+
       # Returns the iteration variable of the `for` loop.
       #
       # @return [Node] The iteration variable of the `for` loop
@@ -39,14 +47,6 @@ module RuboCop
       # @return [Node, nil] The body of the `for` loop.
       def body
         node_parts[2]
-      end
-
-      # Custom destructuring method. This can be used to normalize
-      # destructuring for different variations of the node.
-      #
-      # @return [Array<Node>] the different parts of the `until` statement
-      def node_parts
-        to_a
       end
     end
   end

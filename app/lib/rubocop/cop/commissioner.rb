@@ -11,10 +11,6 @@ module RuboCop
 
       attr_reader :errors
 
-      def self.callback_methods
-        Parser::Meta::NODE_TYPES.map { |type| :"on_#{type}" }
-      end
-
       def initialize(cops, forces = [], options = {})
         @cops = cops
         @forces = forces
@@ -24,44 +20,44 @@ module RuboCop
         reset_errors
       end
 
-      # In the dynamically generated methods below, a call to `super` is used
+      # Create methods like :on_send, :on_super, etc. They will be called
+      # during AST traversal and try to call corresponding methods on cops.
+      # A call to `super` is used
       # to continue iterating over the children of a node.
       # However, if we know that a certain node type (like `int`) never has
       # child nodes, there is no reason to pay the cost of calling `super`.
-      no_child_callbacks = NO_CHILD_NODES.map do |type|
-        :"on_#{type}"
-      end
-
-      callback_methods.each do |callback|
-        next unless method_defined?(callback)
-        class_eval <<-EOS, __FILE__, __LINE__ + 1
-          def #{callback}(node)
-            @callbacks[:"#{callback}"] ||= @cops.select do |cop|
-              cop.respond_to?(:"#{callback}")
-            end
-            @callbacks[:#{callback}].each do |cop|
-              with_cop_error_handling(cop, node) do
-                cop.send(:#{callback}, node)
-              end
-            end
-
-            #{!no_child_callbacks.include?(callback) && 'super'}
-          end
-        EOS
+      Parser::Meta::NODE_TYPES.each do |node_type|
+        method_name = :"on_#{node_type}"
+        next unless method_defined?(method_name)
+        define_method(method_name) do |node|
+          trigger_responding_cops(method_name, node)
+          super(node) unless NO_CHILD_NODES.include?(node_type)
+        end
       end
 
       def investigate(processed_source)
         reset_errors
-        remove_irrelevant_cops(processed_source.buffer.name)
+        remove_irrelevant_cops(processed_source.file_path)
         reset_callbacks
         prepare(processed_source)
         invoke_custom_processing(@cops, processed_source)
         invoke_custom_processing(@forces, processed_source)
-        walk(processed_source.ast) if processed_source.ast
+        walk(processed_source.ast) unless processed_source.blank?
         @cops.flat_map(&:offenses)
       end
 
       private
+
+      def trigger_responding_cops(callback, node)
+        @callbacks[callback] ||= @cops.select do |cop|
+          cop.respond_to?(callback)
+        end
+        @callbacks[callback].each do |cop|
+          with_cop_error_handling(cop, node) do
+            cop.send(callback, node)
+          end
+        end
+      end
 
       def reset_errors
         @errors = Hash.new { |hash, k| hash[k] = [] }
@@ -102,12 +98,15 @@ module RuboCop
         end
       end
 
+      # Allow blind rescues here, since we're absorbing and packaging or
+      # re-raising exceptions that can be raised from within the individual
+      # cops' `#investigate` methods.
       def with_cop_error_handling(cop, node = nil)
         yield
-      rescue => e
+      rescue StandardError => e
         raise e if @options[:raise_error]
         if node
-          line = node.loc.line
+          line = node.first_line
           column = node.loc.column
         end
         error = CopError.new(e, line, column)

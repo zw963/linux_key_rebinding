@@ -10,8 +10,7 @@ module RuboCop
       # replaced by receiver.empty? and !receiver.empty.
       #
       # @example
-      #
-      #   @bad
+      #   # bad
       #   [1, 2, 3].length == 0
       #   0 == "foobar".length
       #   array.length < 1
@@ -19,7 +18,7 @@ module RuboCop
       #   string.length > 0
       #   hash.size > 0
       #
-      #   @good
+      #   # good
       #   [1, 2, 3].empty?
       #   "foobar".empty?
       #   array.empty?
@@ -27,44 +26,60 @@ module RuboCop
       #   !string.empty?
       #   !hash.empty?
       class ZeroLengthPredicate < Cop
-        ZERO_MSG = 'Use `empty?` instead of `%s %s %s`.'.freeze
-        NONZERO_MSG = 'Use `!empty?` instead of `%s %s %s`.'.freeze
+        ZERO_MSG = 'Use `empty?` instead of `%<lhs>s %<opr>s %<rhs>s`.'.freeze
+        NONZERO_MSG = 'Use `!empty?` instead of ' \
+                      '`%<lhs>s %<opr>s %<rhs>s`.'.freeze
 
         def on_send(node)
-          zero_length_predicate = zero_length_predicate(node)
-
-          if zero_length_predicate
-            add_offense(node, :expression,
-                        format(ZERO_MSG, *zero_length_predicate))
-          end
-
-          nonzero_length_predicate = nonzero_length_predicate(node)
-
-          # rubocop:disable Style/GuardClause
-          if nonzero_length_predicate
-            add_offense(node, :expression,
-                        format(NONZERO_MSG, *nonzero_length_predicate))
-          end
-          # rubocop:enable Style/GuardClause
+          check_zero_length_predicate(node)
+          check_nonzero_length_predicate(node)
         end
-
-        def_node_matcher :zero_length_predicate, <<-END
-          {(send (send (...) ${:length :size}) $:== (int $0))
-           (send (int $0) $:== (send (...) ${:length :size}))
-           (send (send (...) ${:length :size}) $:<  (int $1))
-           (send (int $1) $:> (send (...) ${:length :size}))}
-        END
-
-        def_node_matcher :nonzero_length_predicate, <<-END
-          {(send (send (...) ${:length :size}) ${:> :!=} (int $0))
-           (send (int $0) ${:< :!=} (send (...) ${:length :size}))}
-        END
 
         def autocorrect(node)
           lambda do |corrector|
             corrector.replace(node.loc.expression, replacement(node))
           end
         end
+
+        private
+
+        def check_zero_length_predicate(node)
+          zero_length_predicate = zero_length_predicate(node)
+
+          return unless zero_length_predicate
+
+          lhs, opr, rhs = zero_length_predicate
+
+          add_offense(
+            node,
+            message: format(ZERO_MSG, lhs: lhs, opr: opr, rhs: rhs)
+          )
+        end
+
+        def check_nonzero_length_predicate(node)
+          nonzero_length_predicate = nonzero_length_predicate(node)
+
+          return unless nonzero_length_predicate
+
+          lhs, opr, rhs = nonzero_length_predicate
+
+          add_offense(
+            node,
+            message: format(NONZERO_MSG, lhs: lhs, opr: opr, rhs: rhs)
+          )
+        end
+
+        def_node_matcher :zero_length_predicate, <<-PATTERN
+          {(send (send (...) ${:length :size}) $:== (int $0))
+           (send (int $0) $:== (send (...) ${:length :size}))
+           (send (send (...) ${:length :size}) $:<  (int $1))
+           (send (int $1) $:> (send (...) ${:length :size}))}
+        PATTERN
+
+        def_node_matcher :nonzero_length_predicate, <<-PATTERN
+          {(send (send (...) ${:length :size}) ${:> :!=} (int $0))
+           (send (int $0) ${:< :!=} (send (...) ${:length :size}))}
+        PATTERN
 
         def replacement(node)
           receiver = zero_length_receiver(node)
@@ -73,17 +88,17 @@ module RuboCop
           "!#{other_receiver(node).source}.empty?"
         end
 
-        def_node_matcher :zero_length_receiver, <<-END
+        def_node_matcher :zero_length_receiver, <<-PATTERN
           {(send (send $_ _) :== (int 0))
            (send (int 0) :== (send $_ _))
            (send (send $_ _) :<  (int 1))
            (send (int 1) :> (send $_ _))}
-        END
+        PATTERN
 
-        def_node_matcher :other_receiver, <<-END
+        def_node_matcher :other_receiver, <<-PATTERN
           {(send (send $_ _) _ _)
            (send _ _ (send $_ _))}
-        END
+        PATTERN
       end
     end
   end

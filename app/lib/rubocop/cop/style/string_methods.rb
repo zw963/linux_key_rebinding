@@ -5,21 +5,24 @@ module RuboCop
     module Style
       # This cop enforces the use of consistent method names
       # from the String class.
+      #
+      # @example
+      #   # bad
+      #   'name'.intern
+      #   'var'.unfavored_method
+      #
+      #   # good
+      #   'name'.to_sym
+      #   'var'.preferred_method
       class StringMethods < Cop
         include MethodPreference
 
-        MSG = 'Prefer `%s` over `%s`.'.freeze
+        MSG = 'Prefer `%<prefer>s` over `%<current>s`.'.freeze
 
         def on_send(node)
           return unless preferred_method(node.method_name)
 
-          add_offense(node, :selector)
-        end
-
-        private
-
-        def message(node)
-          format(MSG, preferred_method(node.method_name), node.method_name)
+          add_offense(node, location: :selector)
         end
 
         def autocorrect(node)
@@ -27,6 +30,14 @@ module RuboCop
             corrector.replace(node.loc.selector,
                               preferred_method(node.method_name))
           end
+        end
+
+        private
+
+        def message(node)
+          format(MSG,
+                 prefer: preferred_method(node.method_name),
+                 current: node.method_name)
         end
       end
     end

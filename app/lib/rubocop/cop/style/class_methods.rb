@@ -10,18 +10,18 @@ module RuboCop
       #   # bad
       #   class SomeClass
       #     def SomeClass.class_method
-      #       ...
+      #       # ...
       #     end
       #   end
       #
       #   # good
       #   class SomeClass
       #     def self.class_method
-      #       ...
+      #       # ...
       #     end
       #   end
       class ClassMethods < Cop
-        MSG = 'Use `self.%s` instead of `%s.%s`.'.freeze
+        MSG = 'Use `self.%<method>s` instead of `%<class>s.%<method>s`.'.freeze
 
         def on_class(node)
           name, _superclass, body = *node
@@ -31,6 +31,10 @@ module RuboCop
         def on_module(node)
           name, body = *node
           check(name, body)
+        end
+
+        def autocorrect(node)
+          ->(corrector) { corrector.replace(node.loc.name, 'self') }
         end
 
         private
@@ -51,15 +55,12 @@ module RuboCop
           return unless name == definee
 
           _, class_name = *definee
-          add_offense(definee, :name, message(class_name, method_name))
+          add_offense(definee, location: :name,
+                               message: message(class_name, method_name))
         end
 
         def message(class_name, method_name)
-          format(MSG, method_name, class_name, method_name)
-        end
-
-        def autocorrect(node)
-          ->(corrector) { corrector.replace(node.loc.name, 'self') }
+          format(MSG, method: method_name, class: class_name)
         end
       end
     end

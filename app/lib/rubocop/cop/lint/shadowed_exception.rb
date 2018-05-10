@@ -19,8 +19,6 @@ module RuboCop
       #     handle_standard_error
       #   end
       #
-      # @example
-      #
       #   # good
       #
       #   begin
@@ -30,8 +28,24 @@ module RuboCop
       #   rescue Exception
       #     handle_exception
       #   end
+      #
+      #   # good, however depending on runtime environment.
+      #   #
+      #   # This is a special case for system call errors.
+      #   # System dependent error code depends on runtime environment.
+      #   # For example, whether `Errno::EAGAIN` and `Errno::EWOULDBLOCK` are
+      #   # the same error code or different error code depends on environment.
+      #   # This good case is for `Errno::EAGAIN` and `Errno::EWOULDBLOCK` with
+      #   # the same error code.
+      #   begin
+      #     something
+      #   rescue Errno::EAGAIN, Errno::EWOULDBLOCK
+      #     handle_standard_error
+      #   end
+      #
       class ShadowedException < Cop
         include RescueNode
+        include RangeHelp
 
         MSG = 'Do not shadow rescued Exceptions.'.freeze
 
@@ -51,7 +65,7 @@ module RuboCop
           return if !rescue_group_rescues_multiple_levels &&
                     sorted?(rescued_groups)
 
-          add_offense(node, offense_range(rescues))
+          add_offense(node, location: offense_range(rescues))
         end
 
         private
@@ -77,7 +91,27 @@ module RuboCop
             return !(group.size == 2 && group.include?(NilClass))
           end
 
-          group.combination(2).any? { |a, b| a && b && a <=> b }
+          group.combination(2).any? do |a, b|
+            compare_exceptions(a, b)
+          end
+        end
+
+        def compare_exceptions(exception, other_exception)
+          if system_call_err?(exception) && system_call_err?(other_exception)
+            # This condition logic is for special case.
+            # System dependent error code depends on runtime environment.
+            # For example, whether `Errno::EAGAIN` and `Errno::EWOULDBLOCK` are
+            # the same error code or different error code depends on runtime
+            # environment. This checks the error code for that.
+            exception.const_get(:Errno) != other_exception.const_get(:Errno) &&
+              exception <=> other_exception
+          else
+            exception && other_exception && exception <=> other_exception
+          end
+        end
+
+        def system_call_err?(error)
+          error && error.ancestors[1] == SystemCallError
         end
 
         def evaluate_exceptions(rescue_group)
@@ -116,12 +150,6 @@ module RuboCop
         def rescued_exceptions(rescue_group)
           klasses = *rescue_group
           klasses.map do |klass|
-            # `rescue nil` is valid syntax in all versions of Ruby. In Ruby
-            # 1.9.3, it effectively disables the `rescue`. In versions
-            # after 1.9.3, a `TypeError` is thrown when the statement is
-            # rescued. In order to account for this, we convert `nil` to
-            # `NilClass`.
-            next 'NilClass' if klass.nil_type?
             next unless klass.const_type?
             klass.source
           end.compact

@@ -5,24 +5,33 @@ module RuboCop
     module Metrics
       # This cop checks for methods with too many parameters.
       # The maximum number of parameters is configurable.
-      # On Ruby 2.0+ keyword arguments can optionally
-      # be excluded from the total count.
+      # Keyword arguments can optionally be excluded from the total count.
       class ParameterLists < Cop
         include ConfigurableMax
 
-        MSG = 'Avoid parameter lists longer than %d parameters. [%d/%d]'.freeze
+        MSG = 'Avoid parameter lists longer than %<max>d parameters. ' \
+              '[%<count>d/%<max>d]'.freeze
 
         def on_args(node)
           count = args_count(node)
           return unless count > max_params
 
-          message = format(MSG, max_params, count, max_params)
-          add_offense(node, :expression, message) do
+          return if argument_to_lambda_or_proc?(node)
+
+          add_offense(node) do
             self.max = count
           end
         end
 
         private
+
+        def_node_matcher :argument_to_lambda_or_proc?, <<-PATTERN
+          ^lambda_or_proc?
+        PATTERN
+
+        def message(node)
+          format(MSG, max: max_params, count: args_count(node))
+        end
 
         def args_count(node)
           if count_keyword_args?

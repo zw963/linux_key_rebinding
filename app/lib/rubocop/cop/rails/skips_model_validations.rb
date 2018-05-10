@@ -16,15 +16,15 @@ module RuboCop
       #   person.toggle :active
       #   product.touch
       #   Billing.update_all("category = 'authorized', author = 'David'")
-      #   user.update_attribute(website: 'example.com')
+      #   user.update_attribute(:website, 'example.com')
       #   user.update_columns(last_request_at: Time.current)
       #   Post.update_counters 5, comment_count: -1, action_count: 1
       #
       #   # good
-      #   user.update_attributes(website: 'example.com')
+      #   user.update(website: 'example.com')
       #   FileUtils.touch('file')
       class SkipsModelValidations < Cop
-        MSG = 'Avoid using `%s` because it skips validations.'.freeze
+        MSG = 'Avoid using `%<method>s` because it skips validations.'.freeze
 
         METHODS_WITH_ARGUMENTS = %w[decrement!
                                     decrement_counter
@@ -38,7 +38,7 @@ module RuboCop
                                     update_counters].freeze
 
         def_node_matcher :good_touch?, <<-PATTERN
-          (send (const nil :FileUtils) :touch ...)
+          (send (const nil? :FileUtils) :touch ...)
         PATTERN
 
         def on_send(node)
@@ -52,13 +52,13 @@ module RuboCop
 
           return if good_touch?(node)
 
-          add_offense(node, :selector)
+          add_offense(node, location: :selector)
         end
 
         private
 
         def message(node)
-          format(MSG, node.method_name)
+          format(MSG, method: node.method_name)
         end
 
         def blacklist

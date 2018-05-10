@@ -13,7 +13,7 @@ module RuboCop
       #   # good
       #   x += 1
       class SelfAssignment < Cop
-        MSG = 'Use self-assignment shorthand `%s=`.'.freeze
+        MSG = 'Use self-assignment shorthand `%<method>s=`.'.freeze
         OPS = %i[+ - * ** / | &].freeze
 
         def self.autocorrect_incompatible_with
@@ -30,6 +30,16 @@ module RuboCop
 
         def on_cvasgn(node)
           check(node, :cvar)
+        end
+
+        def autocorrect(node)
+          _var_name, rhs = *node
+
+          if rhs.send_type?
+            autocorrect_send_node(node, rhs)
+          elsif %i[and or].include?(rhs.type)
+            autocorrect_boolean_node(node, rhs)
+          end
         end
 
         private
@@ -52,7 +62,7 @@ module RuboCop
           target_node = s(var_type, var_name)
           return unless receiver == target_node
 
-          add_offense(node, :expression, format(MSG, method_name))
+          add_offense(node, message: format(MSG, method: method_name))
         end
 
         def check_boolean_node(node, rhs, var_name, var_type)
@@ -62,17 +72,7 @@ module RuboCop
           return unless first_operand == target_node
 
           operator = rhs.loc.operator.source
-          add_offense(node, :expression, format(MSG, operator))
-        end
-
-        def autocorrect(node)
-          _var_name, rhs = *node
-
-          if rhs.send_type?
-            autocorrect_send_node(node, rhs)
-          elsif %i[and or].include?(rhs.type)
-            autocorrect_boolean_node(node, rhs)
-          end
+          add_offense(node, message: format(MSG, method: operator))
         end
 
         def autocorrect_send_node(node, rhs)

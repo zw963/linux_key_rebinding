@@ -7,19 +7,21 @@ module RuboCop
       # `tr` or `delete`.
       #
       # @example
-      #   @bad
+      #   # bad
       #   'abc'.gsub('b', 'd')
       #   'abc'.gsub('a', '')
       #   'abc'.gsub(/a/, 'd')
       #   'abc'.gsub!('a', 'd')
       #
-      #   @good
+      #   # good
       #   'abc'.gsub(/.*/, 'a')
       #   'abc'.gsub(/a+/, 'd')
       #   'abc'.tr('b', 'd')
       #   'a b c'.delete(' ')
       class StringReplacement < Cop
-        MSG = 'Use `%s` instead of `%s`.'.freeze
+        include RangeHelp
+
+        MSG = 'Use `%<prefer>s` instead of `%<current>s`.'.freeze
         DETERMINISTIC_REGEX = /\A(?:#{LITERAL_REGEX})+\Z/
         DELETE = 'delete'.freeze
         TR = 'tr'.freeze
@@ -28,7 +30,7 @@ module RuboCop
 
         def_node_matcher :string_replacement?, <<-PATTERN
           (send _ {:gsub :gsub!}
-                    ${regexp str (send (const nil :Regexp) {:new :compile} _)}
+                    ${regexp str (send (const nil? :Regexp) {:new :compile} _)}
                     $str)
         PATTERN
 
@@ -101,7 +103,7 @@ module RuboCop
           second_source, = *second_param
           message = message(node, first_source, second_source)
 
-          add_offense(node, range(node), message)
+          add_offense(node, location: range(node), message: message)
         end
 
         def first_source(first_param)
@@ -151,7 +153,7 @@ module RuboCop
           replacement_method =
             replacement_method(node, first_source, second_source)
 
-          format(MSG, replacement_method, node.method_name)
+          format(MSG, prefer: replacement_method, current: node.method_name)
         end
 
         def method_suffix(node)

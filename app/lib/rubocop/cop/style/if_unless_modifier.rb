@@ -4,13 +4,27 @@ module RuboCop
   module Cop
     module Style
       # Checks for if and unless statements that would fit on one line
-      # if written as a modifier if/unless.
-      # The maximum line length is configurable.
+      # if written as a modifier if/unless. The maximum line length is
+      # configured in the `Metrics/LineLength` cop.
+      #
+      # @example
+      #   # bad
+      #   if condition
+      #     do_stuff(bar)
+      #   end
+      #
+      #   unless qux.empty?
+      #     Foo.do_something
+      #   end
+      #
+      #   # good
+      #   do_stuff(bar) if condition
+      #   Foo.do_something unless qux.empty?
       class IfUnlessModifier < Cop
         include StatementModifier
 
-        MSG = 'Favor modifier `%s` usage when having a single-line body. ' \
-              'Another good alternative is the usage of control flow ' \
+        MSG = 'Favor modifier `%<keyword>s` usage when having a single-line ' \
+              'body. Another good alternative is the usage of control flow ' \
               '`&&`/`||`.'.freeze
 
         ASSIGNMENT_TYPES = %i[lvasgn casgn cvasgn
@@ -19,16 +33,17 @@ module RuboCop
         def on_if(node)
           return unless eligible_node?(node)
 
-          add_offense(node, :keyword, format(MSG, node.keyword))
+          add_offense(node, location: :keyword,
+                            message: format(MSG, keyword: node.keyword))
         end
-
-        private
 
         def autocorrect(node)
           lambda do |corrector|
             corrector.replace(node.source_range, to_modifier_form(node))
           end
         end
+
+        private
 
         def eligible_node?(node)
           !non_eligible_if?(node) && !node.chained? &&
@@ -70,7 +85,7 @@ module RuboCop
 
         def first_line_comment(node)
           comment =
-            processed_source.comments.find { |c| c.loc.line == node.loc.line }
+            processed_source.find_comment { |c| c.loc.line == node.loc.line }
 
           comment ? comment.loc.expression.source : nil
         end

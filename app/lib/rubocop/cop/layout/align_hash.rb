@@ -19,86 +19,155 @@ module RuboCop
       #   - ignore_implicit (without curly braces)
       #   - ignore_explicit (with curly braces)
       #
-      # @example
+      # @example EnforcedHashRocketStyle: key (default)
+      #   # bad
+      #   {
+      #     :foo => bar,
+      #      :ba => baz
+      #   }
       #
-      #   # EnforcedHashRocketStyle: key (default)
-      #   # EnforcedColonStyle: key (default)
+      #   # good
+      #   {
+      #     :foo => bar,
+      #     :ba => baz
+      #   }
+      #
+      # @example EnforcedHashRocketStyle: separator
+      #   # bad
+      #   {
+      #     :foo => bar,
+      #     :ba => baz
+      #   }
+      #   {
+      #     :foo => bar,
+      #     :ba  => baz
+      #   }
+      #
+      #   # good
+      #   {
+      #     :foo => bar,
+      #      :ba => baz
+      #   }
+      #
+      # @example EnforcedHashRocketStyle: table
+      #   # bad
+      #   {
+      #     :foo => bar,
+      #      :ba => baz
+      #   }
+      #
+      #   # good
+      #   {
+      #     :foo => bar,
+      #     :ba  => baz
+      #   }
+      #
+      # @example EnforcedColonStyle: key (default)
+      #   # bad
+      #   {
+      #     foo: bar,
+      #      ba: baz
+      #   }
       #
       #   # good
       #   {
       #     foo: bar,
       #     ba: baz
       #   }
-      #   {
-      #     :foo => bar,
-      #     :ba => baz
-      #   }
       #
+      # @example EnforcedColonStyle: separator
       #   # bad
-      #   {
-      #     foo: bar,
-      #      ba: baz
-      #   }
-      #   {
-      #     :foo => bar,
-      #      :ba => baz
-      #   }
-      #
-      # @example
-      #
-      #   # EnforcedHashRocketStyle: separator
-      #   # EnforcedColonStyle: separator
-      #
-      #   #good
-      #   {
-      #     foo: bar,
-      #      ba: baz
-      #   }
-      #   {
-      #     :foo => bar,
-      #      :ba => baz
-      #   }
-      #
-      #   #bad
       #   {
       #     foo: bar,
       #     ba: baz
       #   }
+      #
+      #   # good
       #   {
-      #     :foo => bar,
-      #     :ba => baz
-      #   }
-      #   {
-      #     :foo => bar,
-      #     :ba  => baz
+      #     foo: bar,
+      #      ba: baz
       #   }
       #
-      # @example
+      # @example EnforcedColonStyle: table
+      #   # bad
+      #   {
+      #     foo: bar,
+      #     ba: baz
+      #   }
       #
-      #   # EnforcedHashRocketStyle: table
-      #   # EnforcedColonStyle: table
-      #
-      #   #good
+      #   # good
       #   {
       #     foo: bar,
       #     ba:  baz
       #   }
-      #   {
-      #     :foo => bar,
-      #     :ba  => baz
-      #   }
       #
-      #   #bad
-      #   {
-      #     foo: bar,
-      #     ba: baz
-      #   }
-      #   {
-      #     :foo => bar,
-      #      :ba => baz
-      #   }
+      # @example EnforcedLastArgumentHashStyle: always_inspect (default)
+      #   # Inspect both implicit and explicit hashes.
+      #
+      #   # bad
+      #   do_something(foo: 1,
+      #     bar: 2)
+      #
+      #   # bad
+      #   do_something({foo: 1,
+      #     bar: 2})
+      #
+      #   # good
+      #   do_something(foo: 1,
+      #                bar: 2)
+      #
+      #   # good
+      #   do_something(
+      #     foo: 1,
+      #     bar: 2
+      #   )
+      #
+      #   # good
+      #   do_something({foo: 1,
+      #                 bar: 2})
+      #
+      #   # good
+      #   do_something({
+      #     foo: 1,
+      #     bar: 2
+      #   })
+      #
+      # @example EnforcedLastArgumentHashStyle: always_ignore
+      #   # Ignore both implicit and explicit hashes.
+      #
+      #   # good
+      #   do_something(foo: 1,
+      #     bar: 2)
+      #
+      #   # good
+      #   do_something({foo: 1,
+      #     bar: 2})
+      #
+      # @example EnforcedLastArgumentHashStyle: ignore_implicit
+      #   # Ignore only implicit hashes.
+      #
+      #   # bad
+      #   do_something({foo: 1,
+      #     bar: 2})
+      #
+      #   # good
+      #   do_something(foo: 1,
+      #     bar: 2)
+      #
+      # @example EnforcedLastArgumentHashStyle: ignore_explicit
+      #   # Ignore only explicit hashes.
+      #
+      #   # bad
+      #   do_something(foo: 1,
+      #     bar: 2)
+      #
+      #   # good
+      #   do_something({foo: 1,
+      #     bar: 2})
+      #
       class AlignHash < Cop
         include HashAlignment
+        include RangeHelp
 
         MSG = 'Align the elements of a hash literal if they span more than ' \
               'one line.'.freeze
@@ -124,6 +193,21 @@ module RuboCop
           check_pairs(node)
         end
 
+        def autocorrect(node)
+          # We can't use the instance variable inside the lambda. That would
+          # just give each lambda the same reference and they would all get the
+          # last value of each. A local variable fixes the problem.
+          key_delta = column_deltas[:key] || 0
+
+          if !node.value
+            correct_no_value(key_delta, node.source_range)
+          else
+            correct_key_value(key_delta, node.key.source_range,
+                              node.value.source_range,
+                              node.loc.operator)
+          end
+        end
+
         private
 
         attr_accessor :column_deltas
@@ -136,12 +220,12 @@ module RuboCop
           first_pair = node.pairs.first
           self.column_deltas = alignment_for(first_pair)
                                .deltas_for_first_pair(first_pair, node)
-          add_offense(first_pair, :expression) unless good_alignment?
+          add_offense(first_pair) unless good_alignment?
 
           node.children.each do |current|
             self.column_deltas = alignment_for(current)
                                  .deltas(first_pair, current)
-            add_offense(current, :expression) unless good_alignment?
+            add_offense(current) unless good_alignment?
           end
         end
 
@@ -170,21 +254,6 @@ module RuboCop
         def alignment_for_colons
           @alignment_for_colons ||=
             new_alignment('EnforcedColonStyle')
-        end
-
-        def autocorrect(node)
-          # We can't use the instance variable inside the lambda. That would
-          # just give each lambda the same reference and they would all get the
-          # last value of each. A local variable fixes the problem.
-          key_delta = column_deltas[:key] || 0
-
-          if !node.value
-            correct_no_value(key_delta, node.source_range)
-          else
-            correct_key_value(key_delta, node.key.source_range,
-                              node.value.source_range,
-                              node.loc.operator)
-          end
         end
 
         def correct_no_value(key_delta, key)

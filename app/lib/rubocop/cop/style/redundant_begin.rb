@@ -9,6 +9,7 @@ module RuboCop
       #
       # @example
       #
+      #   # bad
       #   def redundant
       #     begin
       #       ala
@@ -18,21 +19,43 @@ module RuboCop
       #     end
       #   end
       #
+      #   # good
       #   def preferred
       #     ala
       #     bala
       #   rescue StandardError => e
       #     something
       #   end
+      #
+      #   # bad
+      #   # When using Ruby 2.5 or later.
+      #   do_something do
+      #     begin
+      #       something
+      #     rescue => ex
+      #       anything
+      #     end
+      #   end
+      #
+      #   # good
+      #   # In Ruby 2.5 or later, you can omit `begin` in `do-end` block.
+      #   do_something do
+      #     something
+      #   rescue => ex
+      #     anything
+      #   end
       class RedundantBegin < Cop
-        include OnMethodDef
-
         MSG = 'Redundant `begin` block detected.'.freeze
 
-        def on_method_def(_node, _method_name, _args, body)
-          return unless body && body.kwbegin_type?
+        def on_def(node)
+          check(node)
+        end
+        alias on_defs on_def
 
-          add_offense(body, :begin)
+        def on_block(node)
+          return if target_ruby_version < 2.5
+          return if node.braces?
+          check(node)
         end
 
         def autocorrect(node)
@@ -40,6 +63,14 @@ module RuboCop
             corrector.remove(node.loc.begin)
             corrector.remove(node.loc.end)
           end
+        end
+
+        private
+
+        def check(node)
+          return unless node.body && node.body.kwbegin_type?
+
+          add_offense(node.body, location: :begin)
         end
       end
     end

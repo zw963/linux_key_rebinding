@@ -22,7 +22,11 @@ module RuboCop
       #     puts 'error'
       #   end
       class RescueEnsureAlignment < Cop
-        MSG = '`%s` at %d, %d is not aligned with `end` at %d, %d.'.freeze
+        include RangeHelp
+
+        MSG = '`%<kw_loc>s` at %<kw_loc_line>d, %<kw_loc_column>d is not ' \
+              'aligned with `end` at %<end_loc_line>d, %<end_loc_column>d.'
+              .freeze
 
         def on_resbody(node)
           check(node) unless modifier?(node)
@@ -35,7 +39,7 @@ module RuboCop
         def investigate(processed_source)
           @modifier_locations =
             processed_source.tokens.each_with_object([]) do |token, locations|
-              next unless token.type == :kRESCUE_MOD
+              next unless token.rescue_modifier?
               locations << token.pos
             end
         end
@@ -57,12 +61,18 @@ module RuboCop
           return if end_loc.column == kw_loc.column
           return if end_loc.line == kw_loc.line
 
-          add_offense(node, kw_loc, format_message(kw_loc, end_loc))
+          add_offense(node,
+                      location: kw_loc,
+                      message: format_message(kw_loc, end_loc))
         end
 
         def format_message(kw_loc, end_loc)
-          format(MSG, kw_loc.source, kw_loc.line, kw_loc.column, end_loc.line,
-                 end_loc.column)
+          format(MSG,
+                 kw_loc: kw_loc.source,
+                 kw_loc_line: kw_loc.line,
+                 kw_loc_column: kw_loc.column,
+                 end_loc_line: end_loc.line,
+                 end_loc_column: end_loc.column)
         end
 
         def modifier?(node)
@@ -78,7 +88,9 @@ module RuboCop
         end
 
         def ancestor_node(node)
-          node.each_ancestor(:kwbegin, :def, :defs, :class, :module).first
+          types = %i[kwbegin def defs class module]
+          types << :block if target_ruby_version >= 2.5
+          node.each_ancestor(*types).first
         end
       end
     end

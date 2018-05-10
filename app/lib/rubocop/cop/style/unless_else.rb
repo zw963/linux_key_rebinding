@@ -4,14 +4,31 @@ module RuboCop
   module Cop
     module Style
       # This cop looks for *unless* expressions with *else* clauses.
+      #
+      # @example
+      #   # bad
+      #   unless foo_bar.nil?
+      #     # do something...
+      #   else
+      #     # do a different thing...
+      #   end
+      #
+      #   # good
+      #   if foo_bar.present?
+      #     # do something...
+      #   else
+      #     # do a different thing...
+      #   end
       class UnlessElse < Cop
+        include RangeHelp
+
         MSG = 'Do not use `unless` with `else`. Rewrite these with the ' \
               'positive case first.'.freeze
 
         def on_if(node)
           return unless node.unless? && node.else?
 
-          add_offense(node, :expression)
+          add_offense(node)
         end
 
         def autocorrect(node)

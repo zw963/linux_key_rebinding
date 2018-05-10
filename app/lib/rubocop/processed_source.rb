@@ -54,7 +54,7 @@ module RuboCop
     def lines
       @lines ||= begin
         all_lines = @buffer.source_lines
-        last_token_line = tokens.any? ? tokens.last.pos.line : all_lines.size
+        last_token_line = tokens.any? ? tokens.last.line : all_lines.size
         result = []
         all_lines.each_with_index do |line, ix|
           break if ix >= last_token_line && line == '__END__'
@@ -78,7 +78,60 @@ module RuboCop
       Digest::MD5.hexdigest(@raw_source)
     end
 
+    def each_comment
+      comments.each { |comment| yield comment }
+    end
+
+    def find_comment
+      comments.find { |comment| yield comment }
+    end
+
+    def each_token
+      tokens.each { |token| yield token }
+    end
+
+    def find_token
+      tokens.find { |token| yield token }
+    end
+
+    def file_path
+      buffer.name
+    end
+
+    def blank?
+      ast.nil?
+    end
+
+    def commented?(source_range)
+      comment_lines.include?(source_range.line)
+    end
+
+    def comment_on_line?(line)
+      comments.any? { |c| c.loc.line == line }
+    end
+
+    def comments_before_line(line)
+      comments.select { |c| c.location.line <= line }
+    end
+
+    def start_with?(string)
+      return false if self[0].nil?
+      self[0].start_with?(string)
+    end
+
+    def preceding_line(token)
+      lines[token.line - 2]
+    end
+
+    def following_line(token)
+      lines[token.line]
+    end
+
     private
+
+    def comment_lines
+      @comment_lines ||= comments.map { |c| c.location.line }
+    end
 
     def parse(source, ruby_version)
       buffer_name = @path || STRING_SOURCE_NAME
@@ -107,14 +160,9 @@ module RuboCop
       [ast, comments, tokens]
     end
 
-    def parser_class(ruby_version) # rubocop:disable Metrics/MethodLength
+    # rubocop:disable Metrics/MethodLength
+    def parser_class(ruby_version)
       case ruby_version
-      when 1.9
-        require 'parser/ruby19'
-        Parser::Ruby19
-      when 2.0
-        require 'parser/ruby20'
-        Parser::Ruby20
       when 2.1
         require 'parser/ruby21'
         Parser::Ruby21
@@ -127,16 +175,20 @@ module RuboCop
       when 2.4
         require 'parser/ruby24'
         Parser::Ruby24
+      when 2.5
+        require 'parser/ruby25'
+        Parser::Ruby25
       else
         raise ArgumentError, "Unknown Ruby version: #{ruby_version.inspect}"
       end
     end
+    # rubocop:enable Metrics/MethodLength
 
     def create_parser(ruby_version)
       builder = RuboCop::AST::Builder.new
 
       parser_class(ruby_version).new(builder).tap do |parser|
-        # On JRuby and Rubinius, there's a risk that we hang in tokenize() if we
+        # On JRuby there's a risk that we hang in tokenize() if we
         # don't set the all errors as fatal flag. The problem is caused by a bug
         # in Racc that is discussed in issue #93 of the whitequark/parser
         # project on GitHub.

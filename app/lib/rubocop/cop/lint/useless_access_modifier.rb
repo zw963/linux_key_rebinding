@@ -91,7 +91,7 @@ module RuboCop
       #     delegate :method_a, to: :method_b
       #   end
       class UselessAccessModifier < Cop
-        MSG = 'Useless `%s` access modifier.'.freeze
+        MSG = 'Useless `%<current>s` access modifier.'.freeze
 
         def on_class(node)
           check_node(node.children[2]) # class body
@@ -113,16 +113,12 @@ module RuboCop
 
         private
 
-        def_node_matcher :access_modifier, <<-PATTERN
-          (send nil ${:public :protected :private})
-        PATTERN
-
         def_node_matcher :static_method_definition?, <<-PATTERN
-          {def (send nil {:attr :attr_reader :attr_writer :attr_accessor} ...)}
+          {def (send nil? {:attr :attr_reader :attr_writer :attr_accessor} ...)}
         PATTERN
 
         def_node_matcher :dynamic_method_definition?, <<-PATTERN
-          {(send nil :define_method ...) (block (send nil :define_method ...) ...)}
+          {(send nil? :define_method ...) (block (send nil? :define_method ...) ...)}
         PATTERN
 
         def_node_matcher :class_or_instance_eval?, <<-PATTERN
@@ -130,7 +126,7 @@ module RuboCop
         PATTERN
 
         def_node_matcher :class_or_module_or_struct_new_call?, <<-PATTERN
-          (block (send (const nil {:Class :Module :Struct}) :new ...) ...)
+          (block (send (const nil? {:Class :Module :Struct}) :new ...) ...)
         PATTERN
 
         def check_node(node)
@@ -138,22 +134,22 @@ module RuboCop
 
           if node.begin_type?
             check_scope(node)
-          elsif (vis = access_modifier(node))
-            add_offense(node, :expression, format(MSG, vis))
+          elsif node.send_type? && node.access_modifier?
+            add_offense(node, message: format(MSG, current: node.method_name))
           end
         end
 
         def check_scope(node)
           cur_vis, unused = check_child_nodes(node, nil, :public)
 
-          add_offense(unused, :expression, format(MSG, cur_vis)) if unused
+          add_offense(unused, message: format(MSG, current: cur_vis)) if unused
         end
 
         def check_child_nodes(node, unused, cur_vis)
           node.child_nodes.each do |child|
-            if (new_vis = access_modifier(child))
+            if child.send_type? && child.access_modifier?
               cur_vis, unused =
-                check_new_visibility(child, unused, new_vis, cur_vis)
+                check_new_visibility(child, unused, child.method_name, cur_vis)
             elsif method_definition?(child)
               unused = nil
             elsif start_of_new_scope?(child)
@@ -169,10 +165,12 @@ module RuboCop
         def check_new_visibility(node, unused, new_vis, cur_vis)
           # does this modifier just repeat the existing visibility?
           if new_vis == cur_vis
-            add_offense(node, :expression, format(MSG, cur_vis))
+            add_offense(node, message: format(MSG, current: cur_vis))
           else
             # was the previous modifier never applied to any defs?
-            add_offense(unused, :expression, format(MSG, cur_vis)) if unused
+            if unused
+              add_offense(unused, message: format(MSG, current: cur_vis))
+            end
             # once we have already warned about a certain modifier, don't
             # warn again even if it is never applied to any method defs
             unused = node
@@ -192,7 +190,7 @@ module RuboCop
             matcher_name = "#{m}_method?".to_sym
             unless respond_to?(matcher_name)
               self.class.def_node_matcher matcher_name, <<-PATTERN
-                {def (send nil :#{m} ...)}
+                {def (send nil? :#{m} ...)}
               PATTERN
             end
 
@@ -216,7 +214,7 @@ module RuboCop
             matcher_name = "#{m}_block?".to_sym
             unless respond_to?(matcher_name)
               self.class.def_node_matcher matcher_name, <<-PATTERN
-                (block (send {nil const} {:#{m}} ...) ...)
+                (block (send {nil? const} {:#{m}} ...) ...)
               PATTERN
             end
 

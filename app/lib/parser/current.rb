@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Parser
   class << self
     def warn_syntax_deviation(feature, version)
@@ -9,24 +11,6 @@ module Parser
   end
 
   case RUBY_VERSION
-  when /^1\.8\./
-    current_version = '1.8.7'
-    if RUBY_VERSION != current_version
-      warn_syntax_deviation 'parser/ruby18', current_version
-    end
-
-    require 'parser/ruby18'
-    CurrentRuby = Ruby18
-
-  when /^1\.9\./
-    current_version = '1.9.3'
-    if RUBY_VERSION != current_version
-      warn_syntax_deviation 'parser/ruby19', current_version
-    end
-
-    require 'parser/ruby19'
-    CurrentRuby = Ruby19
-
   when /^2\.0\./
     current_version = '2.0.0'
     if RUBY_VERSION != current_version
@@ -37,7 +21,7 @@ module Parser
     CurrentRuby = Ruby20
 
   when /^2\.1\./
-    current_version = '2.1.8'
+    current_version = '2.1.10'
     if RUBY_VERSION != current_version
       warn_syntax_deviation 'parser/ruby21', current_version
     end
@@ -46,7 +30,7 @@ module Parser
     CurrentRuby = Ruby21
 
   when /^2\.2\./
-    current_version = '2.2.6'
+    current_version = '2.2.10'
     if RUBY_VERSION != current_version
       warn_syntax_deviation 'parser/ruby22', current_version
     end
@@ -55,7 +39,7 @@ module Parser
     CurrentRuby = Ruby22
 
   when /^2\.3\./
-    current_version = '2.3.3'
+    current_version = '2.3.7'
     if RUBY_VERSION != current_version
       warn_syntax_deviation 'parser/ruby23', current_version
     end
@@ -64,7 +48,7 @@ module Parser
     CurrentRuby = Ruby23
 
   when /^2\.4\./
-    current_version = '2.4.0'
+    current_version = '2.4.4'
     if RUBY_VERSION != current_version
       warn_syntax_deviation 'parser/ruby24', current_version
     end
@@ -72,10 +56,28 @@ module Parser
     require 'parser/ruby24'
     CurrentRuby = Ruby24
 
+  when /^2\.5\./
+    current_version = '2.5.1'
+    if RUBY_VERSION != current_version
+      warn_syntax_deviation 'parser/ruby25', current_version
+    end
+
+    require 'parser/ruby25'
+    CurrentRuby = Ruby25
+
+  when /^2\.6\./
+    current_version = '2.6.0-dev'
+    if RUBY_VERSION != current_version
+      warn_syntax_deviation 'parser/ruby26', current_version
+    end
+
+    require 'parser/ruby26'
+    CurrentRuby = Ruby26
+
   else # :nocov:
     # Keep this in sync with released Ruby.
-    warn_syntax_deviation 'parser/ruby24', '2.4.x'
-    require 'parser/ruby24'
-    CurrentRuby = Ruby24
+    warn_syntax_deviation 'parser/ruby25', '2.5.x'
+    require 'parser/ruby25'
+    CurrentRuby = Ruby25
   end
 end

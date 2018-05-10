@@ -12,6 +12,11 @@ module RuboCop
       #
       #   # good
       #   CONST = [1, 2, 3].freeze
+      #
+      #   # good
+      #   CONST = <<~TESTING.freeze
+      #   This is a heredoc
+      #   TESTING
       class MutableConstant < Cop
         include FrozenStringLiteral
 
@@ -30,6 +35,19 @@ module RuboCop
           on_assignment(value)
         end
 
+        def autocorrect(node)
+          expr = node.source_range
+
+          lambda do |corrector|
+            if node.array_type? && !node.bracketed?
+              corrector.insert_before(expr, '[')
+              corrector.insert_after(expr, '].freeze')
+            else
+              corrector.insert_after(expr, '.freeze')
+            end
+          end
+        end
+
         private
 
         def on_assignment(value)
@@ -39,24 +57,7 @@ module RuboCop
           return if FROZEN_STRING_LITERAL_TYPES.include?(value.type) &&
                     frozen_string_literals_enabled?
 
-          add_offense(value, :expression)
-        end
-
-        def autocorrect(node)
-          expr = node.source_range
-
-          lambda do |corrector|
-            if unbracketed_array?(node)
-              corrector.insert_before(expr, '[')
-              corrector.insert_after(expr, '].freeze')
-            else
-              corrector.insert_after(expr, '.freeze')
-            end
-          end
-        end
-
-        def unbracketed_array?(node)
-          node.array_type? && !node.square_brackets? && !node.percent_literal?
+          add_offense(value)
         end
 
         def_node_matcher :splat_value, <<-PATTERN

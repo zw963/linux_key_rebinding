@@ -4,10 +4,29 @@ module RuboCop
   module Cop
     module Style
       # This cop checks if usage of %() or %Q() matches configuration.
+      #
+      # @example EnforcedStyle: bare_percent (default)
+      #   # bad
+      #   %Q(He said: "#{greeting}")
+      #   %q{She said: 'Hi'}
+      #
+      #   # good
+      #   %(He said: "#{greeting}")
+      #   %{She said: 'Hi'}
+      #
+      # @example EnforcedStyle: percent_q
+      #   # bad
+      #   %|He said: "#{greeting}"|
+      #   %/She said: 'Hi'/
+      #
+      #   # good
+      #   %Q|He said: "#{greeting}"|
+      #   %q/She said: 'Hi'/
+      #
       class BarePercentLiterals < Cop
         include ConfigurableEnforcedStyle
 
-        MSG = 'Use `%%%s` instead of `%%%s`.'.freeze
+        MSG = 'Use `%%%<good>s` instead of `%%%<bad>s`.'.freeze
 
         def on_dstr(node)
           check(node)
@@ -15,6 +34,14 @@ module RuboCop
 
         def on_str(node)
           check(node)
+        end
+
+        def autocorrect(node)
+          src = node.loc.begin.source
+          replacement = src.start_with?('%Q') ? '%' : '%Q'
+          lambda do |corrector|
+            corrector.replace(node.loc.begin, src.sub(/%Q?/, replacement))
+          end
         end
 
         private
@@ -41,15 +68,9 @@ module RuboCop
         end
 
         def add_offense_for_wrong_style(node, good, bad)
-          add_offense(node, :begin, format(MSG, good, bad))
-        end
-
-        def autocorrect(node)
-          src = node.loc.begin.source
-          replacement = src.start_with?('%Q') ? '%' : '%Q'
-          lambda do |corrector|
-            corrector.replace(node.loc.begin, src.sub(/%Q?/, replacement))
-          end
+          add_offense(node, location: :begin, message: format(MSG,
+                                                              good: good,
+                                                              bad: bad))
         end
       end
     end

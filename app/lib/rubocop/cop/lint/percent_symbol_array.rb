@@ -33,7 +33,18 @@ module RuboCop
         def on_percent_literal(node)
           return unless contains_colons_or_commas?(node)
 
-          add_offense(node, :expression, MSG)
+          add_offense(node)
+        end
+
+        def autocorrect(node)
+          lambda do |corrector|
+            node.children.each do |child|
+              range = child.loc.expression
+
+              corrector.remove_trailing(range, 1) if /,$/ =~ range.source
+              corrector.remove_leading(range, 1) if /^:/ =~ range.source
+            end
+          end
         end
 
         private
@@ -47,17 +58,6 @@ module RuboCop
             next if literal.to_s.gsub(/[^\p{Alnum}]/, '').empty?
 
             patterns.any? { |pat| literal =~ pat }
-          end
-        end
-
-        def autocorrect(node)
-          lambda do |corrector|
-            node.children.each do |child|
-              range = child.loc.expression
-
-              corrector.remove_trailing(range, 1) if /,$/ =~ range.source
-              corrector.remove_leading(range, 1) if /^:/ =~ range.source
-            end
           end
         end
       end

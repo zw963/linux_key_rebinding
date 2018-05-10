@@ -13,6 +13,8 @@ module RuboCop
       #   # good
       #   [].reverse_each
       class ReverseEach < Cop
+        include RangeHelp
+
         MSG = 'Use `reverse_each` instead of `reverse.each`.'.freeze
         UNDERSCORE = '_'.freeze
 
@@ -27,7 +29,7 @@ module RuboCop
 
             range = range_between(location_of_reverse, end_location)
 
-            add_offense(node, range)
+            add_offense(node, location: range)
           end
         end
 

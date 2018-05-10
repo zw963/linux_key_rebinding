@@ -5,11 +5,23 @@ module RuboCop
     module Style
       # This cop checks for multiple expressions placed on the same line.
       # It also checks for lines terminated with a semicolon.
+      #
+      # @example
+      #   # bad
+      #   foo = 1; bar = 2;
+      #   baz = 3;
+      #
+      #   # good
+      #   foo = 1
+      #   bar = 2
+      #   baz = 3
       class Semicolon < Cop
+        include RangeHelp
+
         MSG = 'Do not use semicolons to terminate expressions.'.freeze
 
         def investigate(processed_source)
-          return unless processed_source.ast
+          return if processed_source.blank?
           @processed_source = processed_source
 
           check_for_line_terminator_or_opener
@@ -36,6 +48,11 @@ module RuboCop
           end
         end
 
+        def autocorrect(range)
+          return unless range
+          ->(corrector) { corrector.remove(range) }
+        end
+
         private
 
         def check_for_line_terminator_or_opener
@@ -44,25 +61,20 @@ module RuboCop
 
         def each_semicolon
           tokens_for_lines.each do |line, tokens|
-            yield line, tokens.last.pos.column if tokens.last.type == :tSEMI
-            yield line, tokens.first.pos.column if tokens.first.type == :tSEMI
+            yield line, tokens.last.column if tokens.last.semicolon?
+            yield line, tokens.first.column if tokens.first.semicolon?
           end
         end
 
         def tokens_for_lines
-          @processed_source.tokens.group_by { |token| token.pos.line }
+          @processed_source.tokens.group_by(&:line)
         end
 
         def convention_on(line, column, autocorrect)
           range = source_range(@processed_source.buffer, line, column)
           # Don't attempt to autocorrect if semicolon is separating statements
           # on the same line
-          add_offense(autocorrect ? range : nil, range)
-        end
-
-        def autocorrect(range)
-          return unless range
-          ->(corrector) { corrector.remove(range) }
+          add_offense(autocorrect ? range : nil, location: range)
         end
       end
     end

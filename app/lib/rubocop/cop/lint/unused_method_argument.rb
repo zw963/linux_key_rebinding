@@ -23,13 +23,20 @@ module RuboCop
       class UnusedMethodArgument < Cop
         include UnusedArgument
 
+        def autocorrect(node)
+          UnusedArgCorrector.correct(processed_source, node)
+        end
+
+        private
+
         def check_argument(variable)
           return unless variable.method_argument?
           return if variable.keyword_argument? &&
                     cop_config['AllowUnusedKeywordArguments']
 
           if cop_config['IgnoreEmptyMethods']
-            _name, _args, body = *variable.scope.node
+            body = variable.scope.node.body
+
             return if body.nil?
           end
 

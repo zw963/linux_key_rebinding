@@ -18,13 +18,12 @@ module RuboCop
         ASGN_NODES = %i[lvasgn masgn] + SHORTHAND_ASGN_NODES
 
         def on_send(node)
-          return if node.camel_case_method?
+          return if ineligible_node?(node)
           return unless !node.arguments? && node.parenthesized?
+          return if ignored_method?(node.method_name)
           return if same_name_assignment?(node)
-          return if node.implicit_call?
-          return if node.keyword_not?
 
-          add_offense(node, :begin)
+          add_offense(node, location: :begin)
         end
 
         def autocorrect(node)
@@ -35,6 +34,14 @@ module RuboCop
         end
 
         private
+
+        def ineligible_node?(node)
+          node.camel_case_method? || node.implicit_call? || node.keyword_not?
+        end
+
+        def ignored_method?(method)
+          cop_config['IgnoredMethods'].to_a.map(&:to_sym).include?(method)
+        end
 
         def same_name_assignment?(node)
           any_assignment?(node) do |asgn_node|
