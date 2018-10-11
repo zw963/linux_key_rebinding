@@ -4,4 +4,4 @@ ROOT=$(dirname `(readlink -e $0)`)
 export RUBYOPT=
 export RUBYLIB=$ROOT
 
-$ROOT/ruby-2.4.3 $ROOT/../app/bin/seeing_is_believing "$@"
+$ROOT/ruby-2.5.1 $ROOT/../app/bin/seeing_is_believing "$@"
