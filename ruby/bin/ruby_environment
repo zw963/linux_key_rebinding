@@ -14,9 +14,9 @@ echo RUBYOPT=\"-r$ROOT/lib/restore_environment\"
 for DIR in "$ROOT"/lib/ruby/gems/*/deplibs/*/*; do
 	echo LD_LIBRARY_PATH=\"\$LD_LIBRARY_PATH:$DIR\"
 done
-echo GEM_HOME="$ROOT/lib/ruby/gems/2.4.0"
-echo GEM_PATH="$ROOT/lib/ruby/gems/2.4.0"
-echo RUBYLIB=\"$ROOT/lib/ruby/gems/2.4.0/gems/did_you_mean-1.1.0/lib:$ROOT/lib/ruby/site_ruby/2.4.0:$ROOT/lib/ruby/site_ruby/2.4.0/x86_64-linux:$ROOT/lib/ruby/site_ruby:$ROOT/lib/ruby/vendor_ruby/2.4.0:$ROOT/lib/ruby/vendor_ruby/2.4.0/x86_64-linux:$ROOT/lib/ruby/vendor_ruby:$ROOT/lib/ruby/2.4.0:$ROOT/lib/ruby/2.4.0/x86_64-linux\"
+echo GEM_HOME="$ROOT/lib/ruby/gems/2.5.0"
+echo GEM_PATH="$ROOT/lib/ruby/gems/2.5.0"
+echo RUBYLIB=\"$ROOT/lib/ruby/gems/2.5.0/gems/did_you_mean-1.2.0/lib:$ROOT/lib/ruby/site_ruby/2.5.0:$ROOT/lib/ruby/site_ruby/2.5.0/x86_64-linux:$ROOT/lib/ruby/site_ruby:$ROOT/lib/ruby/vendor_ruby/2.5.0:$ROOT/lib/ruby/vendor_ruby/2.5.0/x86_64-linux:$ROOT/lib/ruby/vendor_ruby:$ROOT/lib/ruby/2.5.0:$ROOT/lib/ruby/2.5.0/x86_64-linux\"
 
 echo export ORIG_LD_LIBRARY_PATH
 echo export ORIG_SSL_CERT_DIR
