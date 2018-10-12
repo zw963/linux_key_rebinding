@@ -7,8 +7,15 @@ inherit_from:
 
 # Common configuration.
 AllCops:
+  RubyInterpreters:
+    - ruby
+    - macruby
+    - rake
+    - jruby
+    - rbx
   # Include common Ruby source files.
   Include:
+    - '**/*.rb'
     - '**/*.arb'
     - '**/*.axlsx'
     - '**/*.builder'
@@ -35,7 +42,6 @@ AllCops:
     - '**/.irbrc'
     - '**/.pryrc'
     - '**/buildfile'
-    - '**/config.ru'
     - '**/Appraisals'
     - '**/Berksfile'
     - '**/Brewfile'
@@ -73,7 +79,7 @@ AllCops:
   DisplayStyleGuide: false
   # When specifying style guide URLs, any paths and/or fragments will be
   # evaluated relative to the base URL.
-  StyleGuideBaseURL: https://github.com/bbatsov/ruby-style-guide
+  StyleGuideBaseURL: https://github.com/rubocop-hq/ruby-style-guide
   # Extra details are not displayed in offense messages by default. Change
   # behavior by overriding ExtraDetails, or by giving the
   # `-E/--extra-details` option.
@@ -90,7 +96,7 @@ AllCops:
   # cops in user configuration will be enabled even if they don't set the
   # Enabled parameter.
   # When `EnabledByDefault` is `true`, all cops, even those in disabled.yml,
-  # are enabled by default.  Cops can still be disabled in user configuration.
+  # are enabled by default. Cops can still be disabled in user configuration.
   # Note that it is invalid to set both EnabledByDefault and DisabledByDefault
   # to true in the same configuration.
   EnabledByDefault: false
@@ -123,14 +129,14 @@ AllCops:
   # followed by the Gemfile.lock or gems.locked file. (Although the Ruby version
   # is specified in the Gemfile or gems.rb file, RuboCop reads the final value
   # from the lock file.) If the Ruby version is still unresolved, RuboCop will
-  # use the oldest officially supported Ruby version (currently Ruby 2.1).
+  # use the oldest officially supported Ruby version (currently Ruby 2.2).
   TargetRubyVersion: ~
   # What version of Rails is the inspected code using?  If a value is specified
-  # for TargetRailsVersion then it is used.  Acceptable values are specificed
+  # for TargetRailsVersion then it is used. Acceptable values are specificed
   # as a float (i.e. 5.1); the patch version of Rails should not be included.
   # If TargetRailsVersion is not set, RuboCop will parse the Gemfile.lock or
   # gems.locked file to find the version of Rails that has been bound to the
-  # application.  If neither of those files exist, RuboCop will use Rails 5.0
+  # application. If neither of those files exist, RuboCop will use Rails 5.0
   # as the default.
   TargetRailsVersion: ~
 
@@ -361,6 +367,9 @@ Layout/FirstParameterIndentation:
     # The first parameter should always be indented one step more than the
     # preceding line.
     - consistent
+    # The first parameter should always be indented one level relative to the
+    # parent that is receiving the parameter
+    - consistent_relative_to_receiver
     # The first parameter should normally be indented one step more than the
     # preceding line, but if it's a parameter for a method call that is itself
     # a parameter in a method call, then the inner parameter should be indented
@@ -660,8 +669,8 @@ Layout/TrailingWhitespace:
 #################### Naming ##########################
 
 Naming/FileName:
-  # File names listed in `AllCops:Include` are excluded by default. Add extra
-  # excludes here.
+  # Camel case file names listed in `AllCops:Include` and all file names listed
+  # in `AllCops:Exclude` are excluded by default. Add extra excludes here.
   Exclude: []
   # When `true`, requires that each source file should define a class or module
   # with a name which matches the file name (converted to ... case).
@@ -729,6 +738,13 @@ Naming/HeredocDelimiterCase:
     - lowercase
     - uppercase
 
+Naming/MemoizedInstanceVariableName:
+  EnforcedStyleForLeadingUnderscores: disallowed
+  SupportedStylesForLeadingUnderscores:
+    - disallowed
+    - required
+    - optional
+
 Naming/MethodName:
   EnforcedStyle: snake_case
   SupportedStyles:
@@ -781,6 +797,8 @@ Naming/UncommunicativeMethodParamName:
     - 'on'
     - in
     - at
+    - ip
+    - db
   # Blacklisted names that will register an offense
   ForbiddenNames: []
 
@@ -798,6 +816,12 @@ Naming/VariableNumber:
     - non_integer
 
 #################### Style ###########################
+
+Style/AccessModifierDeclarations:
+  EnforcedStyle: group
+  SupportedStyles:
+    - inline
+    - group
 
 Style/Alias:
   EnforcedStyle: prefer_alias
@@ -992,7 +1016,7 @@ Style/ConditionalAssignment:
 # You can override the default Notice in your .rubocop.yml file.
 #
 # In order to use autocorrect, you must supply a value for the
-# `AutocorrectNotice` key that matches the regexp Notice.  A blank
+# `AutocorrectNotice` key that matches the regexp Notice. A blank
 # `AutocorrectNotice` will cause an error during autocorrect.
 #
 # Autocorrect will add a copyright notice in a comment at the top
@@ -1116,6 +1140,12 @@ Style/InverseMethods:
     :select: :reject
     :select!: :reject!
 
+Style/IpAddresses:
+  # Allow strings to be whitelisted
+  Whitelist:
+    - "::"
+    # :: is a valid IPv6 address, but could potentially be legitimately in code
+
 Style/Lambda:
   EnforcedStyle: line_count_dependent
   SupportedStyles:
@@ -1217,6 +1247,12 @@ Style/Next:
     - skip_modifier_ifs
     - always
 
+Style/NilComparison:
+  EnforcedStyle: predicate
+  SupportedStyles:
+    - predicate
+    - comparison
+
 Style/NonNilCheck:
   # With `IncludeSemanticChanges` set to `true`, this cop reports offenses for
   # `!x.nil?` and autocorrects that and `x != nil` to solely `x`, which is
@@ -1241,6 +1277,7 @@ Style/NumericPredicate:
   SupportedStyles:
     - predicate
     - comparison
+  IgnoredMethods: []
   # Exclude RSpec specs because assertions like `expect(1).to be > 0` cause
   # false positives.
   Exclude:
@@ -1258,6 +1295,7 @@ Style/OptionHash:
 # Allow safe assignment in conditions.
 Style/ParenthesesAroundCondition:
   AllowSafeAssignment: true
+  AllowInMultilineConditions: false
 
 Style/PercentLiteralDelimiters:
   # Specify the default preferred delimiter for all types with the 'default' key
@@ -1330,6 +1368,7 @@ Style/SafeNavigation:
     - blank?
     - presence
     - try
+    - try!
 
 Style/Semicolon:
   # Allow `;` to separate several expressions on the same line.
@@ -1393,7 +1432,7 @@ Style/StringMethods:
 
 Style/SymbolArray:
   EnforcedStyle: percent
-  MinSize: 0
+  MinSize: 2
   SupportedStyles:
     - percent
     - brackets
@@ -1497,9 +1536,9 @@ Style/WordArray:
     # bracket style: ['word1', 'word2']
     - brackets
   # The `MinSize` option causes the `WordArray` rule to be ignored for arrays
-  # smaller than a certain size.  The rule is only applied to arrays
+  # smaller than a certain size. The rule is only applied to arrays
   # whose element count is greater than or equal to `MinSize`.
-  MinSize: 0
+  MinSize: 2
   # The regular expression `WordRegex` decides what is considered a word.
   WordRegex: !ruby/regexp '/\A[\p{Word}\n\t]+\z/'
 
@@ -1521,7 +1560,10 @@ Metrics/AbcSize:
 Metrics/BlockLength:
   CountComments: false  # count full line comments?
   Max: 25
-  ExcludedMethods: []
+  ExcludedMethods:
+    # By default, exclude the `#refine` method, as it tends to have larger
+    # associated blocks.
+    - refine
 
 Metrics/BlockNesting:
   CountBlocks: false
@@ -1555,6 +1597,7 @@ Metrics/LineLength:
 Metrics/MethodLength:
   CountComments: false  # count full line comments?
   Max: 10
+  ExcludedMethods: []
 
 Metrics/ModuleLength:
   CountComments: false  # count full line comments?
@@ -1596,6 +1639,15 @@ Lint/SafeNavigationChain:
     - blank?
     - presence
     - try
+    - try!
+
+Lint/SafeNavigationConsistency:
+  Whitelist:
+    - present?
+    - blank?
+    - presence
+    - try
+    - try!
 
 # Checks for shadowed arguments
 Lint/ShadowedArgument:
@@ -1610,6 +1662,10 @@ Lint/UnusedBlockArgument:
 Lint/UnusedMethodArgument:
   AllowUnusedKeywordArguments: false
   IgnoreEmptyMethods: true
+
+Lint/UselessAccessModifier:
+  ContextCreatingMethods: []
+  MethodCreatingMethods: []
 
 Lint/Void:
   CheckForMethodsWithNoSideEffects: false
@@ -1634,6 +1690,26 @@ Rails/ActionFilter:
     - filter
   Include:
     - app/controllers/**/*.rb
+
+Rails/AssertNot:
+  Include:
+    - '**/test/**/*'
+
+Rails/Blank:
+  # Convert usages of `nil? || empty?` to `blank?`
+  NilOrEmpty: true
+  # Convert usages of `!present?` to `blank?`
+  NotPresent: true
+  # Convert usages of `unless present?` to `if blank?`
+  UnlessPresent: true
+
+Rails/BulkChangeTable:
+  Database: null
+  SupportedDatabases:
+    - mysql
+    - postgresql
+  Include:
+    - db/migrate/*.rb
 
 Rails/CreateTableWithTimestamps:
   Include:
@@ -1671,6 +1747,12 @@ Rails/Exit:
     - lib/**/*.rb
   Exclude:
     - lib/**/*.rake
+
+Rails/FilePath:
+  EnforcedStyle: arguments
+  SupportedStyles:
+    - slashes
+    - arguments
 
 Rails/FindBy:
   Include:
@@ -1713,9 +1795,24 @@ Rails/Output:
     - db/**/*.rb
     - lib/**/*.rb
 
+Rails/Present:
+  # Convert usages of `!nil? && !empty?` to `present?`
+  NotNilAndNotEmpty: true
+  # Convert usages of `!blank?` to `present?`
+  NotBlank: true
+  # Convert usages of `unless blank?` to `if present?`
+  UnlessBlank: true
+
 Rails/ReadWriteAttribute:
   Include:
     - app/models/**/*.rb
+
+Rails/RefuteMethods:
+  Include:
+    - '**/test/**/*'
+
+Rails/RelativeDateConstant:
+  AutoCorrect: false
 
 Rails/RequestReferer:
   EnforcedStyle: referer
@@ -1733,6 +1830,10 @@ Rails/SafeNavigation:
   # both raise a `NoMethodError` if the receiver of the method call does not
   # implement the intended method. `try` will not raise an exception for this.
   ConvertTry: false
+
+Rails/SaveBang:
+  AllowImplicitReturn: true
+  AllowedReceivers: []
 
 Rails/ScopeArgs:
   Include:

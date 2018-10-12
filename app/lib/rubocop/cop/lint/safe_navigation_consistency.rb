@@ -27,12 +27,16 @@ module RuboCop
       #   foo&.bar && (foobar.baz || foo&.baz)
       #
       class SafeNavigationConsistency < Cop
+        include IgnoredNode
+        include NilMethods
+
         MSG = 'Ensure that safe navigation is used consistently ' \
           'inside of `&&` and `||`.'.freeze
 
         def on_csend(node)
           return unless node.parent &&
                         AST::Node::OPERATOR_KEYWORDS.include?(node.parent.type)
+
           check(node)
         end
 
@@ -42,15 +46,16 @@ module RuboCop
           safe_nav_receiver = node.receiver
 
           method_calls = conditions.select(&:send_type?)
-          unsafe_method_calls = method_calls.select do |method_call|
-            safe_nav_receiver == method_call.receiver
-          end
+          unsafe_method_calls =
+            unsafe_method_calls(method_calls, safe_nav_receiver)
 
           unsafe_method_calls.each do |unsafe_method_call|
             location =
               node.loc.expression.join(unsafe_method_call.loc.expression)
             add_offense(unsafe_method_call,
                         location: location)
+
+            ignore_node(unsafe_method_call)
           end
         end
 
@@ -69,10 +74,20 @@ module RuboCop
           unless parent &&
                  (AST::Node::OPERATOR_KEYWORDS.include?(parent.type) ||
                   (parent.begin_type? &&
+                   parent.parent &&
                    AST::Node::OPERATOR_KEYWORDS.include?(parent.parent.type)))
             return node
           end
+
           top_conditional_ancestor(parent)
+        end
+
+        def unsafe_method_calls(method_calls, safe_nav_receiver)
+          method_calls.select do |method_call|
+            safe_nav_receiver == method_call.receiver &&
+              !nil_methods.include?(method_call.method_name) &&
+              !ignored_node?(method_call)
+          end
         end
       end
     end

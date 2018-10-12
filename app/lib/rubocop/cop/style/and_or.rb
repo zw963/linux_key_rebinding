@@ -4,7 +4,7 @@ module RuboCop
   module Cop
     module Style
       # This cop checks for uses of `and` and `or`, and suggests using `&&` and
-      # `|| instead`. It can be configured to check only in conditions, or in
+      # `||` instead. It can be configured to check only in conditions, or in
       # all contexts.
       #
       # @example EnforcedStyle: always (default)
@@ -110,11 +110,11 @@ module RuboCop
         # recurse down a level and add parens to 'obj.method arg'
         # however, 'not x' also parses as (send x :!)
         def correct_not(node, receiver, corrector)
-          if node.keyword_bang?
+          if node.prefix_bang?
             return unless receiver.send_type?
 
             correct_send(receiver, corrector)
-          elsif node.keyword_not?
+          elsif node.prefix_not?
             correct_other(node, corrector)
           else
             raise 'unrecognized unary negation operator'

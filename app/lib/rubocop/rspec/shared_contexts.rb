@@ -59,10 +59,6 @@ shared_context 'config', :config do
   end
 end
 
-shared_context 'ruby 2.1', :ruby21 do
-  let(:ruby_version) { 2.1 }
-end
-
 shared_context 'ruby 2.2', :ruby22 do
   let(:ruby_version) { 2.2 }
 end
@@ -77,6 +73,10 @@ end
 
 shared_context 'ruby 2.5', :ruby25 do
   let(:ruby_version) { 2.5 }
+end
+
+shared_context 'ruby 2.6', :ruby26 do
+  let(:ruby_version) { 2.6 }
 end
 
 shared_context 'with Rails', :enabled_rails do

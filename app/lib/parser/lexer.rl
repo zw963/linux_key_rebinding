@@ -1628,7 +1628,7 @@ class Parser::Lexer
         else
           emit(:tLBRACE_ARG, '{'.freeze)
         end
-        fnext expr_value;
+        fnext expr_value; fbreak;
       };
 
       'do'
@@ -2243,10 +2243,16 @@ class Parser::Lexer
       # OPERATORS
       #
 
+      '*'
+      => {
+        emit(:tSTAR2)
+        fgoto expr_value;
+      };
+
       # When '|', '~', '!', '=>' are used as operators
       # they do not accept any symbols (or quoted labels) after.
       # Other binary operators accept it.
-      ( operator_arithmetic | operator_rest ) - ( '|' | '~' | '!' )
+      ( operator_arithmetic | operator_rest ) - ( '|' | '~' | '!' - '*' )
       => {
         emit_table(PUNCTUATION);
         fnext expr_value; fbreak;

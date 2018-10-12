@@ -82,7 +82,7 @@ module RuboCop
         MSG_USE_PERCENT_X = 'Use `%x` around command string.'.freeze
 
         def on_xstr(node)
-          return if heredoc_literal?(node)
+          return if node.heredoc?
 
           if backtick_literal?(node)
             check_backtick_literal(node)
@@ -95,7 +95,7 @@ module RuboCop
           return if contains_backtick?(node)
 
           replacement = if backtick_literal?(node)
-                          ['%x', ''].zip(preferred_delimiters).map(&:join)
+                          ['%x', ''].zip(preferred_delimiter).map(&:join)
                         else
                           %w[` `]
                         end
@@ -161,17 +161,25 @@ module RuboCop
           loc.expression.source[loc.begin.length...-loc.end.length]
         end
 
-        def heredoc_literal?(node)
-          node.loc.respond_to?(:heredoc_body)
-        end
-
         def backtick_literal?(node)
           node.loc.begin.source == '`'
         end
 
-        def preferred_delimiters
+        def preferred_delimiter
+          (command_delimiter || default_delimiter).split(//)
+        end
+
+        def command_delimiter
+          preferred_delimiters_config['%x']
+        end
+
+        def default_delimiter
+          preferred_delimiters_config['default']
+        end
+
+        def preferred_delimiters_config
           config.for_cop('Style/PercentLiteralDelimiters') \
-            ['PreferredDelimiters']['%x'].split(//)
+            ['PreferredDelimiters']
         end
       end
     end

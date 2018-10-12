@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Parser
   module Source
 
@@ -159,7 +161,7 @@ module Parser
       #  #   :expression => #<Source::Range (string) 0...6>
       #  # }
       #
-      # @return [Hash(Symbol, Parser::Source::Range)]
+      # @return [Hash<Symbol, Parser::Source::Range>]
       #
       def to_hash
         instance_variables.inject({}) do |hash, ivar|

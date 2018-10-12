@@ -46,6 +46,7 @@ module RuboCop
 
     def ast_with_comments
       return if !ast || !comments
+
       @ast_with_comments ||= Parser::Source::Comment.associate(ast, comments)
     end
 
@@ -58,6 +59,7 @@ module RuboCop
         result = []
         all_lines.each_with_index do |line, ix|
           break if ix >= last_token_line && line == '__END__'
+
           result << line
         end
         result
@@ -70,6 +72,7 @@ module RuboCop
 
     def valid_syntax?
       return false if @parser_error
+
       @diagnostics.none? { |d| %i[error fatal].include?(d.level) }
     end
 
@@ -106,16 +109,13 @@ module RuboCop
       comment_lines.include?(source_range.line)
     end
 
-    def comment_on_line?(line)
-      comments.any? { |c| c.loc.line == line }
-    end
-
     def comments_before_line(line)
       comments.select { |c| c.location.line <= line }
     end
 
     def start_with?(string)
       return false if self[0].nil?
+
       self[0].start_with?(string)
     end
 
@@ -125,6 +125,13 @@ module RuboCop
 
     def following_line(token)
       lines[token.line]
+    end
+
+    def line_indentation(line_number)
+      lines[line_number - 1]
+        .match(/^(\s*)/)[1]
+        .to_s
+        .length
     end
 
     private
@@ -163,9 +170,6 @@ module RuboCop
     # rubocop:disable Metrics/MethodLength
     def parser_class(ruby_version)
       case ruby_version
-      when 2.1
-        require 'parser/ruby21'
-        Parser::Ruby21
       when 2.2
         require 'parser/ruby22'
         Parser::Ruby22
@@ -178,6 +182,9 @@ module RuboCop
       when 2.5
         require 'parser/ruby25'
         Parser::Ruby25
+      when 2.6
+        require 'parser/ruby26'
+        Parser::Ruby26
       else
         raise ArgumentError, "Unknown Ruby version: #{ruby_version.inspect}"
       end

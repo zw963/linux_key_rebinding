@@ -9,6 +9,11 @@ module RuboCop
       # names. Ruby scripts (i.e. source files with a shebang in the
       # first line) are ignored.
       #
+      # The cop also ignores `.gemspec` files, because Bundler
+      # recommends using dashes to separate namespaces in nested gems
+      # (i.e. `bundler-console` becomes `Bundler::Console`). As such, the
+      # gemspec is supposed to be named `bundler-console.gemspec`.
+      #
       # @example
       #   # bad
       #   lib/layoutManager.rb
@@ -32,7 +37,8 @@ module RuboCop
 
         def investigate(processed_source)
           file_path = processed_source.file_path
-          return if config.file_to_include?(file_path)
+          return if config.file_to_exclude?(file_path) ||
+                    config.allowed_camel_case_file?(file_path)
 
           for_bad_filename(file_path) do |range, msg|
             add_offense(nil, location: range, message: msg)
@@ -52,6 +58,7 @@ module RuboCop
                 else
                   return if ignore_executable_scripts? &&
                             processed_source.start_with?('#!')
+
                   other_message(basename)
                 end
 
@@ -89,7 +96,11 @@ module RuboCop
         end
 
         def filename_good?(basename)
+          basename = basename.sub(/^\./, '')
           basename = basename.sub(/\.[^\.]+$/, '')
+          # special handling for Action Pack Variants file names like
+          # some_file.xlsx+mobile.axlsx
+          basename = basename.sub('+', '_')
           basename =~ (regex || SNAKE_CASE)
         end
 
@@ -121,6 +132,7 @@ module RuboCop
 
           node.each_ancestor(:class, :module, :sclass, :casgn) do |ancestor|
             return false if ancestor.sclass_type?
+
             match_partial.call(ancestor.defined_module)
           end
 
@@ -161,7 +173,7 @@ module RuboCop
           # To convert a pathname to a Ruby namespace, we need a starting point
           # But RC can be run from any working directory, and can check any path
           # We can't assume that the working directory, or any other, is the
-          # "starting point" to build a namespace
+          # "starting point" to build a namespace.
           start = %w[lib spec test src]
           start_index = nil
 

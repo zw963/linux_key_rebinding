@@ -3,10 +3,12 @@
 module RuboCop
   module AST
     # Common functionality for nodes that are a kind of method dispatch:
-    # `send`, `csend`, `super`, `zsuper`, `yield`
+    # `send`, `csend`, `super`, `zsuper`, `yield`, `defined?`
     module MethodDispatchNode
       extend NodePattern::Macros
       include MethodIdentifierPredicates
+
+      ARITHMETIC_OPERATORS = %i[+ - * / % **].freeze
 
       # The receiving node of the method dispatch.
       #
@@ -29,6 +31,14 @@ module RuboCop
         node_parts[2..-1]
       end
 
+      # The `block` node associated with this method dispatch, if any.
+      #
+      # @return [BlockNode, nil] the `block` node associated with this method
+      #                          call or `nil`
+      def block_node
+        parent if block_literal?
+      end
+
       # Checks whether the dispatched method is a macro method. A macro method
       # is defined as a method that sits in a class, module, or block body and
       # has an implicit receiver.
@@ -40,12 +50,29 @@ module RuboCop
         !receiver && macro_scope?
       end
 
-      # Checks whether the dispatched method is a bare access modifier affects
-      # all methods defined after the macro.
+      # Checks whether the dispatched method is an access modifier.
       #
-      # @return [Boolean] whether the dispatched method is access modifier
+      # @return [Boolean] whether the dispatched method is an access modifier
       def access_modifier?
-        macro? && bare_access_modifier?
+        bare_access_modifier? || non_bare_access_modifier?
+      end
+
+      # Checks whether the dispatched method is a bare access modifier that
+      # affects all methods defined after the macro.
+      #
+      # @return [Boolean] whether the dispatched method is a bare
+      #                   access modifier
+      def bare_access_modifier?
+        macro? && bare_access_modifier_declaration?
+      end
+
+      # Checks whether the dispatched method is a non-bare access modifier that
+      # affects only the method it receives.
+      #
+      # @return [Boolean] whether the dispatched method is a non-bare
+      #                   access modifier
+      def non_bare_access_modifier?
+        macro? && non_bare_access_modifier_declaration?
       end
 
       # Checks whether the name of the dispatched method matches the argument
@@ -63,6 +90,7 @@ module RuboCop
       def setter_method?
         loc.respond_to?(:operator) && loc.operator
       end
+      alias assignment? setter_method?
 
       # Checks whether the dispatched method uses a dot to connect the
       # receiver and the method name.
@@ -115,12 +143,12 @@ module RuboCop
         parent && parent.block_type? && eql?(parent.send_node)
       end
 
-      # The `block` node associated with this method dispatch, if any.
+      # Checks whether this node is an arithmetic operation
       #
-      # @return [BlockNode, nil] the `block` node associated with this method
-      #                          call or `nil`
-      def block_node
-        parent if block_literal?
+      # @return [Boolean] whether the dispatched method is an arithmetic
+      #                   operation
+      def arithmetic_operation?
+        ARITHMETIC_OPERATORS.include?(method_name)
       end
 
       # Checks if this node is part of a chain of `def` modifiers.
@@ -133,6 +161,25 @@ module RuboCop
       def def_modifier?
         send_type? &&
           [self, *each_descendant(:send)].any?(&:adjacent_def_modifier?)
+      end
+
+      # Checks whether this is a lambda. Some versions of parser parses
+      # non-literal lambdas as a method send.
+      #
+      # @return [Boolean] whether this method is a lambda
+      def lambda?
+        block_literal? && command?(:lambda)
+      end
+
+      # Checks whether this is a lambda literal (stabby lambda.)
+      #
+      # @example
+      #
+      #   -> (foo) { bar }
+      #
+      # @return [Boolean] whether this method is a lambda literal
+      def lambda_literal?
+        block_literal? && loc.expression && loc.expression.source == '->'
       end
 
       private
@@ -166,8 +213,12 @@ module RuboCop
         (send nil? _ ({def defs} ...))
       PATTERN
 
-      def_node_matcher :bare_access_modifier?, <<-PATTERN
+      def_node_matcher :bare_access_modifier_declaration?, <<-PATTERN
         (send nil? {:public :protected :private :module_function})
+      PATTERN
+
+      def_node_matcher :non_bare_access_modifier_declaration?, <<-PATTERN
+        (send nil? {:public :protected :private :module_function} _)
       PATTERN
     end
   end

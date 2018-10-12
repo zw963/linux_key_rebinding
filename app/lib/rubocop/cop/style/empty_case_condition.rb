@@ -43,6 +43,14 @@ module RuboCop
 
         def on_case(case_node)
           return if case_node.condition
+          return if case_node.when_branches.any? do |when_branch|
+            when_branch.each_descendant.any?(&:return_type?)
+          end
+
+          if (else_branch = case_node.else_branch)
+            return if else_branch.return_type? ||
+                      else_branch.each_descendant.any?(&:return_type?)
+          end
 
           add_offense(case_node, location: :keyword)
         end
@@ -59,9 +67,8 @@ module RuboCop
         private
 
         def correct_case_when(corrector, case_node, when_nodes)
-          case_range = case_node.loc.keyword.join(when_nodes.first.loc.keyword)
-
-          corrector.replace(case_range, 'if')
+          remove_case_node(corrector, case_node)
+          corrector.replace(when_nodes.first.loc.keyword, 'if')
 
           when_nodes[1..-1].each do |when_node|
             corrector.replace(when_node.loc.keyword, 'elsif')
@@ -79,6 +86,14 @@ module RuboCop
 
             corrector.replace(range, conditions.map(&:source).join(' || '))
           end
+        end
+
+        def remove_case_node(corrector, case_node)
+          range = range_by_whole_lines(
+            case_node.loc.keyword, include_final_newline: true
+          )
+
+          corrector.remove(range)
         end
       end
     end

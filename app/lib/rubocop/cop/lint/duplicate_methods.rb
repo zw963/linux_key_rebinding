@@ -138,6 +138,7 @@ module RuboCop
 
         def found_instance_method(node, name)
           return unless (scope = node.parent_module_name)
+
           if scope =~ /\A#<Class:(.*)>\Z/
             found_method(node, "#{Regexp.last_match(1)}.#{name}")
           else
@@ -147,7 +148,12 @@ module RuboCop
 
         def found_method(node, method_name)
           if @definitions.key?(method_name)
-            loc = node.send_type? ? node.loc.selector : node.loc.keyword
+            loc = case node.type
+                  when :def, :defs
+                    node.loc.keyword.join(node.loc.name)
+                  else
+                    node.loc.expression
+                  end
             message = message_for_dup(node, method_name)
 
             add_offense(node, location: loc, message: message)
@@ -174,6 +180,7 @@ module RuboCop
           args.each do |arg|
             name = sym_name(arg)
             next unless name
+
             found_instance_method(node, name) if readable
             found_instance_method(node, "#{name}=") if writable
           end
@@ -193,6 +200,7 @@ module RuboCop
               end
 
               break if namespace.nil?
+
               namespace, mod_name = *namespace
             end
           end

@@ -4,6 +4,19 @@ module RuboCop
   module Cop
     module Style
       # This cop checks for usage of the %q/%Q syntax when '' or "" would do.
+      #
+      # @example
+      #
+      #   # bad
+      #   name = %q(Bruce Wayne)
+      #   time = %q(8 o'clock)
+      #   question = %q("What did you say?")
+      #
+      #   # good
+      #   name = 'Bruce Wayne'
+      #   time = "8 o'clock"
+      #   question = '"What did you say?"'
+      #
       class UnneededPercentQ < Cop
         MSG = 'Use `%<q_type>s` only for strings that contain both ' \
               'single quotes and double quotes%<extra>s.'.freeze
@@ -19,6 +32,7 @@ module RuboCop
 
         def on_dstr(node)
           return unless string_literal?(node)
+
           check(node)
         end
 
@@ -27,6 +41,7 @@ module RuboCop
           # will call `on_dstr` for the entire string and `on_str` for the
           # non interpolated portion of the string
           return unless string_literal?(node)
+
           check(node)
         end
 

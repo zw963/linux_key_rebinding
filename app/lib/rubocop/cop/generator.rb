@@ -52,7 +52,7 @@ module RuboCop
                 # TODO: Implement the cop in here.
                 #
                 # In many cases, you can use a node matcher for matching node pattern.
-                # See https://github.com/bbatsov/rubocop/blob/master/lib/rubocop/node_pattern.rb
+                # See https://github.com/rubocop-hq/rubocop/blob/master/lib/rubocop/node_pattern.rb
                 #
                 # For example
                 MSG = 'Use `#good_method` instead of `#bad_method`.'.freeze
@@ -98,8 +98,9 @@ module RuboCop
         end
       SPEC
 
-      def initialize(name, output: $stdout)
+      def initialize(name, github_user, output: $stdout)
         @badge = Badge.parse(name)
+        @github_user = github_user
         @output = output
         return if badge.qualified?
 
@@ -145,7 +146,7 @@ module RuboCop
         <<-TODO.strip_indent
           Do 3 steps:
             1. Add an entry to the "New features" section in CHANGELOG.md,
-               e.g. "Add new `#{badge}` cop. ([@your_id][])"
+               e.g. "Add new `#{badge}` cop. ([@#{github_user}][])"
             2. Modify the description of #{badge} in config/enabled.yml
             3. Implement your new cop in the generated file!
         TODO
@@ -153,7 +154,7 @@ module RuboCop
 
       private
 
-      attr_reader :badge, :output
+      attr_reader :badge, :github_user, :output
 
       def write_unless_file_exists(path, contents)
         if File.exist?(path)
@@ -202,6 +203,7 @@ module RuboCop
 
       def snake_case(camel_case_string)
         return 'rspec' if camel_case_string == 'RSpec'
+
         camel_case_string
           .gsub(/([^A-Z])([A-Z]+)/, '\1_\2')
           .gsub(/([A-Z])([A-Z][^A-Z\d]+)/, '\1_\2')

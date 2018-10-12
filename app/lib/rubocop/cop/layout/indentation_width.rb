@@ -70,6 +70,7 @@ module RuboCop
           # Check indentation against end keyword but only if it's first on its
           # line.
           return unless begins_its_line?(node.loc.end)
+
           check_indentation(node.loc.end, node.children.first)
         end
 
@@ -103,7 +104,11 @@ module RuboCop
 
           def_end_config = config.for_cop('Layout/DefEndAlignment')
           style = def_end_config['EnforcedStyleAlignWith'] || 'start_of_line'
-          base = style == 'def' ? node.first_argument : node
+          base = if style == 'def'
+                   node.first_argument
+                 else
+                   leftmost_modifier_of(node) || node
+                 end
 
           check_indentation(base.source_range, body)
           ignore_node(node.first_argument)
@@ -152,11 +157,18 @@ module RuboCop
           check_indentation(base, members.first)
 
           return unless members.any? && members.first.begin_type?
-          return unless indentation_consistency_style == 'rails'
 
-          each_member(members) do |member, previous_modifier|
-            check_indentation(previous_modifier, member,
-                              indentation_consistency_style)
+          if indentation_consistency_style == 'rails'
+            each_member(members) do |member, previous_modifier|
+              check_indentation(previous_modifier, member,
+                                indentation_consistency_style)
+            end
+          else
+            members.first.children.each do |member|
+              next if member.send_type? && member.access_modifier?
+
+              check_indentation(base, member)
+            end
           end
         end
 
@@ -173,7 +185,7 @@ module RuboCop
         end
 
         def special_modifier?(node)
-          node.access_modifier? && SPECIAL_MODIFIERS.include?(node.source)
+          node.bare_access_modifier? && SPECIAL_MODIFIERS.include?(node.source)
         end
 
         def indentation_consistency_style
@@ -307,11 +319,17 @@ module RuboCop
           return unless body_node.begin_type?
 
           starting_node = body_node.children.first
-          starting_node.send_type? && starting_node.access_modifier?
+          starting_node.send_type? && starting_node.bare_access_modifier?
         end
 
         def configured_indentation_width
           cop_config['Width']
+        end
+
+        def leftmost_modifier_of(node)
+          return node unless node.parent && node.parent.send_type?
+
+          leftmost_modifier_of(node.parent)
         end
       end
     end

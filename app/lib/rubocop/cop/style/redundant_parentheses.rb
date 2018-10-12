@@ -28,6 +28,7 @@ module RuboCop
 
         def on_begin(node)
           return if !parentheses?(node) || parens_allowed?(node)
+
           check(node)
         end
 
@@ -63,8 +64,10 @@ module RuboCop
 
         def allowed_multiple_expression?(node)
           return false if node.children.one?
+
           ancestor = node.ancestors.first
           return false unless ancestor
+
           !ancestor.begin_type? && !ancestor.def_type? && !ancestor.block_type?
         end
 
@@ -89,6 +92,7 @@ module RuboCop
           end
           return offense(begin_node, 'a variable') if node.variable?
           return offense(begin_node, 'a constant') if node.const_type?
+
           check_send(begin_node, node) if node.send_type?
         end
 
@@ -157,6 +161,7 @@ module RuboCop
 
           siblings = begin_node.parent && begin_node.parent.children
           return false if siblings.nil?
+
           next_sibling = siblings[begin_node.sibling_index + 1]
           base_value = node.children.first
 
@@ -178,7 +183,7 @@ module RuboCop
 
         def method_call_with_redundant_parentheses?(node)
           return false unless node.send_type?
-          return false if node.keyword_not?
+          return false if node.prefix_not?
           return false if range_end?(node)
 
           send_node, args = method_node_and_args(node)
@@ -190,8 +195,16 @@ module RuboCop
           args.one? && args.first.begin_type?
         end
 
-        def_node_matcher :first_argument?, <<-PATTERN
+        def first_argument?(node)
+          first_send_argument?(node) || first_super_argument?(node)
+        end
+
+        def_node_matcher :first_send_argument?, <<-PATTERN
           ^(send _ _ equal?(%0) ...)
+        PATTERN
+
+        def_node_matcher :first_super_argument?, <<-PATTERN
+          ^(super equal?(%0) ...)
         PATTERN
 
         def call_chain_starts_with_int?(begin_node, send_node)

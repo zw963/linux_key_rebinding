@@ -24,12 +24,13 @@ module RuboCop
         # The array of regular expressions representing percent literals that,
         # if found within a percent literal expression, will cause a
         # NestedPercentLiteral violation to be emitted.
-        REGEXES = PercentLiteral::PERCENT_LITERAL_TYPES.map do |percent_literal|
+        PERCENT_LITERAL_TYPES = PreferredDelimiters::PERCENT_LITERAL_TYPES
+        REGEXES = PERCENT_LITERAL_TYPES.map do |percent_literal|
           /\A#{percent_literal}\W/
         end.freeze
 
         def on_array(node)
-          process(node, *PercentLiteral::PERCENT_LITERAL_TYPES)
+          process(node, *PERCENT_LITERAL_TYPES)
         end
 
         def on_percent_literal(node)
@@ -37,14 +38,6 @@ module RuboCop
         end
 
         private
-
-        def str_content(node)
-          if node.str_type?
-            node.children[0]
-          else
-            node.children.map { |c| str_content(c) }.join
-          end
-        end
 
         def contains_percent_literals?(node)
           node.each_child_node.any? do |child|

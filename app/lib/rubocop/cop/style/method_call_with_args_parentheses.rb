@@ -40,6 +40,8 @@ module RuboCop
       #     bar :baz
       #   end
       class MethodCallWithArgsParentheses < Cop
+        include IgnoredMethods
+
         MSG = 'Use parentheses for method calls with arguments.'.freeze
 
         def on_send(node)
@@ -54,7 +56,10 @@ module RuboCop
         def autocorrect(node)
           lambda do |corrector|
             corrector.replace(args_begin(node), '(')
-            corrector.insert_after(args_end(node), ')')
+
+            unless args_parenthesized?(node)
+              corrector.insert_after(args_end(node), ')')
+            end
           end
         end
 
@@ -63,11 +68,7 @@ module RuboCop
         def ignored_method?(node)
           node.operator_method? || node.setter_method? ||
             ignore_macros? && node.macro? ||
-            ignored_list.include?(node.method_name)
-        end
-
-        def ignored_list
-          cop_config['IgnoredMethods'].map(&:to_sym)
+            super(node.method_name)
         end
 
         def ignore_macros?
@@ -78,11 +79,20 @@ module RuboCop
           loc = node.loc
           selector =
             node.super_type? || node.yield_type? ? loc.keyword : loc.selector
-          selector.end.resize(1)
+
+          resize_by = args_parenthesized?(node) ? 2 : 1
+          selector.end.resize(resize_by)
         end
 
         def args_end(node)
           node.loc.expression.end
+        end
+
+        def args_parenthesized?(node)
+          return false unless node.arguments.one?
+
+          first_node = node.arguments.first
+          first_node.begin_type? && first_node.parenthesized_call?
         end
       end
     end

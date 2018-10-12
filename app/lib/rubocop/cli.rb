@@ -39,7 +39,7 @@ module RuboCop
       act_on_options
       apply_default_formatter
       execute_runners(paths)
-    rescue RuboCop::ConfigNotFoundError => e
+    rescue ConfigNotFoundError, IncorrectCopNameError, OptionArgumentError => e
       warn e.message
       STATUS_ERROR
     rescue RuboCop::Error => e
@@ -47,8 +47,9 @@ module RuboCop
       STATUS_ERROR
     rescue Finished
       STATUS_SUCCESS
-    rescue IncorrectCopNameError => e
+    rescue OptionParser::InvalidOption => e
       warn e.message
+      warn 'For usage information, use --help'
       STATUS_ERROR
     rescue StandardError, SyntaxError, LoadError => e
       warn e.message
@@ -124,9 +125,9 @@ module RuboCop
     def validate_options_vs_config
       if @options[:parallel] &&
          !@config_store.for(Dir.pwd).for_all_cops['UseCache']
-        raise ArgumentError, '-P/--parallel uses caching to speed up ' \
-                             'execution, so combining with AllCops: ' \
-                             'UseCache: false is not allowed.'
+        raise OptionArgumentError, '-P/--parallel uses caching to speed up ' \
+                                   'execution, so combining with AllCops: ' \
+                                   'UseCache: false is not allowed.'
       end
     end
 
@@ -158,7 +159,9 @@ module RuboCop
       display_error_summary(runner.errors)
       maybe_print_corrected_source
 
-      if all_passed && !runner.aborting? && runner.errors.empty?
+      all_pass_or_excluded = all_passed || @options[:auto_gen_config]
+
+      if all_pass_or_excluded && !runner.aborting? && runner.errors.empty?
         STATUS_SUCCESS
       else
         STATUS_OFFENSES
@@ -276,6 +279,7 @@ module RuboCop
       # So a delimiter is needed for tools to easily identify where the
       # autocorrected source begins
       return unless @options[:stdin] && @options[:auto_correct]
+
       puts '=' * 20
       print @options[:stdin]
     end

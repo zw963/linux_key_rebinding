@@ -39,7 +39,7 @@ module RuboCop
       end
 
       def length_in_modifier_form(node, cond, body_length)
-        indentation = node.loc.keyword.column
+        indentation = node.loc.keyword.column * indentation_multiplier
         kw_length = node.loc.keyword.size
         cond_length = cond.source_range.size
         space = 1
@@ -48,6 +48,16 @@ module RuboCop
 
       def max_line_length
         config.for_cop('Metrics/LineLength')['Max']
+      end
+
+      def indentation_multiplier
+        return 1 if config.for_cop('Layout/Tab')['Enabled']
+
+        default_configuration = RuboCop::ConfigLoader.default_configuration
+        config.for_cop('Layout/Tab')['IndentationWidth'] ||
+          config.for_cop('Layout/IndentationWidth')['Width'] ||
+          default_configuration.for_cop('Layout/Tab')['IndentationWidth'] ||
+          default_configuration.for_cop('Layout/IndentationWidth')['Width']
       end
     end
   end

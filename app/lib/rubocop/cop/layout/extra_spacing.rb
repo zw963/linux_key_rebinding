@@ -13,12 +13,12 @@ module RuboCop
       #   name      = "RuboCop"
       #   # Some comment and an empty line
       #
-      #   website  += "/bbatsov/rubocop" unless cond
+      #   website  += "/rubocop-hq/rubocop" unless cond
       #   puts        "rubocop"          if     debug
       #
       #   # bad for any configuration
       #   set_app("RuboCop")
-      #   website  = "https://github.com/bbatsov/rubocop"
+      #   website  = "https://github.com/rubocop-hq/rubocop"
       class ExtraSpacing < Cop
         include PrecedingFollowingAlignment
         include RangeHelp
@@ -89,6 +89,7 @@ module RuboCop
             message = format(MSG_UNALIGNED_ASGN, location: 'following')
           end
           return if aligned_assignment?(token.pos, assignment_line)
+
           add_offense(token.pos, location: token.pos, message: message)
         end
 

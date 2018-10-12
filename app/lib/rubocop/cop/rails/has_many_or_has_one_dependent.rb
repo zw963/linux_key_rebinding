@@ -23,6 +23,10 @@ module RuboCop
       class HasManyOrHasOneDependent < Cop
         MSG = 'Specify a `:dependent` option.'.freeze
 
+        def_node_search :active_resource_class?, <<-PATTERN
+          (const (const nil? :ActiveResource) :Base)
+        PATTERN
+
         def_node_matcher :association_without_options?, <<-PATTERN
           (send nil? {:has_many :has_one} _)
         PATTERN
@@ -47,6 +51,8 @@ module RuboCop
         PATTERN
 
         def on_send(node)
+          return if active_resource?(node.parent)
+
           unless association_without_options?(node)
             return if valid_options?(association_with_options?(node))
           end
@@ -63,8 +69,18 @@ module RuboCop
 
           n = node.parent.begin_type? ? node.parent.parent : node.parent
 
-          if with_options_block(n)
-            return true if valid_options?(with_options_block(n))
+          contain_valid_options_in_with_options_block?(n)
+        end
+
+        def contain_valid_options_in_with_options_block?(node)
+          if with_options_block(node)
+            return true if valid_options?(with_options_block(node))
+
+            return false unless node.parent
+
+            return true if contain_valid_options_in_with_options_block?(
+              node.parent.parent
+            )
           end
 
           false
@@ -77,6 +93,12 @@ module RuboCop
           end
 
           false
+        end
+
+        def active_resource?(node)
+          return false if node.nil?
+
+          active_resource_class?(node)
         end
       end
     end

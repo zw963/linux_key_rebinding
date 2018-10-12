@@ -91,6 +91,10 @@ Layout/CaseIndentation:
   StyleGuide: '#indent-when-to-case'
   Enabled: true
 
+Layout/ClosingHeredocIndentation:
+  Description: 'Checks the indentation of here document closings.'
+  Enabled: true
+
 Layout/ClosingParenthesisIndentation:
   Description: 'Checks the indentation of hanging closing parentheses.'
   Enabled: true
@@ -121,6 +125,10 @@ Layout/ElseAlignment:
 
 Layout/EmptyComment:
   Description: 'Checks empty comment.'
+  Enabled: true
+
+Layout/EmptyLineAfterGuardClause:
+  Description: 'Add empty line after guard clause.'
   Enabled: true
 
 Layout/EmptyLineAfterMagicComment:
@@ -228,6 +236,10 @@ Layout/IndentationWidth:
 Layout/InitialIndentation:
   Description: >-
     Checks the indentation of the first non-blank non-comment line in a file.
+  Enabled: true
+
+Layout/LeadingBlankLines:
+  Description: Check for unnecessary blank lines at the beginning of a file.
   Enabled: true
 
 Layout/LeadingCommentSpace:
@@ -513,6 +525,10 @@ Lint/EnsureReturn:
   StyleGuide: '#no-return-ensure'
   Enabled: true
 
+Lint/ErbNewArguments:
+  Description: 'Use `:trim_mode` and `:eoutvar` keyword arguments to `ERB.new`.'
+  Enabled: true
+
 Lint/FloatOutOfRange:
   Description: >-
                  Catches floating-point literals too large or small for Ruby to
@@ -749,8 +765,6 @@ Lint/UriRegexp:
 Lint/UselessAccessModifier:
   Description: 'Checks for useless access modifiers.'
   Enabled: true
-  ContextCreatingMethods: []
-  MethodCreatingMethods: []
 
 Lint/UselessAssignment:
   Description: 'Checks for useless assignment to a local variable.'
@@ -911,12 +925,6 @@ Performance/Caller:
              Use `caller(n..n)` instead of `caller`.
   Enabled: true
 
-Performance/CaseWhenSplat:
-  Description: >-
-                  Place `when` conditions that use splat at the end
-                  of the list of `when` branches.
-  Enabled: true
-
 Performance/Casecmp:
   Description: >-
              Use `casecmp` rather than `downcase ==`, `upcase ==`, `== downcase`, or `== upcase`..
@@ -983,6 +991,11 @@ Performance/FlatMap:
   # This can be dangerous since `flat_map` will only flatten 1 level, and
   # `flatten` without any parameters can flatten multiple levels.
 
+Performance/InefficientHashSearch:
+  Description: 'Use `key?` or `value?` instead of `keys.include?` or `values.include?`'
+  Reference: 'https://github.com/JuanitoFatas/fast-ruby#hashkey-instead-of-hashkeysinclude-code'
+  Enabled: true
+
 Performance/LstripRstrip:
   Description: 'Use `strip` instead of `lstrip.rstrip`.'
   Enabled: true
@@ -1016,6 +1029,7 @@ Performance/RegexpMatch:
   Description: >-
                   Use `match?` instead of `Regexp#match`, `String#match`, `Symbol#match`,
                   `Regexp#===`, or `=~` when `MatchData` is not used.
+  Reference: 'https://github.com/JuanitoFatas/fast-ruby#regexp-vs-stringmatch-vs-string-vs-stringmatch-code-'
   Enabled: true
 
 Performance/ReverseEach:
@@ -1101,15 +1115,17 @@ Rails/ApplicationRecord:
   Description: 'Check that models subclass ApplicationRecord.'
   Enabled: true
 
-Rails/Blank:
-  Description: 'Enforce using `blank?` and `present?`.'
+Rails/AssertNot:
+  Description: 'Use `assert_not` instead of `assert !`.'
   Enabled: true
-  # Convert checks for `nil` or `empty?` to `blank?`
-  NilOrEmpty: true
-  # Convert usages of not `present?` to `blank?`
-  NotPresent: true
-  # Convert usages of `unless` `present?` to `if` `blank?`
-  UnlessPresent: true
+
+Rails/Blank:
+  Description: 'Enforces use of `blank?`.'
+  Enabled: true
+
+Rails/BulkChangeTable:
+  Description: 'Check whether alter queries are combinable.'
+  Enabled: true
 
 Rails/CreateTableWithTimestamps:
   Description: >-
@@ -1133,7 +1149,7 @@ Rails/DelegateAllowBlank:
 
 Rails/DynamicFindBy:
   Description: 'Use `find_by` instead of dynamic `find_by_*`.'
-  StyleGuide: 'https://github.com/bbatsov/rails-style-guide#find_by'
+  StyleGuide: 'https://github.com/rubocop-hq/rails-style-guide#find_by'
   Enabled: true
 
 Rails/EnumUniqueness:
@@ -1157,22 +1173,22 @@ Rails/FilePath:
 
 Rails/FindBy:
   Description: 'Prefer find_by over where.first.'
-  StyleGuide: 'https://github.com/bbatsov/rails-style-guide#find_by'
+  StyleGuide: 'https://github.com/rubocop-hq/rails-style-guide#find_by'
   Enabled: true
 
 Rails/FindEach:
   Description: 'Prefer all.find_each over all.find.'
-  StyleGuide: 'https://github.com/bbatsov/rails-style-guide#find-each'
+  StyleGuide: 'https://github.com/rubocop-hq/rails-style-guide#find-each'
   Enabled: true
 
 Rails/HasAndBelongsToMany:
   Description: 'Prefer has_many :through to has_and_belongs_to_many.'
-  StyleGuide: 'https://github.com/bbatsov/rails-style-guide#has-many-through'
+  StyleGuide: 'https://github.com/rubocop-hq/rails-style-guide#has-many-through'
   Enabled: true
 
 Rails/HasManyOrHasOneDependent:
   Description: 'Define the dependent option to the has_many and has_one associations.'
-  StyleGuide: 'https://github.com/bbatsov/rails-style-guide#has_many-has_one-dependent-option'
+  StyleGuide: 'https://github.com/rubocop-hq/rails-style-guide#has_many-has_one-dependent-option'
   Enabled: true
 
 Rails/HttpPositionalArguments:
@@ -1192,7 +1208,7 @@ Rails/InverseOf:
 
 Rails/LexicallyScopedActionFilter:
   Description: "Checks that methods specified in the filter's `only` or `except` options are explicitly defined in the controller."
-  StyleGuide: 'https://github.com/bbatsov/rails-style-guide#lexically-scoped-action-filter'
+  StyleGuide: 'https://github.com/rubocop-hq/rails-style-guide#lexically-scoped-action-filter'
   Enabled: true
 
 Rails/NotNullColumn:
@@ -1216,24 +1232,22 @@ Rails/Presence:
   Enabled: true
 
 Rails/Present:
-  Description: 'Enforce using `blank?` and `present?`.'
+  Description: 'Enforces use of `present?`.'
   Enabled: true
-  NotNilAndNotEmpty: true
-  # Convert checks for not `nil` and not `empty?` to `present?`
-  NotBlank: true
-  # Convert usages of not `blank?` to `present?`
-  UnlessBlank: true
-  # Convert usages of `unless` `blank?` to `if` `present?`
 
 Rails/ReadWriteAttribute:
   Description: >-
                  Checks for read_attribute(:attr) and
                  write_attribute(:attr, val).
-  StyleGuide: 'https://github.com/bbatsov/rails-style-guide#read-attribute'
+  StyleGuide: 'https://github.com/rubocop-hq/rails-style-guide#read-attribute'
   Enabled: true
 
 Rails/RedundantReceiverInWithOptions:
   Description: 'Checks for redundant receiver in `with_options`.'
+  Enabled: true
+
+Rails/RefuteMethods:
+  Description: 'Use `assert_not` methods instead of `refute` methods.'
   Enabled: true
 
 Rails/RelativeDateConstant:
@@ -1246,7 +1260,7 @@ Rails/RequestReferer:
 
 Rails/ReversibleMigration:
   Description: 'Checks whether the change method of the migration file is reversible.'
-  StyleGuide: 'https://github.com/bbatsov/rails-style-guide#reversible-migration'
+  StyleGuide: 'https://github.com/rubocop-hq/rails-style-guide#reversible-migration'
   Reference: 'http://api.rubyonrails.org/classes/ActiveRecord/Migration/CommandRecorder.html'
   Enabled: true
 
@@ -1267,7 +1281,7 @@ Rails/SkipsModelValidations:
 
 Rails/TimeZone:
   Description: 'Checks the correct usage of time zone aware methods.'
-  StyleGuide: 'https://github.com/bbatsov/rails-style-guide#time'
+  StyleGuide: 'https://github.com/rubocop-hq/rails-style-guide#time'
   Reference: 'http://danilenko.org/2012/7/6/rails_timezones'
   Enabled: true
 
@@ -1318,6 +1332,10 @@ Security/YAMLLoad:
   Enabled: true
 
 #################### Style ###############################
+
+Style/AccessModifierDeclarations:
+  Description: 'Checks style of how access modifiers are used.'
+  Enabled: true
 
 Style/Alias:
   Description: 'Use alias instead of alias_method.'
@@ -1437,11 +1455,6 @@ Style/ConditionalAssignment:
                  Use the return value of `if` and `case` statements for
                  assignment to a variable and variable comparison instead
                  of assigning that variable inside of each branch.
-  Enabled: true
-
-Style/DateTime:
-  Description: 'Use Date or Time over DateTime.'
-  StyleGuide: '#date--time'
   Enabled: true
 
 Style/DefWithParentheses:
@@ -1636,8 +1649,8 @@ Style/MethodDefParentheses:
   StyleGuide: '#method-parens'
   Enabled: true
 
-Style/MethodMissing:
-  Description: 'Avoid using `method_missing`.'
+Style/MethodMissingSuper:
+  Description: Checks for `method_missing` to call `super`.
   StyleGuide: '#no-method-missing'
   Enabled: true
 
@@ -1645,6 +1658,13 @@ Style/MinMax:
   Description: >-
                  Use `Enumerable#minmax` instead of `Enumerable#min`
                  and `Enumerable#max` in conjunction.'
+  Enabled: true
+
+Style/MissingRespondToMissing:
+  Description: >-
+                  Checks if `method_missing` is implemented
+                  without implementing `respond_to_missing`.
+  StyleGuide: '#no-method-missing'
   Enabled: true
 
 Style/MixinGrouping:
@@ -2012,6 +2032,10 @@ Style/UnlessElse:
 
 Style/UnneededCapitalW:
   Description: 'Checks for %W when interpolation is not needed.'
+  Enabled: true
+
+Style/UnneededCondition:
+  Description: 'Checks for unnecessary conditional expressions.'
   Enabled: true
 
 Style/UnneededInterpolation:

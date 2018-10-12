@@ -5,4 +5,4 @@ export RUBYLIB=
 ROOT=$(dirname `(readlink -e $0)`)
 name=$(basename $0)
 
-$ROOT/ruby-2.5.1 $ROOT/../app/bin/$name "$@"
+$ROOT/ruby-2.5.1 $ROOT/../app/exe/$name "$@"

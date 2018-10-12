@@ -15,11 +15,16 @@ module RuboCop
       class FindEach < Cop
         MSG = 'Use `find_each` instead of `each`.'.freeze
 
-        SCOPE_METHODS = %i[all where not].freeze
+        SCOPE_METHODS = %i[
+          all eager_load includes joins left_joins left_outer_joins not preload
+          references unscoped where
+        ].freeze
         IGNORED_METHODS = %i[order limit select].freeze
 
         def on_send(node)
-          return unless node.receiver && node.method?(:each)
+          return unless node.receiver &&
+                        node.receiver.send_type? &&
+                        node.method?(:each)
 
           return unless SCOPE_METHODS.include?(node.receiver.method_name)
           return if method_chain(node).any? { |m| ignored_by_find_each?(m) }
@@ -34,7 +39,7 @@ module RuboCop
         private
 
         def method_chain(node)
-          [*node.ancestors, node].map(&:method_name)
+          [*node.descendants.select(&:send_type?), node].map(&:method_name)
         end
 
         def ignored_by_find_each?(relation_method)

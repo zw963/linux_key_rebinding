@@ -36,12 +36,14 @@ module RuboCop
     def match_path?(pattern, path)
       case pattern
       when String
-        File.fnmatch?(pattern, path, File::FNM_PATHNAME)
+        File.fnmatch?(pattern, path, File::FNM_PATHNAME | File::FNM_EXTGLOB) ||
+          hidden_file_in_not_hidden_dir?(pattern, path)
       when Regexp
         begin
           path =~ pattern
         rescue ArgumentError => e
           return false if e.message.start_with?('invalid byte sequence')
+
           raise e
         end
       end
@@ -58,6 +60,19 @@ module RuboCop
 
     def self.reset_pwd
       @pwd = nil
+    end
+
+    def hidden_file_in_not_hidden_dir?(pattern, path)
+      File.fnmatch?(
+        pattern, path,
+        File::FNM_PATHNAME | File::FNM_EXTGLOB | File::FNM_DOTMATCH
+      ) && File.basename(path).start_with?('.') && !hidden_dir?(path)
+    end
+
+    def hidden_dir?(path)
+      File.dirname(path).split(File::SEPARATOR).any? do |dir|
+        dir.start_with?('.')
+      end
     end
   end
 end

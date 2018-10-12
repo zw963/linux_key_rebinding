@@ -23,6 +23,7 @@ module RuboCop
         .reverse.each_with_index do |base_config, index|
         base_config.each do |k, v|
           next unless v.is_a?(Hash)
+
           if hash.key?(k)
             v = merge(v, hash[k],
                       cop_name: k, file: file, debug: debug,
@@ -42,7 +43,7 @@ module RuboCop
         end
 
         hash['inherit_from'] = Array(hash['inherit_from'])
-        Array(config_path).reverse.each do |path|
+        Array(config_path).reverse_each do |path|
           # Put gem configuration first so local configuration overrides it.
           hash['inherit_from'].unshift gem_config_path(gem_name, path)
         end
@@ -51,7 +52,7 @@ module RuboCop
 
     # Merges the given configuration with the default one. If
     # AllCops:DisabledByDefault is true, it changes the Enabled params so that
-    # only cops from user configuration are enabled.  If
+    # only cops from user configuration are enabled. If
     # AllCops::EnabledByDefault is true, it changes the Enabled params so that
     # only cops explicitly disabled in user configuration are disabled.
     def merge_with_default(config, config_file)
@@ -70,7 +71,9 @@ module RuboCop
         config = handle_disabled_by_default(config, default_configuration)
       end
 
-      Config.new(merge(default_configuration, config), config_file)
+      Config.new(merge(default_configuration, config,
+                       inherit_mode: config['inherit_mode'] || {}),
+                 config_file)
     end
 
     # Returns a new hash where the parameters of the given config hash have
@@ -83,7 +86,7 @@ module RuboCop
       keys_appearing_in_both = base_hash.keys & derived_hash.keys
       keys_appearing_in_both.each do |key|
         if base_hash[key].is_a?(Hash)
-          result[key] = merge(base_hash[key], derived_hash[key])
+          result[key] = merge(base_hash[key], derived_hash[key], **opts)
         elsif should_union?(base_hash, key, opts[:inherit_mode])
           result[key] = base_hash[key] | derived_hash[key]
         elsif opts[:debug]
@@ -100,6 +103,7 @@ module RuboCop
       return false if inherited_file.start_with?('..') # Legitimate override
       return false if base_hash[key] == derived_hash[key] # Same value
       return false if remote_file?(inherited_file) # Can't change
+
       Gem.path.none? { |dir| inherited_file.start_with?(dir) } # Can change?
     end
 

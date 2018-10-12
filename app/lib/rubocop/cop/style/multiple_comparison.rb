@@ -18,8 +18,12 @@ module RuboCop
         MSG = 'Avoid comparing a variable with multiple items ' \
           'in a conditional, use `Array#include?` instead.'.freeze
 
-        def on_if(node)
-          return unless nested_variable_comparison?(node.condition)
+        def on_or(node)
+          root_of_or_node = root_of_or_node(node)
+
+          return unless node == root_of_or_node
+          return unless nested_variable_comparison?(root_of_or_node)
+
           add_offense(node)
         end
 
@@ -33,6 +37,7 @@ module RuboCop
 
         def nested_variable_comparison?(node)
           return false unless nested_comparison?(node)
+
           variables_in_node(node).count == 1
         end
 
@@ -70,6 +75,16 @@ module RuboCop
 
         def comparison?(node)
           simple_comparison?(node) || nested_comparison?(node)
+        end
+
+        def root_of_or_node(or_node)
+          return or_node unless or_node.parent
+
+          if or_node.parent.or_type?
+            root_of_or_node(or_node.parent)
+          else
+            or_node
+          end
         end
       end
     end

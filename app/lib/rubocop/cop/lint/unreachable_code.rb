@@ -56,13 +56,14 @@ module RuboCop
             return next break retry redo
             (send
              {nil? (const {nil? cbase} :Kernel)}
-             {:raise :fail :throw}
+             {:raise :fail :throw :exit :exit! :abort}
              ...)
           }
         PATTERN
 
         def flow_expression?(node)
           return true if flow_command?(node)
+
           case node.type
           when :begin, :kwbegin
             expressions = *node
@@ -87,6 +88,7 @@ module RuboCop
           else_branch = node.else_branch
           return false unless else_branch
           return false unless flow_expression?(else_branch)
+
           node.when_branches.all? do |branch|
             branch.body && flow_expression?(branch.body)
           end

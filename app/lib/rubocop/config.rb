@@ -16,10 +16,10 @@ module RuboCop
 
     COMMON_PARAMS = %w[Exclude Include Severity
                        AutoCorrect StyleGuide Details].freeze
-    # 2.1 is the oldest officially supported Ruby version.
-    DEFAULT_RUBY_VERSION = 2.1
-    KNOWN_RUBIES = [2.1, 2.2, 2.3, 2.4, 2.5].freeze
-    OBSOLETE_RUBIES = { 1.9 => '0.50', 2.0 => '0.50' }.freeze
+    # 2.2 is the oldest officially supported Ruby version.
+    DEFAULT_RUBY_VERSION = 2.2
+    KNOWN_RUBIES = [2.2, 2.3, 2.4, 2.5].freeze
+    OBSOLETE_RUBIES = { 1.9 => '0.50', 2.0 => '0.50', 2.1 => '0.58' }.freeze
     RUBY_VERSION_FILENAME = '.ruby-version'.freeze
     DEFAULT_RAILS_VERSION = 5.0
     OBSOLETE_COPS = {
@@ -108,7 +108,10 @@ module RuboCop
       'Performance/HashEachMethods' =>
         'The `Performance/HashEachMethods` cop has been removed ' \
           'since it no longer provides performance benefits in ' \
-          'modern rubies.'
+          'modern rubies.',
+      'Style/MethodMissing' =>
+        'The `Style/MethodMissing` cop has been split into ' \
+          '`Style/MethodMissingSuper` and `Style/MissingRespondToMissing`.'
     }.freeze
 
     OBSOLETE_PARAMETERS = [
@@ -288,6 +291,10 @@ module RuboCop
       @to_s ||= @hash.to_s
     end
 
+    def signature
+      @signature ||= Digest::MD5.hexdigest(to_s)
+    end
+
     def make_excludes_absolute
       each_key do |key|
         validate_section_presence(key)
@@ -366,8 +373,25 @@ module RuboCop
       absolute_file_path = File.expand_path(file)
 
       patterns_to_include.any? do |pattern|
-        match_path?(pattern, relative_file_path) ||
-          match_path?(pattern, absolute_file_path)
+        if block_given?
+          yield pattern, relative_file_path, absolute_file_path
+        else
+          match_path?(pattern, relative_file_path) ||
+            match_path?(pattern, absolute_file_path)
+        end
+      end
+    end
+
+    def allowed_camel_case_file?(file)
+      # Gemspecs are allowed to have dashes because that fits with bundler best
+      # practices in the case when the gem is nested under a namespace (e.g.,
+      # `bundler-console` conveys `Bundler::Console`).
+      return true if File.extname(file) == '.gemspec'
+
+      file_to_include?(file) do |pattern, relative_path, absolute_path|
+        pattern.to_s =~ /[A-Z]/ &&
+          (match_path?(pattern, relative_path) ||
+           match_path?(pattern, absolute_path))
       end
     end
 
@@ -389,11 +413,11 @@ module RuboCop
     end
 
     def patterns_to_include
-      for_all_cops['Include']
+      for_all_cops['Include'] || []
     end
 
     def patterns_to_exclude
-      for_all_cops['Exclude']
+      for_all_cops['Exclude'] || []
     end
 
     def path_relative_to_config(path)
@@ -452,6 +476,11 @@ module RuboCop
         # There could be a custom cop with this name. If so, don't warn
         next if Cop::Cop.registry.contains_cop_matching?([name])
 
+        # Special case for inherit_mode, which is a directive that we keep in
+        # the configuration (even though it's not a cop), because it's easier
+        # to do so than to pass the value around to various methods.
+        next if name == 'inherit_mode'
+
         warn Rainbow("Warning: unrecognized cop #{name} found in " \
                      "#{smart_loaded_path}").yellow
       end
@@ -471,6 +500,7 @@ module RuboCop
 
     def validate_section_presence(name)
       return unless key?(name) && self[name].nil?
+
       raise ValidationError,
             "empty section #{name} found in #{smart_loaded_path}"
     end
@@ -534,6 +564,7 @@ module RuboCop
     def obsolete_cops
       OBSOLETE_COPS.map do |cop_name, message|
         next unless key?(cop_name) || key?(Cop::Badge.parse(cop_name).cop_name)
+
         message + "\n(obsolete configuration found in #{smart_loaded_path}," \
                    ' please update it)'
       end
@@ -603,7 +634,8 @@ module RuboCop
         # "RUBY VERSION" line.
         in_ruby_section ||= line.match(/^\s*RUBY\s*VERSION\s*$/)
         next unless in_ruby_section
-        # We currently only allow this feature to work with MRI ruby.  If jruby
+
+        # We currently only allow this feature to work with MRI ruby. If jruby
         # (or something else) is used by the project, it's lock file will have a
         # line that looks like:
         #     RUBY VERSION
@@ -633,6 +665,7 @@ module RuboCop
 
     def bundler_lock_file_path
       return nil unless loaded_path
+
       base_path = base_dir_for_path_parameters
       ['gems.locked', 'Gemfile.lock'].each do |file_name|
         path = find_file_upwards(file_name, base_path)

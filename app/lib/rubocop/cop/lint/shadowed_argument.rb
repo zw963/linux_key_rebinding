@@ -5,10 +5,13 @@ module RuboCop
     module Lint
       # This cop checks for shadowed arguments.
       #
+      # This cop has `IgnoreImplicitReferences` configuration option.
+      # It means argument shadowing is used in order to pass parameters
+      # to zero arity `super` when `IgnoreImplicitReferences` is `true`.
+      #
       # @example
       #
       #   # bad
-      #
       #   do_something do |foo|
       #     foo = 42
       #     puts foo
@@ -18,11 +21,8 @@ module RuboCop
       #     foo = 42
       #     puts foo
       #   end
-      #
-      # @example
       #
       #   # good
-      #
       #   do_something do |foo|
       #     foo = foo + 42
       #     puts foo
@@ -36,6 +36,33 @@ module RuboCop
       #   def do_something(foo)
       #     puts foo
       #   end
+      #
+      # @example IgnoreImplicitReferences: false (default)
+      #
+      #   # bad
+      #   def do_something(foo)
+      #     foo = 42
+      #     super
+      #   end
+      #
+      #   def do_something(foo)
+      #     foo = super
+      #     bar
+      #   end
+      #
+      # @example IgnoreImplicitReferences: true
+      #
+      #   # good
+      #   def do_something(foo)
+      #     foo = 42
+      #     super
+      #   end
+      #
+      #   def do_something(foo)
+      #     foo = super
+      #     bar
+      #   end
+      #
       class ShadowedArgument < Cop
         MSG = 'Argument `%<argument>s` was shadowed by a local variable ' \
               'before it was used.'.freeze
@@ -56,6 +83,9 @@ module RuboCop
 
         def check_argument(argument)
           return unless argument.method_argument? || argument.block_argument?
+          # Block local variables, i.e., variables declared after ; inside
+          # |...| aren't really arguments.
+          return if argument.explicit_block_local_variable?
 
           shadowing_assignment(argument) do |node|
             message = format(MSG, argument: argument.name)
@@ -77,9 +107,7 @@ module RuboCop
             next if references.any? do |reference|
               next true if !reference.explicit? && ignore_implicit_references?
 
-              reference_pos = reference.node.source_range.begin_pos
-
-              reference_pos <= assignment_without_usage_pos
+              reference_pos(reference.node) <= assignment_without_usage_pos
             end
 
             yield location_known ? node : argument.declaration_node
@@ -113,6 +141,12 @@ module RuboCop
 
             location_known
           end
+        end
+
+        def reference_pos(node)
+          node = node.parent.masgn_type? ? node.parent : node
+
+          node.source_range.begin_pos
         end
 
         # Check whether the given node is nested into block or conditional.

@@ -21,6 +21,7 @@ module RuboCop
       request do |response|
         next if response.is_a?(Net::HTTPNotModified)
         next if response.is_a?(SocketError)
+
         File.open cache_path, 'w' do |io|
           io.write response.body
         end
@@ -60,7 +61,11 @@ module RuboCop
       when Net::HTTPRedirection
         request(URI.parse(response['location']), limit - 1, &block)
       else
-        response.error!
+        begin
+          response.error!
+        rescue StandardError => e
+          raise e, "#{e.message} while downloading remote config file #{uri}"
+        end
       end
     end
 

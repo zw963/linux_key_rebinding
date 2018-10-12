@@ -2,7 +2,7 @@
 
 module RuboCop
   module Cop
-    module Style
+    module Layout
       # This cop enforces empty line after guard clause
       #
       # @example
@@ -44,25 +44,27 @@ module RuboCop
         def on_if(node)
           return if correct_style?(node)
 
-          if last_argument_is_heredoc?(node)
+          if node.modifier_form? && last_argument_is_heredoc?(node)
             heredoc_node = last_argument(node)
 
-            num_of_heredoc_lines = heredoc_node.children.size
-            line = node.last_line + num_of_heredoc_lines + END_OF_HEREDOC_LINE
-
-            return if next_line_empty?(line)
+            return if next_line_empty?(heredoc_line(node, heredoc_node))
 
             add_offense(heredoc_node, location: :heredoc_end)
           else
             return if next_line_empty?(node.last_line)
 
-            add_offense(node)
+            add_offense(node, location: offense_location(node))
           end
         end
 
         def autocorrect(node)
           lambda do |corrector|
-            node_range = range_by_whole_lines(node.source_range)
+            node_range = if node.respond_to?(:heredoc?) && node.heredoc?
+                           range_by_whole_lines(node.loc.heredoc_body)
+                         else
+                           range_by_whole_lines(node.source_range)
+                         end
+
             corrector.insert_after(node_range, "\n")
           end
         end
@@ -106,19 +108,33 @@ module RuboCop
         end
 
         def last_argument_is_heredoc?(node)
-          last_children = node.children.last
+          last_children = node.if_branch
 
           return false unless last_children && last_children.send_type?
 
           last_argument = last_argument(node)
 
-          last_argument &&
-            (last_argument.str_type? || last_argument.dstr_type?) &&
-            last_argument.heredoc?
+          last_argument.respond_to?(:heredoc?) && last_argument.heredoc?
         end
 
         def last_argument(node)
-          node.children.last.last_argument
+          node.if_branch.children.last
+        end
+
+        def heredoc_line(node, heredoc_node)
+          heredoc_body = heredoc_node.loc.heredoc_body
+          num_of_heredoc_lines =
+            heredoc_body.last_line - heredoc_body.first_line
+
+          node.last_line + num_of_heredoc_lines + END_OF_HEREDOC_LINE
+        end
+
+        def offense_location(node)
+          if node.loc && node.loc.end
+            :end
+          else
+            :expression
+          end
         end
       end
     end

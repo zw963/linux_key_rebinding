@@ -12,6 +12,8 @@ module RuboCop
       #   # good
       #   object.some_method
       class MethodCallWithoutArgsParentheses < Cop
+        include IgnoredMethods
+
         MSG = 'Do not use parentheses for method calls with ' \
               'no arguments.'.freeze
 
@@ -36,11 +38,7 @@ module RuboCop
         private
 
         def ineligible_node?(node)
-          node.camel_case_method? || node.implicit_call? || node.keyword_not?
-        end
-
-        def ignored_method?(method)
-          cop_config['IgnoredMethods'].to_a.map(&:to_sym).include?(method)
+          node.camel_case_method? || node.implicit_call? || node.prefix_not?
         end
 
         def same_name_assignment?(node)

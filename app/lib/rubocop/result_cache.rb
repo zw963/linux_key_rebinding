@@ -7,7 +7,7 @@ require 'etc'
 module RuboCop
   # Provides functionality for caching rubocop runs.
   class ResultCache
-    NON_CHANGING = %i[color format formatters out debug fail_level
+    NON_CHANGING = %i[color format formatters out debug fail_level auto_correct
                       cache fail_fast stdin parallel].freeze
 
     # Remove old files so that the cache doesn't grow too big. When the
@@ -18,6 +18,7 @@ module RuboCop
     # there's parallel execution and the cache is shared.
     def self.cleanup(config_store, verbose, cache_root = nil)
       return if inhibit_cleanup # OPTIMIZE: For faster testing
+
       cache_root ||= cache_root(config_store)
       return unless File.exist?(cache_root)
 
@@ -132,9 +133,13 @@ module RuboCop
     end
 
     def file_checksum(file, config_store)
-      Digest::MD5.hexdigest(Dir.pwd + file + IO.binread(file) +
-                            File.stat(file).mode.to_s +
-                            config_store.for(file).to_s)
+      digester = Digest::MD5.new
+      mode = File.stat(file).mode
+      digester.update(
+        "#{file}#{mode}#{config_store.for(file).signature}"
+      )
+      digester.file(file)
+      digester.hexdigest
     rescue Errno::ENOENT
       # Spurious files that come and go should not cause a crash, at least not
       # here.
@@ -150,12 +155,12 @@ module RuboCop
       ResultCache.source_checksum ||=
         begin
           lib_root = File.join(File.dirname(__FILE__), '..')
-          bin_root = File.join(lib_root, '..', 'bin')
+          exe_root = File.join(lib_root, '..', 'exe')
 
           # These are all the files we have `require`d plus everything in the
-          # bin directory. A change to any of them could affect the cop output
+          # exe directory. A change to any of them could affect the cop output
           # so we include them in the cache hash.
-          source_files = $LOADED_FEATURES + Find.find(bin_root).to_a
+          source_files = $LOADED_FEATURES + Find.find(exe_root).to_a
           sources = source_files
                     .select { |path| File.file?(path) }
                     .sort

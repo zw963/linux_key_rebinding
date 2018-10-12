@@ -82,10 +82,9 @@ module RuboCop
       end
 
       def process_node(node)
-        catch(:skip_children) do
-          dispatch_node(node)
-          process_children(node)
-        end
+        method_name = node_handler_method_name(node)
+        retval = send(method_name, node) if method_name
+        process_children(node) unless retval == :skip_children
       end
 
       private
@@ -100,39 +99,40 @@ module RuboCop
       def process_children(origin_node)
         origin_node.each_child_node do |child_node|
           next if scanned_node?(child_node)
+
           process_node(child_node)
         end
       end
 
       def skip_children!
-        throw :skip_children
+        :skip_children
       end
 
       # rubocop:disable Metrics/MethodLength, Metrics/CyclomaticComplexity
-      def dispatch_node(node)
+      def node_handler_method_name(node)
         case node.type
         when VARIABLE_ASSIGNMENT_TYPE
-          process_variable_assignment(node)
+          :process_variable_assignment
         when REGEXP_NAMED_CAPTURE_TYPE
-          process_regexp_named_captures(node)
+          :process_regexp_named_captures
         when MULTIPLE_ASSIGNMENT_TYPE
-          process_variable_multiple_assignment(node)
+          :process_variable_multiple_assignment
         when VARIABLE_REFERENCE_TYPE
-          process_variable_referencing(node)
+          :process_variable_referencing
         when RESCUE_TYPE
-          process_rescue(node)
+          :process_rescue
         when ZERO_ARITY_SUPER_TYPE
-          process_zero_arity_super(node)
+          :process_zero_arity_super
         when SEND_TYPE
-          process_send(node)
+          :process_send
         when *ARGUMENT_DECLARATION_TYPES
-          process_variable_declaration(node)
+          :process_variable_declaration
         when *OPERATOR_ASSIGNMENT_TYPES
-          process_variable_operator_assignment(node)
+          :process_variable_operator_assignment
         when *LOOP_TYPES
-          process_loop(node)
+          :process_loop
         when *SCOPE_TYPES
-          process_scope(node)
+          :process_scope
         end
       end
       # rubocop:enable Metrics/MethodLength, Metrics/CyclomaticComplexity
@@ -175,6 +175,7 @@ module RuboCop
 
         variable_names.each do |name|
           next if variable_table.variable_exist?(name)
+
           variable_table.declare_variable(name, node)
         end
 
@@ -273,6 +274,7 @@ module RuboCop
       def process_zero_arity_super(node)
         variable_table.accessible_variables.each do |variable|
           next unless variable.method_argument?
+
           variable.reference!(node)
         end
       end
@@ -316,10 +318,12 @@ module RuboCop
           # Non related references which are caught in the above scan
           # would be skipped here.
           next unless variable
+
           variable.assignments.each do |assignment|
             next if assignment_nodes_in_loop.none? do |assignment_node|
                       assignment_node.equal?(assignment.node)
                     end
+
             assignment.reference!(node)
           end
         end

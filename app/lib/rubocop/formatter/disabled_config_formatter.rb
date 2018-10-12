@@ -18,8 +18,6 @@ module RuboCop
       @config_to_allow_offenses = {}
       @detected_styles = {}
 
-      COPS = Cop::Cop.registry.to_h
-
       class << self
         attr_accessor :config_to_allow_offenses, :detected_styles
       end
@@ -101,7 +99,9 @@ module RuboCop
         if @show_offense_counts
           output_buffer.puts "# Offense count: #{offense_count}"
         end
-        if COPS[cop_name] && COPS[cop_name].first.new.support_autocorrect?
+
+        cop_class = Cop::Cop.registry.find_by_cop_name(cop_name)
+        if cop_class && cop_class.new.support_autocorrect?
           output_buffer.puts '# Cop supports --auto-correct.'
         end
 
@@ -128,10 +128,10 @@ module RuboCop
 
         params.each do |param|
           value = default_cfg[param]
-          if value.is_a?(Array)
-            next if value.empty?
-            output_buffer.puts "# #{param}: #{value.join(', ')}"
-          end
+          next unless value.is_a?(Array)
+          next if value.empty?
+
+          output_buffer.puts "# #{param}: #{value.join(', ')}"
         end
       end
 

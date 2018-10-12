@@ -67,6 +67,7 @@ module RuboCop
 
         def on_send(node)
           return unless node.negation_method?
+
           check_for_literal(node)
         end
 
@@ -98,12 +99,8 @@ module RuboCop
         end
 
         def check_node(node)
-          return unless node
-
-          if node.keyword_bang?
-            receiver, = *node
-
-            handle_node(receiver)
+          if node.send_type? && node.prefix_bang?
+            handle_node(node.receiver)
           elsif LOGICAL_OPERATOR_NODES.include?(node.type)
             node.each_child_node { |op| handle_node(op) }
           elsif node.begin_type? && node.children.one?

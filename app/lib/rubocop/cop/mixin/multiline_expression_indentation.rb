@@ -56,8 +56,25 @@ module RuboCop
         end
       end
 
+      # The correct indentation of `node` is usually `IndentationWidth`, with
+      # one exception: prefix keywords.
+      #
+      # ```
+      # while foo &&  # Here, `while` is called a "prefix keyword"
+      #     bar       # This is called "special indentation"
+      #   baz
+      # end
+      # ```
+      #
+      # Note that *postfix conditionals* do *not* get "special indentation".
+      #
+      # ```
+      # next if foo &&
+      #   bar # normal indentation, not special
+      # ```
       def correct_indentation(node)
-        if kw_node_with_special_indentation(node)
+        kw_node = kw_node_with_special_indentation(node)
+        if kw_node && !postfix_conditional?(kw_node)
           # This cop could have its own IndentationWidth configuration
           configured_indentation_width +
             @config.for_cop('Layout/IndentationWidth')['Width']
@@ -115,6 +132,7 @@ module RuboCop
         keyword_node =
           node.each_ancestor(*KEYWORD_ANCESTOR_TYPES).find do |ancestor|
             next if ancestor.if_type? && ancestor.ternary?
+
             within_node?(node, indented_keyword_expression(ancestor))
           end
 
@@ -220,6 +238,12 @@ module RuboCop
 
         node.source_range.begin_pos > ancestor.loc.begin.begin_pos &&
           node.source_range.end_pos < ancestor.loc.end.end_pos
+      end
+
+      # Returns true if `node` is a conditional whose `body` and `condition`
+      # begin on the same line.
+      def postfix_conditional?(node)
+        node.if_type? && node.modifier_form?
       end
 
       def within_node?(inner, outer)

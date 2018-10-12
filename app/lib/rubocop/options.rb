@@ -5,6 +5,7 @@ require 'shellwords'
 
 module RuboCop
   class IncorrectCopNameError < StandardError; end
+  class OptionArgumentError < StandardError; end
 
   # This class handles command line options.
   class Options
@@ -26,8 +27,9 @@ module RuboCop
         # The parser has put the file name given after --stdin into
         # @options[:stdin]. The args array should be empty.
         if args.any?
-          raise ArgumentError, '-s/--stdin requires exactly one path.'
+          raise OptionArgumentError, '-s/--stdin requires exactly one path.'
         end
+
         # We want the STDIN contents in @options[:stdin] and the file name in
         # args to simplify the rest of the processing.
         args = [@options[:stdin]]
@@ -65,6 +67,7 @@ module RuboCop
         add_severity_option(opts)
         add_flags_with_optional_args(opts)
         add_boolean_flags(opts)
+        add_aliases(opts)
 
         option(opts, '-s', '--stdin FILE')
       end
@@ -134,6 +137,7 @@ module RuboCop
              table) do |severity|
         @options[:fail_level] = severity
       end
+      option(opts, '--display-only-fail-level-offenses')
     end
 
     def add_flags_with_optional_args(opts)
@@ -142,7 +146,7 @@ module RuboCop
       end
     end
 
-    def add_boolean_flags(opts) # rubocop:disable Metrics/MethodLength
+    def add_boolean_flags(opts)
       option(opts, '-F', '--fail-fast')
       option(opts, '-C', '--cache FLAG')
       option(opts, '-d', '--debug')
@@ -150,10 +154,6 @@ module RuboCop
       option(opts, '-E', '--extra-details')
       option(opts, '-S', '--display-style-guide')
       option(opts, '-R', '--rails')
-      option(opts, '-l', '--lint') do
-        @options[:only] ||= []
-        @options[:only] << 'Lint'
-      end
       option(opts, '-a', '--auto-correct')
 
       option(opts, '--[no-]color')
@@ -161,6 +161,18 @@ module RuboCop
       option(opts, '-v', '--version')
       option(opts, '-V', '--verbose-version')
       option(opts, '-P', '--parallel')
+    end
+
+    def add_aliases(opts)
+      option(opts, '-l', '--lint') do
+        @options[:only] ||= []
+        @options[:only] << 'Lint'
+      end
+      option(opts, '-x', '--fix-layout') do
+        @options[:only] ||= []
+        @options[:only] << 'Layout'
+        @options[:auto_correct] = true
+      end
     end
 
     def add_list_options(opts)
@@ -232,21 +244,27 @@ module RuboCop
 
     def validate_compatibility # rubocop:disable Metrics/MethodLength
       if only_includes_unneeded_disable?
-        raise ArgumentError, 'Lint/UnneededCopDisableDirective can not ' \
-                             'be used with --only.'
+        raise OptionArgumentError, 'Lint/UnneededCopDisableDirective can not ' \
+                                   'be used with --only.'
       end
       if except_syntax?
-        raise ArgumentError, 'Syntax checking can not be turned off.'
+        raise OptionArgumentError, 'Syntax checking can not be turned off.'
       end
       unless boolean_or_empty_cache?
-        raise ArgumentError, '-C/--cache argument must be true or false'
+        raise OptionArgumentError, '-C/--cache argument must be true or false'
+      end
+
+      if display_only_fail_level_offenses_with_autocorrect?
+        raise OptionArgumentError, '--autocorrect can not be used with ' \
+          '--display-only-fail-level-offenses'
       end
       validate_auto_gen_config
       validate_parallel
 
       return if incompatible_options.size <= 1
-      raise ArgumentError, 'Incompatible cli options: ' \
-                           "#{incompatible_options.inspect}"
+
+      raise OptionArgumentError, 'Incompatible cli options: ' \
+                                 "#{incompatible_options.inspect}"
     end
 
     def validate_auto_gen_config
@@ -256,7 +274,8 @@ module RuboCop
 
       %i[exclude_limit no_offense_counts no_auto_gen_timestamp].each do |option|
         if @options.key?(option)
-          raise ArgumentError, format(message, flag: option.to_s.tr('_', '-'))
+          raise OptionArgumentError,
+                format(message, flag: option.to_s.tr('_', '-'))
         end
       end
     end
@@ -265,11 +284,15 @@ module RuboCop
       return unless @options.key?(:parallel)
 
       if @options[:cache] == 'false'
-        raise ArgumentError, '-P/--parallel uses caching to speed up ' \
-                             'execution, so combining with --cache false is ' \
-                             'not allowed.'
+        raise OptionArgumentError, '-P/--parallel uses caching to speed up ' \
+                                   'execution, so combining with --cache ' \
+                                   'false is not allowed.'
       end
 
+      validate_parallel_with_combo_option
+    end
+
+    def validate_parallel_with_combo_option
       combos = {
         auto_gen_config: '-P/--parallel uses caching to speed up execution, ' \
                          'while --auto-gen-config needs a non-cached run, ' \
@@ -278,13 +301,19 @@ module RuboCop
         auto_correct: '-P/--parallel can not be combined with --auto-correct.'
       }
 
-      combos.each { |key, msg| raise ArgumentError, msg if @options.key?(key) }
+      combos.each do |key, msg|
+        raise OptionArgumentError, msg if @options.key?(key)
+      end
     end
 
     def only_includes_unneeded_disable?
       @options.key?(:only) &&
         (@options[:only] & %w[Lint/UnneededCopDisableDirective
                               UnneededCopDisableDirective]).any?
+    end
+
+    def display_only_fail_level_offenses_with_autocorrect?
+      @options[:display_only_fail_level_offenses] && @options[:autocorrect]
     end
 
     def except_syntax?
@@ -302,6 +331,7 @@ module RuboCop
 
     def validate_exclude_limit_option
       return if @options[:exclude_limit] =~ /^\d+$/
+
       # Emulate OptionParser's behavior to make failures consistent regardless
       # of option order.
       raise OptionParser::MissingArgument
@@ -361,6 +391,9 @@ module RuboCop
                              'if no format is specified.'],
       fail_level:           ['Minimum severity (A/R/C/W/E/F) for exit',
                              'with error code.'],
+      display_only_fail_level_offenses:
+                            ['Only output offense messages at',
+                             'the specified --fail-level or above'],
       show_cops:            ['Shows the given cops, or all cops by',
                              'default, and their configurations for the',
                              'current directory.'],
@@ -379,6 +412,7 @@ module RuboCop
       lint:                  'Run only lint cops.',
       list_target_files:     'List all files RuboCop will inspect.',
       auto_correct:          'Auto-correct offenses.',
+      fix_layout:            'Run only layout cops, with auto-correct on.',
       color:                 'Force color output on or off.',
       version:               'Display version.',
       verbose_version:       'Display verbose version.',

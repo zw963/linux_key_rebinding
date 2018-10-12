@@ -80,6 +80,7 @@ module RuboCop
 
         if offenses.any? { |o| considered_failure?(o) }
           break false if @options[:fail_fast]
+
           next false
         end
 
@@ -98,6 +99,9 @@ module RuboCop
       file_started(file)
 
       offenses = file_offenses(file)
+      if @options[:display_only_fail_level_offenses]
+        offenses = offenses.select { |o| considered_failure?(o) }
+      end
       formatter_set.file_finished(file, offenses)
       offenses
     rescue InfiniteCorrectionLoop => e
@@ -117,7 +121,15 @@ module RuboCop
       cache = ResultCache.new(file, @options, @config_store) if cached_run?
       if cache && cache.valid?
         offenses = cache.load
+        # If we're running --auto-correct and the cache says there are
+        # offenses, we need to actually inspect the file. If the cache shows no
+        # offenses, we're good.
+        real_run_needed = @options[:auto_correct] && offenses.any?
       else
+        real_run_needed = true
+      end
+
+      if real_run_needed
         offenses = yield
         save_in_cache(cache, offenses)
       end
@@ -176,8 +188,6 @@ module RuboCop
         # cops related to calculating the Max parameters for Metrics cops. We
         # need to do that processing and can not use caching.
         !@options[:auto_gen_config] &&
-        # Auto-correction needs a full run. It can not use cached results.
-        !@options[:auto_correct] &&
         # We can't cache results from code which is piped in to stdin
         !@options[:stdin]
     end
