@@ -1,6 +1,6 @@
 # -*- racc -*-
 
-class Ruby21Parser
+class Ruby25Parser
 
 token kCLASS kMODULE kDEF kUNDEF kBEGIN kRESCUE kENSURE kEND kIF kUNLESS
       kTHEN kELSIF kELSE kCASE kWHEN kWHILE kUNTIL kFOR kBREAK kNEXT
@@ -20,6 +20,8 @@ token kCLASS kMODULE kDEF kUNDEF kBEGIN kRESCUE kENSURE kEND kIF kUNLESS
       tSTRING tSYMBOL tNL tEH tCOLON tCOMMA tSPACE tSEMI tLAMBDA
       tLAMBEG tDSTAR tCHAR tSYMBOLS_BEG tQSYMBOLS_BEG tSTRING_DEND tUBANG
       tRATIONAL tIMAGINARY
+      tLABEL_END
+       tLONELY
 
 prechigh
   right    tBANG tTILDE tUPLUS
@@ -2126,7 +2128,9 @@ keyword_variable: kNIL      { result = s(:nil)   }
                       result = identifier
                     }
 
-      f_arg_item: f_norm_arg
+      f_arg_asgn: f_norm_arg
+
+      f_arg_item: f_arg_asgn
                 | tLPAREN f_margs rparen
                     {
                       result = val[1]
@@ -2221,13 +2225,13 @@ keyword_variable: kNIL      { result = s(:nil)   }
                       result = :"**"
                     }
 
-           f_opt: f_norm_arg tEQL arg_value
+           f_opt: f_arg_asgn tEQL arg_value
                     {
                       result = self.assignable val[0], val[2]
                       # TODO: detect duplicate names
                     }
 
-     f_block_opt: f_norm_arg tEQL primary_value
+     f_block_opt: f_arg_asgn tEQL primary_value
                     {
                       result = self.assignable val[0], val[2]
                     }
@@ -2325,6 +2329,17 @@ keyword_variable: kNIL      { result = s(:nil)   }
                     {
                       result = s(:array, s(:lit, val[0][0].to_sym), val.last)
                     }
+                | tSTRING_BEG string_contents tLABEL_END arg_value
+                    {
+                      _, sym, _, value = val
+                      sym.sexp_type = :dsym
+                      result = s(:array, sym, value)
+                    }
+                | tSYMBOL arg_value
+                    {
+                      raise "not yet: #{val.inspect}"
+                      # result = s(:array, s(:lit, val[1].to_sym), val[1])
+                    }
                 | tDSTAR arg_value
                     {
                       result = s(:array, s(:kwsplat, val[1]))
@@ -2335,6 +2350,7 @@ keyword_variable: kNIL      { result = s(:nil)   }
       operation3: tIDENTIFIER | tFID | op
     dot_or_colon: tDOT | tCOLON2
          call_op: tDOT
+                | tLONELY
        opt_terms:  | terms
           opt_nl:  | tNL
           rparen: opt_nl tRPAREN

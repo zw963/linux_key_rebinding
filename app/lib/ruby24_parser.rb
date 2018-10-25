@@ -5,7 +5,7 @@
 #
 
 require 'racc/parser.rb'
-class Ruby23Parser < RubyParser::Parser
+class Ruby24Parser < RubyParser::Parser
 
 
 require "ruby_lexer"
@@ -6815,4 +6815,4 @@ def _reduce_none(val, _values, result)
   val[0]
 end
 
-end   # class Ruby23Parser
+end   # class Ruby24Parser

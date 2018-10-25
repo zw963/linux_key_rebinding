@@ -1,97 +1,13 @@
 # encoding: ASCII-8BIT
 
-require 'stringio'
-require 'racc/parser'
-require 'sexp'
-require 'strscan'
-require 'ruby_lexer'
+require "sexp"
+require "ruby_lexer"
 require "timeout"
-
-# :stopdoc:
-# WHY do I have to do this?!?
-class Regexp
-  ONCE = 0 unless defined? ONCE # FIX: remove this - it makes no sense
-
-  unless defined? ENC_NONE then
-    ENC_NONE = /x/n.options
-    ENC_EUC  = /x/e.options
-    ENC_SJIS = /x/s.options
-    ENC_UTF8 = /x/u.options
-  end
-end
-
-# I hate ruby 1.9 string changes
-class Fixnum
-  def ord
-    self
-  end
-end unless "a"[0] == "a"
-# :startdoc:
-
-class RPStringScanner < StringScanner
-#   if ENV['TALLY'] then
-#     alias :old_getch :getch
-#     def getch
-#       warn({:getch => caller[0]}.inspect)
-#       old_getch
-#     end
-#   end
-
-  if "".respond_to? :encoding then
-    if "".respond_to? :byteslice then
-      def string_to_pos
-        string.byteslice(0, pos)
-      end
-    else
-      def string_to_pos
-        string.bytes.first(pos).pack("c*").force_encoding(string.encoding)
-      end
-    end
-
-    def charpos
-      string_to_pos.length
-    end
-  else
-    alias :charpos :pos
-
-    def string_to_pos
-      string[0..pos]
-    end
-  end
-
-  def unread_many str # TODO: remove this entirely - we should not need it
-    warn({:unread_many => caller[0]}.inspect) if ENV['TALLY']
-    begin
-      string[charpos, 0] = str
-    rescue IndexError
-      # HACK -- this is a bandaid on a dirty rag on an open festering wound
-    end
-  end
-
-  if ENV['DEBUG'] then
-    alias :old_getch :getch
-    def getch
-      c = self.old_getch
-      p :getch => [c, caller.first]
-      c
-    end
-
-    alias :old_scan :scan
-    def scan re
-      s = old_scan re
-      where = caller[1].split(/:/).first(2).join(":")
-      d :scan => [s, where] if s
-      s
-    end
-  end
-
-  def d o
-    $stderr.puts o.inspect
-  end
-end
+require "rp_extensions"
+require "rp_stringscanner"
 
 module RubyParserStuff
-  VERSION = "3.8.2" unless constants.include? "VERSION" # SIGH
+  VERSION = "3.11.0"
 
   attr_accessor :lexer, :in_def, :in_single, :file
   attr_reader :env, :comments
@@ -107,9 +23,16 @@ module RubyParserStuff
     raise "not yet #{n} #{v.inspect} => #{r.inspect}" unless $good20[n]
   end
 
-  ruby19 = "".respond_to? :encoding
+  def self.deprecate old, new
+    define_method old do |*args|
+      warn "DEPRECATED: #{old} -> #{new} from #{caller.first}"
+      send new, *args
+    end
+  end
 
-  # Rhis is in sorted order of occurrence according to
+  has_enc = "".respond_to? :encoding
+
+  # This is in sorted order of occurrence according to
   # charlock_holmes against 500k files, with UTF_8 forced
   # to the top.
   #
@@ -122,14 +45,14 @@ module RubyParserStuff
     Encoding::SHIFT_JIS,
     Encoding::WINDOWS_1252,
     Encoding::EUC_JP
-  ] if ruby19
+  ] if has_enc
 
   def syntax_error msg
     raise RubyParser::SyntaxError, msg
   end
 
   def arg_blk_pass node1, node2 # TODO: nuke
-    node1 = s(:arglist, node1) unless [:arglist, :call_args, :array, :args].include? node1.first
+    node1 = s(:arglist, node1) unless [:arglist, :call_args, :array, :args].include? node1.sexp_type 
     node1 << node2 if node2
     node1
   end
@@ -144,7 +67,7 @@ module RubyParserStuff
     case sexp.sexp_type
     when :masgn then
       if sexp.size == 2 and sexp[1].sexp_type == :array then
-        s(:masgn, *sexp[1][1..-1].map { |sub| clean_mlhs sub })
+        s(:masgn, *sexp[1].sexp_body.map { |sub| clean_mlhs sub })
       else
         debug20 5
         sexp
@@ -163,7 +86,7 @@ module RubyParserStuff
 
   def block_var *args
     result = self.args args
-    result[0] = :masgn
+    result.sexp_type = :masgn
     result
   end
 
@@ -178,7 +101,7 @@ module RubyParserStuff
     ary << "&#{block[1]}".to_sym if block
 
     if ary.length > 2 or ary.splat then # HACK
-      s(:masgn, *ary[1..-1])
+      s(:masgn, *ary.sexp_body)
     else
       ary.last
     end
@@ -189,7 +112,7 @@ module RubyParserStuff
     when :kwsplat then
       array
     else
-      s(:hash, *array[1..-1])
+      s(:hash, *array.sexp_body)
     end
   end
 
@@ -201,7 +124,7 @@ module RubyParserStuff
       when Sexp then
         case arg.sexp_type
         when :array, :args, :call_args then # HACK? remove array at some point
-          result.concat arg[1..-1]
+          result.concat arg.sexp_body
         else
           result << arg
         end
@@ -225,7 +148,7 @@ module RubyParserStuff
       when Sexp then
         case arg.sexp_type
         when :args, :block, :array, :call_args then # HACK call_args mismatch
-          result.concat arg[1..-1]
+          result.concat arg.sexp_body
         when :block_arg then
           result << :"&#{arg.last}"
         when :shadow then
@@ -254,8 +177,8 @@ module RubyParserStuff
   end
 
   def aryset receiver, index
-    index ||= []
-    s(:attrasgn, receiver, :"[]=", *index[1..-1]).compact # [][1..-1] => nil
+    index ||= s()
+    s(:attrasgn, receiver, :"[]=", *index.sexp_body).compact # [].sexp_body => nil
   end
 
   def assignable(lhs, value = nil)
@@ -310,7 +233,7 @@ module RubyParserStuff
     return nil if node.nil?
     node = value_expr node
 
-    case node.first
+    case node.sexp_type
     when :lit then
       if Regexp === node.last then
         return s(:match, node)
@@ -324,11 +247,13 @@ module RubyParserStuff
     when :dot2 then
       label = "flip#{node.hash}"
       env[label] = :lvar
-      return s(:flip2, node[1], node[2])
+      _, lhs, rhs = node
+      return s(:flip2, lhs, rhs)
     when :dot3 then
       label = "flip#{node.hash}"
       env[label] = :lvar
-      return s(:flip3, node[1], node[2])
+      _, lhs, rhs = node
+      return s(:flip3, lhs, rhs)
     else
       return node
     end
@@ -341,9 +266,9 @@ module RubyParserStuff
     _racc_do_parse_rb(_racc_setup, false)
   end if ENV['PURE_RUBY']
 
-  def get_match_node lhs, rhs # TODO: rename to new_match
+  def new_match lhs, rhs
     if lhs then
-      case lhs[0]
+      case lhs.sexp_type
       when :dregx, :dregx_once then
         return s(:match2, lhs, rhs).line(lhs.line)
       when :lit then
@@ -352,7 +277,7 @@ module RubyParserStuff
     end
 
     if rhs then
-      case rhs[0]
+      case rhs.sexp_type
       when :dregx, :dregx_once then
         return s(:match3, rhs, lhs).line(lhs.line)
       when :lit then
@@ -362,6 +287,9 @@ module RubyParserStuff
 
     return new_call(lhs, :"=~", argl(rhs)).line(lhs.line)
   end
+
+  # TODO: remove in 4.0 or 2018-01, whichever is first
+  deprecate :get_match_node, :new_match
 
   def gettable(id)
     lineno = id.lineno if id.respond_to? :lineno
@@ -421,12 +349,12 @@ module RubyParserStuff
 
   def list_append list, item # TODO: nuke me *sigh*
     return s(:array, item) unless list
-    list = s(:array, list) unless Sexp === list && list.first == :array
+    list = s(:array, list) unless Sexp === list && list.sexp_type == :array
     list << item
   end
 
   def list_prepend item, list # TODO: nuke me *sigh*
-    list = s(:array, list) unless Sexp === list && list[0] == :array
+    list = s(:array, list) unless Sexp === list && list.sexp_type == :array
     list.insert 1, item
     list
   end
@@ -435,37 +363,43 @@ module RubyParserStuff
     return tail unless head
     return head unless tail
 
-    htype, ttype = head[0], tail[0]
+    htype, ttype = head.sexp_type, tail.sexp_type
 
     head = s(:dstr, '', head) if htype == :evstr
 
     case ttype
     when :str then
       if htype == :str
-        head[-1] << tail[-1]
+        head.last << tail.last
       elsif htype == :dstr and head.size == 2 then
-        head[-1] << tail[-1]
+        head.last << tail.last
       else
         head << tail
       end
     when :dstr then
       if htype == :str then
         lineno = head.line
-        tail[1] = head[-1] + tail[1]
+        tail[1] = head.last + tail[1]
         head = tail
         head.line = lineno
       else
-        tail[0] = :array
+        tail.sexp_type = :array
         tail[1] = s(:str, tail[1])
         tail.delete_at 1 if tail[1] == s(:str, '')
 
-        head.push(*tail[1..-1])
+        head.push(*tail.sexp_body)
       end
     when :evstr then
-      head[0] = :dstr if htype == :str
-      if head.size == 2 and tail.size > 1 and tail[1][0] == :str then
-        head[-1] << tail[1][-1]
-        head[0] = :str if head.size == 2 # HACK ?
+      if htype == :str then
+        f, l = head.file, head.line
+        head = s(:dstr, *head.sexp_body)
+        head.file = f
+        head.line = l
+      end
+
+      if head.size == 2 and tail.size > 1 and tail[1].sexp_type == :str then
+        head.last << tail[1].last
+        head.sexp_type = :str if head.size == 2 # HACK ?
       else
         head.push(tail)
       end
@@ -477,17 +411,19 @@ module RubyParserStuff
     return head
   end
 
-  def logop(type, left, right) # TODO: rename logical_op
+  def logical_op type, left, right
     left = value_expr left
 
-    if left and left[0] == type and not left.paren then
-      node, second = left, nil
+    if left and left.sexp_type == type and not left.paren then
+      node, rhs = left, nil
 
-      while (second = node[2]) && second[0] == type and not second.paren do
-        node = second
+      loop do
+        _, _lhs, rhs = node
+        break unless rhs && rhs.sexp_type == type and not rhs.paren
+        node = rhs
       end
 
-      node[2] = s(type, second, right)
+      node[2] = s(type, rhs, right)
 
       return left
     end
@@ -495,15 +431,13 @@ module RubyParserStuff
     return s(type, left, right)
   end
 
+  # TODO: remove in 4.0 or 2018-01, whichever is first
+  deprecate :logop, :logical_op
+
   def new_aref val
     val[2] ||= s(:arglist)
-    val[2][0] = :arglist if val[2][0] == :array # REFACTOR
-    if val[0].node_type == :self then
-      result = new_call nil, :"[]", val[2]
-    else
-      result = new_call val[0], :"[]", val[2]
-    end
-    result
+    val[2].sexp_type = :arglist if val[2].sexp_type == :array # REFACTOR
+    new_call val[0], :"[]", val[2]
   end
 
   def new_body val
@@ -539,13 +473,13 @@ module RubyParserStuff
   end
 
   def argl x
-    x = s(:arglist, x) if x and x[0] == :array
+    x = s(:arglist, x) if x and x.sexp_type == :array
     x
   end
 
   def backref_assign_error ref
     # TODO: need a test for this... obviously
-    case ref.first
+    case ref.sexp_type
     when :nth_ref then
       raise "write a test 2"
       raise SyntaxError, "Can't set variable %p" % ref.last
@@ -571,7 +505,7 @@ module RubyParserStuff
     # TODO: need a test with f(&b) { } to produce warning
 
     if args
-      if [:arglist, :args, :array, :call_args].include? args.first
+      if [:arglist, :args, :array, :call_args].include? args.sexp_type
         result.concat args.sexp_body
       else
         result << args
@@ -610,7 +544,7 @@ module RubyParserStuff
 
     result[2..-1].each do |node|
       block = node.block(:delete)
-      node.concat block[1..-1] if block
+      node.concat block.sexp_body if block
     end
 
     # else
@@ -627,8 +561,8 @@ module RubyParserStuff
     result = s(:class, path, superclass)
 
     if body then
-      if body.first == :block then
-        result.push(*body[1..-1])
+      if body.sexp_type == :block then
+        result.push(*body.sexp_body)
       else
         result.push body
       end
@@ -652,8 +586,8 @@ module RubyParserStuff
     result = s(:defn, name.to_sym, args)
 
     if body then
-      if body.first == :block then
-        result.push(*body[1..-1])
+      if body.sexp_type == :block then
+        result.push(*body.sexp_body)
       else
         result.push body
       end
@@ -673,8 +607,8 @@ module RubyParserStuff
     result = s(:defs, recv, name.to_sym, args)
 
     if body then
-      if body.first == :block then
-        result.push(*body[1..-1])
+      if body.sexp_type == :block then
+        result.push(*body.sexp_body)
       else
         result.push body
       end
@@ -691,10 +625,14 @@ module RubyParserStuff
     result
   end
 
+  def new_hash val
+    s(:hash, *val[2].values).line(val[1])
+  end
+
   def new_if c, t, f
     l = [c.line, t && t.line, f && f.line].compact.min
     c = cond c
-    c, t, f = c.last, f, t if c[0] == :not and canonicalize_conditions
+    c, t, f = c.last, f, t if c.sexp_type == :not and canonicalize_conditions
     s(:if, c, t, f).line(l)
   end
 
@@ -709,7 +647,7 @@ module RubyParserStuff
     result << args
     result << body if body
 
-    args[0] = :args unless args == 0
+    args.sexp_type = :args unless args == 0
 
     result
   end
@@ -721,10 +659,12 @@ module RubyParserStuff
   end
 
   def new_masgn lhs, rhs, wrap = false
-    rhs = value_expr(rhs)
-    rhs = lhs[1] ? s(:to_ary, rhs) : s(:array, rhs) if wrap
+    _, ary = lhs
 
-    lhs.delete_at 1 if lhs[1].nil?
+    rhs = value_expr(rhs)
+    rhs = ary ? s(:to_ary, rhs) : s(:array, rhs) if wrap
+
+    lhs.delete_at 1 if ary.nil?
     lhs << rhs
 
     lhs
@@ -736,8 +676,8 @@ module RubyParserStuff
     result = s(:module, path)
 
     if body then # REFACTOR?
-      if body.first == :block then
-        result.push(*body[1..-1])
+      if body.sexp_type == :block then
+        result.push(*body.sexp_body)
       else
         result.push body
       end
@@ -808,9 +748,9 @@ module RubyParserStuff
       k = c if c =~ /[esu]/ if RUBY_VERSION < "1.9"
     end
 
-    case node[0]
+    case node.sexp_type
     when :str then
-      node[0] = :lit
+      node.sexp_type = :lit
       node[1] = if k then
                   Regexp.new(node[1], o, k)
                 else
@@ -829,14 +769,14 @@ module RubyParserStuff
                 end
     when :dstr then
       if options =~ /o/ then
-        node[0] = :dregx_once
+        node.sexp_type = :dregx_once
       else
-        node[0] = :dregx
+        node.sexp_type = :dregx
       end
       node << o if o and o != 0
     else
       node = s(:dregx, '', node);
-      node[0] = :dregx_once if options =~ /o/
+      node.sexp_type = :dregx_once if options =~ /o/
       node << o if o and o != 0
     end
 
@@ -844,12 +784,12 @@ module RubyParserStuff
   end
 
   def new_resbody cond, body
-    if body && body.first == :block then
+    if body && body.sexp_type == :block then
       body.shift # remove block and splat it in directly
     else
       body = [body]
     end
-    s(:resbody, cond, *body)
+    s(:resbody, cond, *body).line cond.line
   end
 
   def new_sclass val
@@ -858,8 +798,8 @@ module RubyParserStuff
     result = s(:sclass, recv)
 
     if body then
-      if body.first == :block then
-        result.push(*body[1..-1])
+      if body.sexp_type == :block then
+        result.push(*body.sexp_body)
       else
         result.push body
       end
@@ -875,9 +815,71 @@ module RubyParserStuff
     str = val[0]
     str.force_encoding("ASCII-8BIT") unless str.valid_encoding? unless RUBY_VERSION < "1.9"
     result = s(:str, str)
-    self.lexer.lineno += str.count("\n") + self.lexer.extra_lineno
-    self.lexer.extra_lineno = 0
+    self.lexer.fixup_lineno str.count("\n")
     result
+  end
+
+  def new_qword_list_entry val
+    str = val[1]
+    str.force_encoding("ASCII-8BIT") unless str.valid_encoding? unless RUBY_VERSION < "1.9"
+    result = s(:str, str)
+    self.lexer.fixup_lineno
+    result
+  end
+
+  def new_qword_list
+    result = s(:array)
+    self.lexer.fixup_lineno
+    result
+  end
+
+  def new_word_list
+    result = s(:array)
+    self.lexer.fixup_lineno
+    result
+  end
+
+  def new_word_list_entry val
+    result = val[1].sexp_type == :evstr ? s(:dstr, "", val[1]) : val[1]
+    self.lexer.fixup_lineno
+    result
+  end
+
+  def new_qsym_list
+    result = s(:array)
+    self.lexer.fixup_lineno
+    result
+  end
+
+  def new_qsym_list_entry val
+    result = s(:lit, val[1].to_sym)
+    self.lexer.fixup_lineno
+    result
+  end
+
+  def new_symbol_list
+    result = s(:array)
+    self.lexer.fixup_lineno
+    result
+  end
+
+  def new_symbol_list_entry val
+    _list, sym, _nil = val # TODO: use _list
+    result = val[1]
+
+    result ||= s(:str, "")
+
+    case sym.sexp_type
+    when :dstr then
+      sym.sexp_type = :dsym
+    when :str then
+      sym = s(:lit, sym.last.to_sym)
+    else
+      debug20 24
+      sym = s(:dsym, "", sym || s(:str, ""))
+    end
+    self.lexer.fixup_lineno
+    sym
   end
 
   def new_super args
@@ -885,7 +887,7 @@ module RubyParserStuff
       s(:super, args)
     else
       args ||= s(:arglist)
-      s(:super, *args[1..-1])
+      s(:super, *args.sexp_body)
     end
   end
 
@@ -904,11 +906,11 @@ module RubyParserStuff
   def new_until_or_while type, block, expr, pre
     other = type == :until ? :while : :until
     line = [block && block.line, expr.line].compact.min
-    block, pre = block.last, false if block && block[0] == :begin
+    block, pre = block.last, false if block && block.sexp_type == :begin
 
     expr = cond expr
 
-    result = unless expr.first == :not and canonicalize_conditions then
+    result = unless expr.sexp_type == :not and canonicalize_conditions then
                s(type,  expr,      block, pre)
              else
                s(other, expr.last, block, pre)
@@ -928,11 +930,11 @@ module RubyParserStuff
 
   def new_xstring str
     if str then
-      case str[0]
+      case str.sexp_type
       when :str
-        str[0] = :xstr
+        str.sexp_type = :xstr
       when :dstr
-        str[0] = :dxstr
+        str.sexp_type = :dxstr
       else
         str = s(:dxstr, '', str)
       end
@@ -950,10 +952,10 @@ module RubyParserStuff
 
     args ||= s(:arglist)
 
-    args[0] = :arglist if [:call_args, :array].include?(args[0])
-    args = s(:arglist, args) unless args.first == :arglist
+    args.sexp_type = :arglist if [:call_args, :array].include? args.sexp_type
+    args = s(:arglist, args) unless args.sexp_type == :arglist
 
-    return s(:yield, *args[1..-1])
+    return s(:yield, *args.sexp_body)
   end
 
   def next_token
@@ -966,16 +968,16 @@ module RubyParserStuff
     end
   end
 
-  def node_assign(lhs, rhs) # TODO: rename new_assign
+  def new_assign lhs, rhs
     return nil unless lhs
 
     rhs = value_expr rhs
 
-    case lhs[0]
+    case lhs.sexp_type
     when :lasgn, :iasgn, :cdecl, :cvdecl, :gasgn, :cvasgn, :attrasgn, :safe_attrasgn then
       lhs << rhs
     when :const then
-      lhs[0] = :cdecl
+      lhs.sexp_type = :cdecl
       lhs << rhs
     else
       raise "unknown lhs #{lhs.inspect} w/ #{rhs.inspect}"
@@ -983,6 +985,9 @@ module RubyParserStuff
 
     lhs
   end
+
+  # TODO: remove in 4.0 or 2018-01, whichever is first
+  deprecate :node_assign, :new_assign
 
   ##
   # Returns a UTF-8 encoded string after processing BOMs and magic
@@ -1004,11 +1009,11 @@ module RubyParserStuff
 
   def handle_encoding str
     str = str.dup
-    ruby19 = str.respond_to? :encoding
+    has_enc = str.respond_to? :encoding
     encoding = nil
 
     header = str.lines.first(2)
-    header.map! { |s| s.force_encoding "ASCII-8BIT" } if ruby19
+    header.map! { |s| s.force_encoding "ASCII-8BIT" } if has_enc
 
     first = header.first || ""
     encoding, str = "utf-8", str[3..-1] if first =~ /\A\xEF\xBB\xBF/
@@ -1019,7 +1024,7 @@ module RubyParserStuff
     }
 
     if encoding then
-      if ruby19 then
+      if has_enc then
         encoding.sub!(/utf-8-.+$/, 'utf-8') # HACK for stupid emacs formats
         hack_encoding str, encoding
       else
@@ -1027,7 +1032,7 @@ module RubyParserStuff
       end
     else
       # nothing specified... ugh. try to encode as utf-8
-      hack_encoding str if ruby19
+      hack_encoding str if has_enc
     end
 
     str
@@ -1082,8 +1087,8 @@ module RubyParserStuff
 
   def remove_begin node
     oldnode = node
-    if node and :begin == node[0] and node.size == 2 then
-      node = node[-1]
+    if node and node.sexp_type == :begin and node.size == 2 then
+      node = node.last
       node.line = oldnode.line
     end
     node
@@ -1116,18 +1121,18 @@ module RubyParserStuff
 
   def ret_args node
     if node then
-      raise "write a test 5" if node[0] == :block_pass
+      raise "write a test 5" if node.sexp_type == :block_pass
 
       raise SyntaxError, "block argument should not be given" if
-        node[0] == :block_pass
+        node.sexp_type == :block_pass
 
-      node[0] = :array if node[0] == :call_args
-      node = node.last if node[0] == :array && node.size == 2
+      node.sexp_type = :array if node.sexp_type == :call_args
+      node = node.last if node.sexp_type == :array && node.size == 2
 
       # HACK matz wraps ONE of the FOUR splats in a newline to
       # distinguish. I use paren for now. ugh
-      node = s(:svalue, node) if node[0] == :splat and not node.paren
-      node[0] = :svalue if node[0] == :arglist && node[1][0] == :splat
+      node = s(:svalue, node) if node.sexp_type == :splat and not node.paren
+      node.sexp_type = :svalue if node.sexp_type == :arglist && node[1].sexp_type == :splat
     end
 
     node
@@ -1143,15 +1148,20 @@ module RubyParserStuff
   def value_expr oldnode # HACK
     node = remove_begin oldnode
     node.line = oldnode.line if oldnode
-    node[2] = value_expr(node[2]) if node and node[0] == :if
+    node[2] = value_expr node[2] if node and node.sexp_type == :if
     node
   end
 
   def void_stmts node
     return nil unless node
-    return node unless node[0] == :block
+    return node unless node.sexp_type == :block
 
-    node[1..-1] = node[1..-1].map { |n| remove_begin(n) }
+    if node.respond_to? :sexp_body= then
+      node.sexp_body = node.sexp_body.map { |n| remove_begin n }
+    else
+      node[1..-1] = node[1..-1].map { |n| remove_begin(n) }
+    end
+
     node
   end
 
@@ -1312,10 +1322,15 @@ module RubyParserStuff
     attr_reader :stack
     attr_accessor :debug
 
-    def initialize(name)
+    def initialize name, debug=false
       @name = name
       @stack = [false]
-      @debug = false
+      @debug = debug
+    end
+
+    def reset
+      @stack = [false]
+      warn "#{name}_stack(set): 0" if debug
     end
 
     def inspect
@@ -1323,12 +1338,11 @@ module RubyParserStuff
     end
 
     def is_in_state
-      p :stack_is_in_state => [name, @stack.last, caller.first] if debug
       @stack.last
     end
 
     def lexpop
-      p :stack_lexpop => caller.first if debug
+      warn "#{name}_stack.lexpop" if debug
       raise if @stack.size == 0
       a = @stack.pop
       b = @stack.pop
@@ -1337,14 +1351,16 @@ module RubyParserStuff
 
     def pop
       r = @stack.pop
-      p :stack_pop => [name, r, @stack, caller.first] if debug
+      warn "#{name}_stack.pop" if debug
       @stack.push false if @stack.size == 0
       r
     end
 
     def push val
       @stack.push val
-      p :stack_push => [name, @stack, caller.first] if debug
+      c = caller.first
+      c = caller[1] if c =~ /expr_result/
+      warn "#{name}_stack(push): #{val} at line #{c.clean_caller}" if debug
       nil
     end
 
@@ -1359,142 +1375,3 @@ module RubyParserStuff
     end
   end
 end
-
-class Ruby23Parser < Racc::Parser
-  include RubyParserStuff
-end
-
-class Ruby22Parser < Racc::Parser
-  include RubyParserStuff
-end
-
-class Ruby21Parser < Racc::Parser
-  include RubyParserStuff
-end
-
-class Ruby20Parser < Racc::Parser
-  include RubyParserStuff
-end
-
-class Ruby19Parser < Racc::Parser
-  include RubyParserStuff
-end
-
-class Ruby18Parser < Racc::Parser
-  include RubyParserStuff
-end
-
-##
-# RubyParser is a compound parser that first attempts to parse using
-# the 1.9 syntax parser and falls back to the 1.8 syntax parser on a
-# parse error.
-
-class RubyParser
-  class SyntaxError < RuntimeError; end
-
-  def initialize
-    @p18 = Ruby18Parser.new
-    @p19 = Ruby19Parser.new
-    @p20 = Ruby20Parser.new
-    @p21 = Ruby21Parser.new
-    @p22 = Ruby22Parser.new
-    @p23 = Ruby23Parser.new
-  end
-
-  def process s, f = "(string)", t = 10
-    e = nil
-    [@p23, @p22, @p21, @p20, @p19, @p18].each do |parser|
-      begin
-        return parser.process s, f, t
-      rescue Racc::ParseError, RubyParser::SyntaxError => exc
-        e = exc
-      end
-    end
-    raise e
-  end
-
-  alias :parse :process
-
-  def reset
-    @p18.reset
-    @p19.reset
-    @p20.reset
-    @p21.reset
-    @p22.reset
-    @p23.reset
-  end
-
-  def self.for_current_ruby
-    case RUBY_VERSION
-    when /^1\.8/ then
-      Ruby18Parser.new
-    when /^1\.9/ then
-      Ruby19Parser.new
-    when /^2.0/ then
-      Ruby20Parser.new
-    when /^2.1/ then
-      Ruby21Parser.new
-    when /^2.2/ then
-      Ruby22Parser.new
-    when /^2.3/ then
-      Ruby23Parser.new
-    else
-      raise "unrecognized RUBY_VERSION #{RUBY_VERSION}"
-    end
-  end
-end
-
-############################################################
-# HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
-
-unless "".respond_to?(:grep) then
-  class String
-    def grep re
-      lines.grep re
-    end
-  end
-end
-
-class String
-  ##
-  # This is a hack used by the lexer to sneak in line numbers at the
-  # identifier level. This should be MUCH smaller than making
-  # process_token return [value, lineno] and modifying EVERYTHING that
-  # reduces tIDENTIFIER.
-
-  attr_accessor :lineno
-end
-
-class Sexp
-  attr_writer :paren
-
-  def paren
-    @paren ||= false
-  end
-
-  def value
-    raise "multi item sexp" if size > 2
-    last
-  end
-
-  def to_sym
-    raise "no: #{self.inspect}.to_sym is a bug"
-    self.value.to_sym
-  end
-
-  alias :add :<<
-
-  def add_all x
-    self.concat x.sexp_body
-  end
-
-  def block_pass?
-    any? { |s| Sexp === s && s[0] == :block_pass }
-  end
-
-  alias :node_type :sexp_type
-  alias :values :sexp_body # TODO: retire
-end
-
-# END HACK
-############################################################

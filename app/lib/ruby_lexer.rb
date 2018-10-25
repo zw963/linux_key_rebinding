@@ -1,11 +1,13 @@
 # encoding: UTF-8
 
+$DEBUG = true if ENV["DEBUG"]
+
 class RubyLexer
 
   # :stopdoc:
-  RUBY19 = "".respond_to? :encoding
+  HAS_ENC = "".respond_to? :encoding
 
-  IDENT_CHAR = if RUBY19 then
+  IDENT_CHAR = if HAS_ENC then
                  /[\w\u0080-\u{10ffff}]/u
                else
                  /[\w\x80-\xFF]/n
@@ -22,6 +24,7 @@ class RubyLexer
   STR_FUNC_QWORDS = 0x08
   STR_FUNC_SYMBOL = 0x10
   STR_FUNC_INDENT = 0x20 # <<-HEREDOC
+  STR_FUNC_ICNTNT = 0x40 # <<~HEREDOC
 
   STR_SQUOTE = STR_FUNC_BORING
   STR_DQUOTE = STR_FUNC_BORING | STR_FUNC_EXPAND
@@ -62,6 +65,8 @@ class RubyLexer
     "->"  => :tLAMBDA,
   }
 
+  TAB_WIDTH = 8
+
   @@regexp_cache = Hash.new { |h,k| h[k] = Regexp.new(Regexp.escape(k)) }
   @@regexp_cache[nil] = nil
 
@@ -89,6 +94,17 @@ class RubyLexer
   attr_accessor :string_buffer
   attr_accessor :string_nest
 
+  if $DEBUG then
+    alias lex_state= lex_state=
+    def lex_state=o
+      return if @lex_state == o
+      c = caller.first
+      c = caller[1] if c =~ /\bresult\b/
+      warn "lex_state: %p -> %p from %s" % [@lex_state, o, c.clean_caller]
+      @lex_state = o
+    end
+  end
+
   # Last token read via next_token.
   attr_accessor :token
 
@@ -102,6 +118,10 @@ class RubyLexer
 
   def initialize v = 18
     self.version = v
+    @lex_state = :expr_none
+
+    self.cmdarg = RubyParserStuff::StackState.new(:cmdarg, $DEBUG)
+    self.cond   = RubyParserStuff::StackState.new(:cond, $DEBUG)
 
     reset
   end
@@ -146,10 +166,11 @@ class RubyLexer
   def heredoc here # TODO: rewrite / remove
     _, eos, func, last_line = here
 
-    indent  = (func & STR_FUNC_INDENT) != 0 ? "[ \t]*" : nil
-    expand  = (func & STR_FUNC_EXPAND) != 0
-    eos_re  = /#{indent}#{Regexp.escape eos}(\r*\n|\z)/
-    err_msg = "can't match #{eos_re.inspect} anywhere in "
+    indent         = (func & STR_FUNC_INDENT) != 0 ? "[ \t]*" : nil
+    content_indent = (func & STR_FUNC_ICNTNT) != 0
+    expand         = (func & STR_FUNC_EXPAND) != 0
+    eos_re         = /#{indent}#{Regexp.escape eos}(\r*\n|\z)/
+    err_msg        = "can't match #{eos_re.inspect} anywhere in "
 
     rb_compile_error err_msg if end_of_stream?
 
@@ -195,17 +216,64 @@ class RubyLexer
 
     self.lex_strterm = [:heredoc, eos, func, last_line]
 
-    return :tSTRING_CONTENT, string_buffer.join.delete("\r")
+    string_content = string_buffer.join.delete("\r")
+
+    string_content = heredoc_dedent(string_content) if content_indent && ruby23plus?
+
+    return :tSTRING_CONTENT, string_content
+  end
+
+  def heredoc_dedent(string_content)
+    width = string_content.scan(/^[ \t]*(?=\S)/).map do |whitespace|
+      heredoc_whitespace_indent_size whitespace
+    end.min || 0
+
+    string_content.split("\n", -1).map do |line|
+      dedent_string line, width
+    end.join "\n"
+  end
+
+  def dedent_string(string, width)
+    characters_skipped = 0
+    indentation_skipped = 0
+
+    string.chars.each do |char|
+      break if indentation_skipped >= width
+      if char == ' '
+        characters_skipped += 1
+        indentation_skipped += 1
+      elsif char == "\t"
+        proposed = TAB_WIDTH * (indentation_skipped / TAB_WIDTH + 1)
+        break if (proposed > width)
+        characters_skipped += 1
+        indentation_skipped = proposed
+      end
+    end
+    string[characters_skipped..-1]
+  end
+
+  def heredoc_whitespace_indent_size(whitespace)
+    whitespace.chars.inject 0 do |size, char|
+      if char == "\t"
+        size + TAB_WIDTH
+      else
+        size + 1
+      end
+    end
   end
 
   def heredoc_identifier # TODO: remove / rewrite
     term, func = nil, STR_FUNC_BORING
     self.string_buffer = []
 
+    heredoc_indent_mods = '-'
+    heredoc_indent_mods += '\~' if ruby23plus?
+
     case
-    when scan(/(-?)([\'\"\`])(.*?)\2/) then
+    when scan(/([#{heredoc_indent_mods}]?)([\'\"\`])(.*?)\2/) then
       term = ss[2]
       func |= STR_FUNC_INDENT unless ss[1].empty?
+      func |= STR_FUNC_ICNTNT if ss[1] == '~'
       func |= case term
               when "\'" then
                 STR_SQUOTE
@@ -215,13 +283,14 @@ class RubyLexer
                 STR_XQUOTE
               end
       string_buffer << ss[3]
-    when scan(/-?([\'\"\`])(?!\1*\Z)/) then
+    when scan(/[#{heredoc_indent_mods}]?([\'\"\`])(?!\1*\Z)/) then
       rb_compile_error "unterminated here document identifier"
-    when scan(/(-?)(#{IDENT_CHAR}+)/) then
+    when scan(/([#{heredoc_indent_mods}]?)(#{IDENT_CHAR}+)/) then
       term = '"'
       func |= STR_DQUOTE
       unless ss[1].empty? then
         func |= STR_FUNC_INDENT
+        func |= STR_FUNC_ICNTNT if ss[1] == '~'
       end
       string_buffer << ss[2]
     else
@@ -258,7 +327,18 @@ class RubyLexer
 
   def int_with_base base
     rb_compile_error "Invalid numeric format" if matched =~ /__/
-    return result(:expr_end, :tINTEGER, matched.to_i(base))
+
+    text = matched
+    case
+    when text.end_with?('ri')
+      return result(:expr_end, :tIMAGINARY, Complex(0, Rational(text.chop.chop.to_i(base))))
+    when text.end_with?('r')
+      return result(:expr_end, :tRATIONAL, Rational(text.chop.to_i(base)))
+    when text.end_with?('i')
+      return result(:expr_end, :tIMAGINARY, Complex(0, text.chop.to_i(base)))
+    else
+      return result(:expr_end, :tINTEGER, text.to_i(base))
+    end
   end
 
   def is_arg?
@@ -274,7 +354,7 @@ class RubyLexer
   end
 
   def ruby22_label?
-    ruby22? and is_label_possible?
+    ruby22plus? and is_label_possible?
   end
 
   def is_label_possible?
@@ -406,7 +486,17 @@ class RubyLexer
 
   def process_float text
     rb_compile_error "Invalid numeric format" if text =~ /__/
-    return result(:expr_end, :tFLOAT, text.to_f)
+
+    case
+    when text.end_with?('ri')
+      return result(:expr_end, :tIMAGINARY, Complex(0, Rational(text.chop.chop)))
+    when text.end_with?('r')
+      return result(:expr_end, :tRATIONAL, Rational(text.chop))
+    when text.end_with?('i')
+      return result(:expr_end, :tIMAGINARY, Complex(0, text.chop.to_f))
+    else
+      return result(:expr_end, :tFLOAT, text.to_f)
+    end
   end
 
   def process_gvar text
@@ -458,9 +548,9 @@ class RubyLexer
     self.lineno += matched.lines.to_a.size if scan(/\n+/)
 
     return if in_lex_state?(:expr_beg, :expr_value, :expr_class,
-                            :expr_fname, :expr_dot, :expr_labelarg)
+                            :expr_fname, :expr_dot)
 
-    if scan(/([\ \t\r\f\v]*)\./) then
+    if scan(/([\ \t\r\f\v]*)(\.|&)/) then
       self.space_seen = true unless ss[1].empty?
 
       ss.pos -= 1
@@ -486,6 +576,7 @@ class RubyLexer
 
     self.paren_nest += 1
 
+    # TODO: add :expr_label to :expr_beg (set in expr_result below)
     return expr_result(token, "(")
   end
 
@@ -757,7 +848,7 @@ class RubyLexer
       when lpar_beg && lpar_beg == paren_nest then
         self.lpar_beg = nil
         self.paren_nest -= 1
-        result(state, :kDO_LAMBDA, value)
+        expr_result(:kDO_LAMBDA, value)
       when cond.is_in_state then
         result(state, :kDO_COND, value)
       when cmdarg.is_in_state && lex_state != :expr_cmdarg then
@@ -767,7 +858,7 @@ class RubyLexer
       else
         result(state, :kDO, value)
       end
-    when in_lex_state?(:expr_beg, :expr_value) then # TODO: :expr_labelarg
+    when in_lex_state?(:expr_beg, :expr_value, :expr_labelarg) then
       result(state, keyword.id0, value)
     when keyword.id0 != keyword.id1 then
       result(:expr_beg, keyword.id1, value)
@@ -796,6 +887,7 @@ class RubyLexer
     when scan(/\\/) then                  # Backslash
       '\\'
     when scan(/n/) then                   # newline
+      self.extra_lineno -= 1
       "\n"
     when scan(/t/) then                   # horizontal tab
       "\t"
@@ -867,7 +959,7 @@ class RubyLexer
     self.brace_nest    = 0
     self.command_start = true
     self.comments      = []
-    self.lex_state     = nil
+    self.lex_state     = :expr_none
     self.lex_strterm   = nil
     self.lineno        = 1
     self.lpar_beg      = nil
@@ -877,8 +969,8 @@ class RubyLexer
     self.token         = nil
     self.extra_lineno  = 0
 
-    self.cmdarg = RubyParserStuff::StackState.new(:cmdarg)
-    self.cond   = RubyParserStuff::StackState.new(:cond)
+    self.cmdarg.reset
+    self.cond.reset
   end
 
   def result lex_state, token, text # :nodoc:
@@ -888,11 +980,7 @@ class RubyLexer
   end
 
   def ruby18
-    Ruby18Parser === parser
-  end
-
-  def ruby19
-    Ruby19Parser === parser
+    RubyParser::V18 === parser
   end
 
   def scan re
@@ -901,6 +989,17 @@ class RubyLexer
 
   def check re
     ss.check re
+  end
+
+  def eat_whitespace
+    r = scan(/\s+/)
+    self.extra_lineno += r.count("\n") if r
+    r
+  end
+
+  def fixup_lineno extra = 0
+    self.lineno += self.extra_lineno + extra
+    self.extra_lineno = 0
   end
 
   def scanner_class # TODO: design this out of oedipus_lex. or something.
@@ -943,7 +1042,13 @@ class RubyLexer
     when scan(/\\[McCx]/) then
       rb_compile_error "Invalid escape character syntax"
     when scan(/\\(.)/m) then
-      self.string_buffer << matched
+      chr = ss[1]
+      prev = self.string_buffer.last
+      if term == chr && prev && prev.end_with?("(?") then
+        self.string_buffer << chr
+      else
+        self.string_buffer << matched
+      end
     else
       rb_compile_error "Invalid escape character syntax"
     end
@@ -1015,7 +1120,7 @@ class RubyLexer
         t = Regexp.escape term
         x = Regexp.escape(paren) if paren && paren != "\000"
         re = if qwords then
-               if RUBY19 then
+               if HAS_ENC then
                  /[^#{t}#{x}\#\0\\\s]+|./ # |. to pick up whatever
                else
                  /[^#{t}#{x}\#\0\\\s\v]+|./ # argh. 1.8's \s doesn't pick up \v
@@ -1043,7 +1148,8 @@ class RubyLexer
   def unescape s
     r = ESCAPES[s]
 
-    self.extra_lineno -= 1 if r && s == "n"
+    self.extra_lineno += 1 if s == "\n"     # eg backslash newline strings
+    self.extra_lineno -= 1 if r && s == "n" # literal \n, not newline
 
     return r if r
 
@@ -1065,7 +1171,7 @@ class RubyLexer
         else
           s
         end
-    x.force_encoding "UTF-8" if RUBY19
+    x.force_encoding "UTF-8" if HAS_ENC
     x
   end
 
@@ -1073,9 +1179,12 @@ class RubyLexer
     # do nothing for now
   end
 
-  def ruby22?
-    Ruby22Parser === parser or
-      Ruby23Parser === parser
+  def ruby22plus?
+    parser.class.version >= 22
+  end
+
+  def ruby23plus?
+    parser.class.version >= 23
   end
 
   def process_string # TODO: rewrite / remove
@@ -1087,7 +1196,7 @@ class RubyLexer
 
     token_type, c = token
 
-    if ruby22? && token_type == :tSTRING_END && ["'", '"'].include?(c) then
+    if ruby22plus? && token_type == :tSTRING_END && ["'", '"'].include?(c) then
       if (([:expr_beg, :expr_endfn].include?(lex_state) &&
            !cond.is_in_state) || is_arg?) &&
           is_label_suffix? then
@@ -1131,10 +1240,10 @@ class RubyLexer
                               when 'q' then
                                 [:tSTRING_BEG,   STR_SQUOTE]
                               when 'W' then
-                                scan(/\s*/)
+                                eat_whitespace
                                 [:tWORDS_BEG,    STR_DQUOTE | STR_FUNC_QWORDS]
                               when 'w' then
-                                scan(/\s*/)
+                                eat_whitespace
                                 [:tQWORDS_BEG,   STR_SQUOTE | STR_FUNC_QWORDS]
                               when 'x' then
                                 [:tXSTRING_BEG,  STR_XQUOTE]
@@ -1144,10 +1253,10 @@ class RubyLexer
                                 self.lex_state  = :expr_fname
                                 [:tSYMBEG,       STR_SSYM]
                               when 'I' then
-                                scan(/\s*/)
+                                eat_whitespace
                                 [:tSYMBOLS_BEG, STR_DQUOTE | STR_FUNC_QWORDS]
                               when 'i' then
-                                scan(/\s*/)
+                                eat_whitespace
                                 [:tQSYMBOLS_BEG, STR_SQUOTE | STR_FUNC_QWORDS]
                               end
 
@@ -1177,7 +1286,7 @@ class RubyLexer
       return :tSTRING_END, nil
     end
 
-    space = true if qwords and scan(/\s+/)
+    space = true if qwords and eat_whitespace
 
     if self.string_nest == 0 && scan(/#{term_re}/) then
       if qwords then

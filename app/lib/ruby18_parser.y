@@ -139,7 +139,7 @@ rule
                     }
                 | lhs tEQL command_call
                     {
-                      result = node_assign val[0], val[2]
+                      result = new_assign val[0], val[2]
                     }
                 | mlhs tEQL command_call
                     {
@@ -171,7 +171,7 @@ rule
                     }
                 | lhs tEQL mrhs
                     {
-                      result = node_assign val[0], s(:svalue, val[2])
+                      result = new_assign val[0], s(:svalue, val[2])
                     }
                 | mlhs tEQL arg_value
                     {
@@ -186,11 +186,11 @@ rule
             expr: command_call
                 | expr kAND expr
                     {
-                      result = logop(:and, val[0], val[2])
+                      result = logical_op :and, val[0], val[2]
                     }
                 | expr kOR expr
                     {
-                      result = logop(:or, val[0], val[2])
+                      result = logical_op :or, val[0], val[2]
                     }
                 | kNOT expr
                     {
@@ -507,11 +507,11 @@ rule
 
              arg: lhs tEQL arg
                     {
-                      result = node_assign val[0], val[2]
+                      result = new_assign val[0], val[2]
                     }
                 | lhs tEQL arg kRESCUE_MOD arg
                     {
-                      result = node_assign val[0], s(:rescue, val[2], new_resbody(s(:array), val[4]))
+                      result = new_assign val[0], s(:rescue, val[2], new_resbody(s(:array), val[4]))
                       # result.line = val[0].line
                     }
                 | var_lhs tOP_ASGN arg
@@ -521,7 +521,7 @@ rule
                 | primary_value tLBRACK2 aref_args tRBRACK tOP_ASGN arg
                     {
                       result = s(:op_asgn1, val[0], val[2], val[4].to_sym, val[5])
-                      val[2][0] = :arglist if val[2]
+                      val[2].sexp_type = :arglist if val[2]
                     }
                 | primary_value tDOT tIDENTIFIER tOP_ASGN arg
                     {
@@ -550,7 +550,7 @@ rule
                 | arg tDOT2 arg
                     {
                       v1, v2 = val[0], val[2]
-                      if v1.node_type == :lit and v2.node_type == :lit and Fixnum === v1.last and Fixnum === v2.last then
+                      if v1.node_type == :lit and v2.node_type == :lit and Integer === v1.last and Integer === v2.last then
                         result = s(:lit, (v1.last)..(v2.last))
                       else
                         result = s(:dot2, v1, v2)
@@ -559,7 +559,7 @@ rule
                 | arg tDOT3 arg
                     {
                       v1, v2 = val[0], val[2]
-                      if v1.node_type == :lit and v2.node_type == :lit and Fixnum === v1.last and Fixnum === v2.last then
+                      if v1.node_type == :lit and v2.node_type == :lit and Integer === v1.last and Integer === v2.last then
                         result = s(:lit, (v1.last)...(v2.last))
                       else
                         result = s(:dot3, v1, v2)
@@ -599,7 +599,7 @@ rule
                     }
                 | tUPLUS arg
                     {
-                      if val[1][0] == :lit then
+                      if val[1].sexp_type == :lit then
                         result = val[1]
                       else
                         result = new_call val[1], :"+@"
@@ -657,11 +657,11 @@ rule
                     }
                 | arg tMATCH arg
                     {
-                      result = get_match_node val[0], val[2]
+                      result = new_match val[0], val[2]
                     }
                 | arg tNMATCH arg
                     {
-                      result = s(:not, get_match_node(val[0], val[2]))
+                      result = s(:not, new_match(val[0], val[2]))
                     }
                 | tBANG arg
                     {
@@ -686,11 +686,11 @@ rule
                     }
                 | arg tANDOP arg
                     {
-                      result = logop(:and, val[0], val[2])
+                      result = logical_op :and, val[0], val[2]
                     }
                 | arg tOROP arg
                     {
-                      result = logop(:or, val[0], val[2])
+                      result = logical_op :or, val[0], val[2]
                     }
                 | kDEFINED opt_nl arg
                     {
@@ -969,9 +969,13 @@ rule
                     {
                       result = val[1] || s(:array)
                     }
-                | tLBRACE assoc_list tRCURLY
+                | tLBRACE
                     {
-                      result = s(:hash, *val[1].values)
+                      result = self.lexer.lineno
+                    }
+                    assoc_list tRCURLY
+                    {
+                      result = new_hash val
                     }
                 | kRETURN
                     {
@@ -1154,11 +1158,16 @@ rule
                       self.in_single += 1
                       self.env.extend
                       lexer.lex_state = :expr_end # force for args
+                      result = [lexer.lineno, self.lexer.cmdarg.stack.dup]
+                      lexer.cmdarg.stack.replace [false]
                     }
                     f_arglist bodystmt kEND
                     {
+                      line, cmdarg = val[5]
                       result = new_defs val
+                      result[3].line line
 
+                      lexer.cmdarg.stack.replace cmdarg
                       self.env.unextend
                       self.in_single -= 1
                       self.lexer.comments # we don't care about comments in the body
@@ -1413,10 +1422,11 @@ rule
 
       opt_rescue: kRESCUE exc_list exc_var then compstmt opt_rescue
                     {
-                      klasses, var, body, rest = val[1], val[2], val[4], val[5]
+                      (_, line), klasses, var, _, body, rest = val
 
                       klasses ||= s(:array)
-                      klasses << node_assign(var, s(:gvar, :"$!")) if var
+                      klasses << new_assign(var, s(:gvar, :"$!")) if var
+                      klasses.line line
 
                       result = new_resbody(klasses, body)
                       result << rest if rest # UGH, rewritten above
@@ -1455,7 +1465,7 @@ rule
 
          strings: string
                     {
-                      val[0] = s(:dstr, val[0].value) if val[0][0] == :evstr
+                      val[0] = s(:dstr, val[0].value) if val[0].sexp_type == :evstr
                       result = val[0]
                     }
 
@@ -1495,12 +1505,11 @@ rule
 
        word_list: none
                     {
-                      result = s(:array)
+                      result = new_word_list
                     }
                 | word_list word tSPACE
                     {
-                      word = val[1][0] == :evstr ? s(:dstr, "", val[1]) : val[1]
-                      result = val[0] << word
+                      result = val[0] << new_word_list_entry(val)
                     }
 
             word: string_content
@@ -1520,11 +1529,11 @@ rule
 
       qword_list: none
                     {
-                      result = s(:array)
+                      result = new_qword_list
                     }
                 | qword_list tSTRING_CONTENT tSPACE
                     {
-                      result = val[0] << s(:str, val[1])
+                      result = val[0] << new_qword_list_entry(val)
                     }
 
  string_contents: none
@@ -1563,10 +1572,10 @@ xstring_contents: none
                     }
                 | tSTRING_DBEG
                     {
-                      result = [lexer.lex_strterm, 
-                                lexer.brace_nest, 
+                      result = [lexer.lex_strterm,
+                                lexer.brace_nest,
                                 lexer.string_nest, # TODO: remove
-                                lexer.cond.store, 
+                                lexer.cond.store,
                                 lexer.cmdarg.store]
 
                       lexer.lex_strterm = nil
@@ -1590,7 +1599,7 @@ xstring_contents: none
 
                       case stmt
                       when Sexp then
-                        case stmt[0]
+                        case stmt.sexp_type
                         when :str, :dstr, :evstr then
                           result = stmt
                         else
@@ -1628,9 +1637,9 @@ xstring_contents: none
                       yyerror "empty symbol literal" if
                         result.nil? or result.empty?
 
-                      case result[0]
+                      case result.sexp_type
                       when :dstr then
-                        result[0] = :dsym
+                        result.sexp_type = :dsym
                       when :str then
                         result = s(:lit, result.last.to_sym)
                       else
@@ -1835,7 +1844,7 @@ xstring_contents: none
                     {
                       result = val[2]
                       yyerror "Can't define single method for literals." if
-                        result[0] == :lit
+                        result.sexp_type == :lit
                     }
 
       assoc_list: none # [!nil]
@@ -1859,7 +1868,7 @@ xstring_contents: none
                 | assocs tCOMMA assoc
                     {
                       list = val[0].dup
-                      more = val[2][1..-1]
+                      more = val[2].sexp_body
                       list.push(*more) unless more.empty?
                       result = list
                     }
