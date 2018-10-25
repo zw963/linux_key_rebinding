@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Cucumber
   class Runtime
     class AfterHooks
@@ -18,7 +20,7 @@ module Cucumber
         @hooks.map do |hook|
           action = ->(result) { hook.invoke('After', @scenario.with_result(result)) }
           Hooks.after_hook(source, hook.location, &action)
-        end          
+        end
       end
     end
   end

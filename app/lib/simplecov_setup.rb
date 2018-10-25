@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 if ENV['SIMPLECOV']
   begin
     # Suppress warnings in order not to pollute stdout which tests expectations rely on
@@ -13,6 +15,6 @@ if ENV['SIMPLECOV']
       add_filter '/features/'
     end
   rescue LoadError
-    warn("Unable to load simplecov")
+    warn('Unable to load simplecov')
   end
 end

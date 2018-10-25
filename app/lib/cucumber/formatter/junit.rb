@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'builder'
 require 'cucumber/formatter/backtrace_filter'
 require 'cucumber/formatter/io'
@@ -8,7 +10,6 @@ module Cucumber
   module Formatter
     # The formatter used for <tt>--format junit</tt>
     class Junit
-
       include Io
 
       class UnNamedFeatureError < StandardError
@@ -18,24 +19,26 @@ module Cucumber
       end
 
       def initialize(config)
-        config.on_event :before_test_case, &method(:on_before_test_case)
-        config.on_event :after_test_case, &method(:on_after_test_case)
-        config.on_event :after_test_step, &method(:on_after_test_step)
-        config.on_event :finished_testing, &method(:on_finished_testing)
-        @reportdir = ensure_dir(config.out_stream, "junit")
+        config.on_event :test_case_started, &method(:on_test_case_started)
+        config.on_event :test_case_finished, &method(:on_test_case_finished)
+        config.on_event :test_step_finished, &method(:on_test_step_finished)
+        config.on_event :test_run_finished, &method(:on_test_run_finished)
+        @reportdir = ensure_dir(config.out_stream, 'junit')
         @config = config
-        @features_data = Hash.new { |h,k| h[k] = {
-          feature: nil,
-          failures: 0,
-          errors: 0,
-          tests: 0,
-          skipped: 0,
-          time: 0,
-          builder: Builder::XmlMarkup.new(:indent => 2)
-        }}
+        @features_data = Hash.new do |h, k|
+          h[k] = {
+            feature: nil,
+            failures: 0,
+            errors: 0,
+            tests: 0,
+            skipped: 0,
+            time: 0,
+            builder: Builder::XmlMarkup.new(:indent => 2)
+          }
+        end
       end
 
-      def on_before_test_case(event)
+      def on_test_case_started(event)
         test_case = event.test_case
         unless same_feature_as_previous_test_case?(test_case.feature)
           start_feature(test_case.feature)
@@ -47,15 +50,16 @@ module Cucumber
         @interceptederr = Interceptor::Pipe.wrap(:stderr)
       end
 
-      def on_after_test_step(event)
+      def on_test_step_finished(event)
+        test_step, result = *event.attributes
         return if @failing_step_source
 
-        @failing_step_source = event.test_step.source.last unless event.result.ok?(@config.strict?)
+        @failing_step_source = test_step.source.last unless result.ok?(@config.strict)
       end
 
-      def on_after_test_case(event)
-        test_case = event.test_case
-        result = event.result.with_filtered_backtrace(Cucumber::Formatter::BacktraceFilter)
+      def on_test_case_finished(event)
+        test_case, result = *event.attributes
+        result = result.with_filtered_backtrace(Cucumber::Formatter::BacktraceFilter)
         test_case_name = NameBuilder.new(test_case)
         scenario = test_case_name.scenario_name
         scenario_designation = "#{scenario}#{test_case_name.name_suffix}"
@@ -66,7 +70,7 @@ module Cucumber
         Interceptor::Pipe.unwrap! :stderr
       end
 
-      def on_finished_testing(event)
+      def on_test_run_finished(_event)
         @features_data.each { |file, data| end_feature(data) }
       end
 
@@ -90,8 +94,9 @@ module Cucumber
           :errors => feature_data[:errors],
           :skipped => feature_data[:skipped],
           :tests => feature_data[:tests],
-          :time => "%.6f" % feature_data[:time],
-          :name => feature_data[:feature].name ) do
+          :time => format('%.6f', feature_data[:time]),
+          :name => feature_data[:feature].name
+        ) do
           @testsuite << feature_data[:builder].target!
         end
 
@@ -100,10 +105,14 @@ module Cucumber
 
       def create_output_string(test_case, scenario, result, row_name)
         output = "#{test_case.keyword}: #{scenario}\n\n"
-        return output if result.ok?(@config.strict?)
-        if test_case.keyword == "Scenario"
-          output += "#{@failing_step_source.keyword}" unless hook?(@failing_step_source)
-          output += "#{@failing_step_source.name}\n"
+        return output if result.ok?(@config.strict)
+        if test_case.keyword == 'Scenario'
+          if @failing_step_source
+            output += @failing_step_source.keyword.to_s unless hook?(@failing_step_source)
+            output += "#{@failing_step_source}\n"
+          else # An Around hook has failed
+            output += "Around hook\n"
+          end
         else
           output += "Example row: #{row_name}\n"
         end
@@ -111,7 +120,7 @@ module Cucumber
       end
 
       def hook?(step)
-        ["Before hook", "After hook", "AfterStep hook"].include? step.name
+        ['Before hook', 'After hook', 'AfterStep hook'].include? step.text
       end
 
       def build_testcase(result, scenario_designation, output)
@@ -120,8 +129,8 @@ module Cucumber
         classname = @current_feature_data[:feature].name
         name = scenario_designation
 
-        @current_feature_data[:builder].testcase(:classname => classname, :name => name, :time => "%.6f" % duration) do
-          if !result.passed? && result.ok?(@config.strict?)
+        @current_feature_data[:builder].testcase(:classname => classname, :name => name, :time => format('%.6f', duration)) do
+          if !result.passed? && result.ok?(@config.strict)
             @current_feature_data[:builder].skipped
             @current_feature_data[:skipped] += 1
           elsif !result.passed?
@@ -134,10 +143,10 @@ module Cucumber
             @current_feature_data[:failures] += 1
           end
           @current_feature_data[:builder].tag!('system-out') do
-            @current_feature_data[:builder].cdata! strip_control_chars(@interceptedout.buffer.join)
+            @current_feature_data[:builder].cdata! strip_control_chars(@interceptedout.buffer_string)
           end
           @current_feature_data[:builder].tag!('system-err') do
-            @current_feature_data[:builder].cdata! strip_control_chars(@interceptederr.buffer.join)
+            @current_feature_data[:builder].cdata! strip_control_chars(@interceptederr.buffer_string)
           end
         end
         @current_feature_data[:tests] += 1
@@ -173,15 +182,14 @@ module Cucumber
       def strip_control_chars(cdata)
         cdata.scan(/[[:print:]\t\n\r]/).join
       end
-
     end
 
     class NameBuilder
       attr_reader :scenario_name, :name_suffix, :row_name
 
       def initialize(test_case)
-        @name_suffix = ""
-        @row_name = ""
+        @name_suffix = ''
+        @row_name = ''
         test_case.describe_source_to self
       end
 
@@ -190,12 +198,12 @@ module Cucumber
       end
 
       def scenario(scenario)
-        @scenario_name = (scenario.name.nil? || scenario.name == "") ? "Unnamed scenario" : scenario.name
+        @scenario_name = (scenario.name.nil? || scenario.name == '') ? 'Unnamed scenario' : scenario.name
         self
       end
 
       def scenario_outline(outline)
-        @scenario_name = (outline.name.nil? || outline.name == "") ? "Unnamed scenario outline" : outline.name
+        @scenario_name = (outline.name.nil? || outline.name == '') ? 'Unnamed scenario outline' : outline.name
         self
       end
 
@@ -233,6 +241,5 @@ module Cucumber
         duration.tap { |duration| @test_case_duration = duration.nanoseconds / 10**9.0 }
       end
     end
-
   end
 end

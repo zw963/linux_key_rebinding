@@ -1,6 +1,8 @@
-require "cucumber/filters/gated_receiver"
-require "cucumber/filters/tag_limits/test_case_index"
-require "cucumber/filters/tag_limits/verifier"
+# frozen_string_literal: true
+
+require 'cucumber/filters/gated_receiver'
+require 'cucumber/filters/tag_limits/test_case_index'
+require 'cucumber/filters/tag_limits/verifier'
 
 module Cucumber
   module Filters
@@ -11,7 +13,7 @@ module Cucumber
     end
 
     class TagLimits
-      def initialize(tag_limits, receiver=nil)
+      def initialize(tag_limits, receiver = nil)
         @tag_limits = tag_limits
         @gated_receiver = GatedReceiver.new(receiver)
         @test_case_index = TestCaseIndex.new
@@ -40,6 +42,5 @@ module Cucumber
       attr_reader :test_case_index
       attr_reader :verifier
     end
-
   end
 end

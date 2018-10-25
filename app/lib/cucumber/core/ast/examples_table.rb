@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 require 'cucumber/core/ast/describes_itself'
 require 'cucumber/core/ast/location'
 require 'cucumber/core/ast/names'
@@ -79,6 +80,10 @@ module Cucumber
             other.number == number &&
               other.location == location &&
               other.data == data
+          end
+
+          def [](parameter_name)
+            @data[parameter_name]
           end
 
           def values

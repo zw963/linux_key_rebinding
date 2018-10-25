@@ -1,14 +1,11 @@
+# frozen_string_literal: true
+
 require 'timeout'
 
 module Cucumber
   class Runtime
-
     module UserInterface
       attr_writer :visitor
-
-      def visitor=(visitor)
-        @visitor = visitor
-      end
 
       # Output +messages+ alongside the formatted output.
       # This is an alternative to using Kernel#puts - it will display
@@ -36,18 +33,15 @@ module Cucumber
         STDOUT.flush
         puts(question)
 
-        if(Cucumber::JRUBY)
-          answer = jruby_gets(timeout_seconds)
-        else
-          answer = mri_gets(timeout_seconds)
-        end
+        answer = if Cucumber::JRUBY
+                   jruby_gets(timeout_seconds)
+                 else
+                   mri_gets(timeout_seconds)
+                 end
 
-        if(answer)
-          puts(answer)
-          answer
-        else
-          raise("Waited for input for #{timeout_seconds} seconds, then timed out.")
-        end
+        raise("Waited for input for #{timeout_seconds} seconds, then timed out.") unless answer
+        puts(answer)
+        answer
       end
 
       # Embed +src+ of MIME type +mime_type+ into the output. The +src+ argument may
@@ -58,7 +52,7 @@ module Cucumber
         @visitor.embed(src, mime_type, label)
       end
 
-    private
+      private
 
       def mri_gets(timeout_seconds)
         begin
@@ -80,6 +74,5 @@ module Cucumber
         answer
       end
     end
-
   end
 end

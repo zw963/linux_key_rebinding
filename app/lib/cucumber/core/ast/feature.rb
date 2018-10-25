@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 require 'cucumber/core/ast/describes_itself'
 require 'cucumber/core/ast/names'
 require 'cucumber/core/ast/location'
@@ -39,16 +40,6 @@ module Cucumber
           else
             first_line
           end
-        end
-
-        def to_sexp
-          sexp = [:feature, file, name]
-          comment = @comment.to_sexp
-          sexp += [comment] if comment
-          tags = @tags.to_sexp
-          sexp += tags if tags.any?
-          sexp += @feature_elements.map{|fe| fe.to_sexp}
-          sexp
         end
 
         private

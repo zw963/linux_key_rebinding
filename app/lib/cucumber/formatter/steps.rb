@@ -1,15 +1,16 @@
+# frozen_string_literal: true
+
 module Cucumber
   module Formatter
     # The formatter used for <tt>--format steps</tt>
     class Steps
-
       def initialize(runtime, path_or_io, options)
         @io = ensure_io(path_or_io)
         @options = options
         @step_definition_files = collect_steps(runtime)
       end
 
-      def after_features(features)
+      def after_features(_features)
         print_summary
       end
 
@@ -36,7 +37,7 @@ module Cucumber
       def collect_steps(runtime)
         runtime.step_definitions.inject({}) do |step_definitions, step_definition|
           step_definitions[step_definition.file] ||= []
-          step_definitions[step_definition.file] << [ step_definition.file_colon_line, step_definition.regexp_source ]
+          step_definitions[step_definition.file] << [step_definition.file_colon_line, step_definition.regexp_source]
           step_definitions
         end
       end

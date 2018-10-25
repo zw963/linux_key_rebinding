@@ -1,10 +1,11 @@
+# frozen_string_literal: true
+
 require 'cucumber/formatter/ansicolor'
 require 'cucumber/formatter/duration'
-require 'cucumber/formatter/summary'
+require 'cucumber/gherkin/i18n'
 
 module Cucumber
   module Formatter
-
     # This module contains helper methods that are used by formatters that
     # print output to the terminal.
     #
@@ -28,15 +29,14 @@ module Cucumber
     module Console
       extend ANSIColor
       include Duration
-      include Summary
 
       def format_step(keyword, step_match, status, source_indent)
         comment = if source_indent
-          c = ('# ' + step_match.location.to_s).indent(source_indent)
-          format_string(c, :comment)
-        else
-          ''
-        end
+                    c = ('# ' + step_match.location.to_s).indent(source_indent)
+                    format_string(c, :comment)
+                  else
+                    ''
+                  end
 
         format = format_for(status, :param)
         line = keyword + step_match.format_args(format) + comment
@@ -59,100 +59,83 @@ module Cucumber
       end
 
       def print_elements(elements, status, kind)
-        if elements.any?
+        return if elements.empty?
+
+        element_messages = element_messages(elements, status)
+        print_element_messages(element_messages, status, kind)
+      end
+
+      def print_element_messages(element_messages, status, kind)
+        if element_messages.any?
           @io.puts(format_string("(::) #{status} #{kind} (::)", status))
           @io.puts
           @io.flush
         end
 
-        elements.each_with_index do |element, i|
-          if status == :failed
-            print_exception(element.exception, status, 0)
-          else
-            message = linebreaks(element.backtrace_line, ENV['CUCUMBER_TRUNCATE_OUTPUT'].to_i)
-            @io.puts(format_string(message, status))
-          end
+        element_messages.each do |message|
+          @io.puts(format_string(message, status))
           @io.puts
           @io.flush
         end
       end
 
-      def print_stats(features, options)
-        duration = features ? features.duration : nil
-        print_statistics(duration, options)
-      end
-
-      def print_statistics(duration, options)
-        failures = collect_failing_scenarios(runtime)
-        if !failures.empty?
-          print_failing_scenarios(failures, options.custom_profiles, options[:source])
+      def print_statistics(duration, config, counts, issues)
+        if issues.any?
+          @io.puts issues.to_s
+          @io.puts
         end
 
-        @io.puts scenario_summary(runtime) {|status_count, status| format_string(status_count, status)}
-        @io.puts step_summary(runtime) {|status_count, status| format_string(status_count, status)}
-        @io.puts(format_duration(duration)) if duration && options[:duration]
+        @io.puts counts.to_s
+        @io.puts(format_duration(duration)) if duration && config.duration?
 
-        if runtime.configuration.randomize?
+        if config.randomize?
           @io.puts
-          @io.puts "Randomized with seed #{runtime.configuration.seed}"
+          @io.puts "Randomized with seed #{config.seed}"
         end
 
         @io.flush
       end
 
-      def collect_failing_scenarios(runtime)
-        # TODO: brittle - stop coupling to types
-        scenario_class = LegacyApi::Ast::Scenario
-        example_table_class = Core::Ast::ExamplesTable
-
-        runtime.scenarios(:failed).select do |s|
-          [scenario_class, example_table_class].include?(s.class)
-        end.map do |s|
-          s.is_a?(example_table_class)? s.scenario_outline : s
-        end
-      end
-
-      def print_failing_scenarios(failures, custom_profiles, given_source)
-        @io.puts format_string("Failing Scenarios:", :failed)
-        failures.each do |failure|
-          profiles_string = custom_profiles.empty? ? '' : (custom_profiles.map{|profile| "-p #{profile}" }).join(' ') + ' '
-          source = given_source ? format_string(" # " + failure.name, :comment) : ''
-          @io.puts format_string("cucumber #{profiles_string}" + failure.location, :failed) + source
-        end
-        @io.puts
-      end
-
       def print_exception(e, status, indent)
-        message = "#{e.message} (#{e.class})".force_encoding("UTF-8")
+        string = exception_message_string(e, indent)
+        @io.puts(format_string(string, status))
+      end
+
+      def exception_message_string(e, indent)
+        message = "#{e.message} (#{e.class})".dup.force_encoding('UTF-8')
         message = linebreaks(message, ENV['CUCUMBER_TRUNCATE_OUTPUT'].to_i)
 
-        string = "#{message}\n#{e.backtrace.join("\n")}".indent(indent)
-        @io.puts(format_string(string, status))
+        "#{message}\n#{e.backtrace.join("\n")}".indent(indent)
       end
 
       # http://blade.nagaokaut.ac.jp/cgi-bin/scat.rb/ruby/ruby-talk/10655
       def linebreaks(s, max)
         return s unless max && max > 0
-        s.gsub(/.{1,#{max}}(?:\s|\Z)/){($& + 5.chr).gsub(/\n\005/,"\n").gsub(/\005/,"\n")}.rstrip
+        s.gsub(/.{1,#{max}}(?:\s|\Z)/) { ($& + 5.chr).gsub(/\n\005/, "\n").gsub(/\005/, "\n") }.rstrip
       end
 
       def collect_snippet_data(test_step, result)
         # collect snippet data for undefined steps
-        unless hook?(test_step)
-          keyword = test_step.source.last.actual_keyword(@previous_step_keyword)
-          @previous_step_keyword = keyword
-          if result.undefined?
-            @snippets_input << Console::SnippetData.new(keyword, test_step.source.last)
-          end
-        end
+        return if hook?(test_step)
+        keyword = test_step.source.last.actual_keyword(@previous_step_keyword)
+        @previous_step_keyword = keyword
+        return unless result.undefined?
+        @snippets_input << Console::SnippetData.new(keyword, test_step.source.last)
       end
 
       def print_snippets(options)
         return unless options[:snippets]
         return if runtime.steps(:undefined).empty?
 
+        snippet_text_proc = lambda do |step_keyword, step_name, multiline_arg|
+          runtime.snippet_text(step_keyword, step_name, multiline_arg)
+        end
+        do_print_snippets(snippet_text_proc)
+      end
+
+      def do_print_snippets(snippet_text_proc)
         snippets = @snippets_input.map do |data|
-          @runtime.snippet_text(data.actual_keyword, data.step.name, data.step.multiline_arg)
+          snippet_text_proc.call(data.actual_keyword, data.step.text, data.step.multiline_arg)
         end.uniq
 
         text = "\nYou can implement step definitions for undefined steps with these snippets:\n\n"
@@ -165,10 +148,14 @@ module Cucumber
 
       def print_passing_wip(options)
         return unless options[:wip]
-        passed = runtime.scenarios(:passed)
-        if passed.any?
+        passed_messages = element_messages(runtime.scenarios(:passed), :passed)
+        do_print_passing_wip(passed_messages)
+      end
+
+      def do_print_passing_wip(passed_messages)
+        if passed_messages.any?
           @io.puts format_string("\nThe --wip switch was used, so I didn't expect anything to pass. These scenarios passed:", :failed)
-          print_elements(passed, :passed, "scenarios")
+          print_element_messages(passed_messages, :passed, 'scenarios')
         else
           @io.puts format_string("\nThe --wip switch was used, so the failures were expected. All is good.\n", :passed)
         end
@@ -178,8 +165,8 @@ module Cucumber
         # no-op
       end
 
-      #define @delayed_messages = [] in your Formatter if you want to
-      #activate this feature
+      # define @delayed_messages = [] in your Formatter if you want to
+      # activate this feature
       def puts(*messages)
         if @delayed_messages
           @delayed_messages += messages
@@ -195,7 +182,7 @@ module Cucumber
       end
 
       def print_messages
-        @delayed_messages.each {|message| print_message(message)}
+        @delayed_messages.each { |message| print_message(message) }
         empty_messages
       end
 
@@ -217,17 +204,19 @@ module Cucumber
 
       def print_profile_information
         return if @options[:skip_profile_information] || @options[:profiles].nil? || @options[:profiles].empty?
-        profiles = @options[:profiles]
-        profiles_sentence = ''
+        do_print_profile_information(@options[:profiles])
+      end
+
+      def do_print_profile_information(profiles)
         profiles_sentence = profiles.size == 1 ? profiles.first :
           "#{profiles[0...-1].join(', ')} and #{profiles.last}"
 
-        @io.puts "Using the #{profiles_sentence} profile#{'s' if profiles.size> 1}..."
+        @io.puts "Using the #{profiles_sentence} profile#{'s' if profiles.size > 1}..."
       end
 
       private
 
-      FORMATS = Hash.new{ |hash, format| hash[format] = method(format).to_proc }
+      FORMATS = Hash.new { |hash, format| hash[format] = method(format).to_proc }
 
       def format_for(*keys)
         key = keys.join('_').to_sym
@@ -240,13 +229,29 @@ module Cucumber
         not test_step.source.last.respond_to?(:actual_keyword)
       end
 
+      def element_messages(elements, status)
+        elements.map do |element|
+          if status == :failed
+            exception_message_string(element.exception, 0)
+          else
+            linebreaks(element.backtrace_line, ENV['CUCUMBER_TRUNCATE_OUTPUT'].to_i)
+          end
+        end
+      end
+
+      def snippet_text(step_keyword, step_name, multiline_arg)
+        keyword = Cucumber::Gherkin::I18n.code_keyword_for(step_keyword).strip
+        config.snippet_generators.map do |generator|
+          generator.call(keyword, step_name, multiline_arg, config.snippet_type)
+        end.join("\n")
+      end
+
       class SnippetData
         attr_reader :actual_keyword, :step
         def initialize(actual_keyword, step)
           @actual_keyword, @step = actual_keyword, step
         end
       end
-
     end
   end
 end

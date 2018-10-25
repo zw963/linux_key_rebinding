@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 module Cucumber
   module Core
     module Ast
@@ -19,10 +20,6 @@ module Cucumber
         end
 
         def all_locations
-          []
-        end
-
-        def to_sexp
           []
         end
 

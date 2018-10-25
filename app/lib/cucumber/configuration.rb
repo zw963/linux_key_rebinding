@@ -1,8 +1,12 @@
+# frozen_string_literal: true
+
 require 'cucumber/constantize'
 require 'cucumber/cli/rerun_file'
 require 'cucumber/events'
+require 'cucumber/core/event_bus'
+require 'cucumber/core/test/result'
 require 'forwardable'
-require 'cucumber/core/gherkin/tag_expression'
+require 'cucumber'
 
 module Cucumber
   # The base class for configuring settings for a Cucumber run.
@@ -20,25 +24,21 @@ module Cucumber
     #
     # @param event_id [Symbol, Class, String] Identifier for the type of event to subscribe to
     # @param handler_object [Object optional] an object to be called when the event occurs
-    # @yield [Object] Block to be called when th event occurs
+    # @yield [Object] Block to be called when the event occurs
     # @method on_event
-    def_instance_delegator :event_bus, :register, :on_event
+    def_instance_delegator :event_bus, :on, :on_event
 
     # @private
-    def_instance_delegator :event_bus, :notify
+    def notify(message, *args)
+      event_bus.send(message, *args)
+    end
 
     def initialize(user_options = {})
-      @options = default_options.merge(Cucumber::Hash(user_options))
+      @options = default_options.merge(Hash(user_options))
     end
 
     def with_options(new_options)
       self.class.new(@options.merge(new_options))
-    end
-
-    # TODO: Actually Deprecate???
-    def options
-      warn("Deprecated: Configuration#options will be removed from the next release of Cucumber. Please use the configuration object directly instead.")
-      Marshal.load(Marhal.dump(@options))
     end
 
     def out_stream
@@ -73,7 +73,7 @@ module Cucumber
       @options[:guess]
     end
 
-    def strict?
+    def strict
       @options[:strict]
     end
 
@@ -83,6 +83,30 @@ module Cucumber
 
     def expand?
       @options[:expand]
+    end
+
+    def source?
+      @options[:source]
+    end
+
+    def duration?
+      @options[:duration]
+    end
+
+    def snippets?
+      @options[:snippets]
+    end
+
+    def skip_profile_information?
+      @options[:skip_profile_information]
+    end
+
+    def profiles
+      @options[:profiles] || []
+    end
+
+    def custom_profiles
+      profiles - [@options[:default_profile]]
     end
 
     def paths
@@ -107,13 +131,8 @@ module Cucumber
       with_default_features_path(dirs)
     end
 
-    # todo: remove
-    def tag_expression
-      Cucumber::Core::Gherkin::TagExpression.new(@options[:tag_expressions])
-    end
-
     def tag_limits
-      tag_expression.limits.to_hash
+      @options[:tag_limits]
     end
 
     def tag_expressions
@@ -130,7 +149,7 @@ module Cucumber
 
     def feature_files
       potential_feature_files = with_default_features_path(paths).map do |path|
-        path = path.gsub(/\\/, '/') # In case we're on windows. Globs don't work with backslashes.
+        path = path.tr('\\', '/') # In case we're on windows. Globs don't work with backslashes.
         path = path.chomp('/')
 
         # TODO: Move to using feature loading strategies stored in
@@ -148,45 +167,45 @@ module Cucumber
     end
 
     def support_to_load
-      support_files = all_files_to_load.select {|f| f =~ %r{/support/} }
-      env_files = support_files.select {|f| f =~ %r{/support/env\..*} }
+      support_files = all_files_to_load.select { |f| f =~ %r{/support/} }
+      env_files = support_files.select { |f| f =~ %r{/support/env\..*} }
       other_files = support_files - env_files
       @options[:dry_run] ? other_files : env_files + other_files
     end
 
     def all_files_to_load
       files = require_dirs.map do |path|
-        path = path.gsub(/\\/, '/') # In case we're on windows. Globs don't work with backslashes.
+        path = path.tr('\\', '/') # In case we're on windows. Globs don't work with backslashes.
         path = path.gsub(/\/$/, '') # Strip trailing slash.
         File.directory?(path) ? Dir["#{path}/**/*"] : path
       end.flatten.uniq
       remove_excluded_files_from(files)
-      files.reject! {|f| !File.file?(f)}
-      files.reject! {|f| File.extname(f) == '.feature' }
-      files.reject! {|f| f =~ /^http/}
+      files.reject! { |f| !File.file?(f) }
+      files.reject! { |f| File.extname(f) == '.feature' }
+      files.reject! { |f| f =~ /^http/ }
       files.sort
     end
 
     def step_defs_to_load
-      all_files_to_load.reject {|f| f =~ %r{/support/} }
+      all_files_to_load.reject { |f| f =~ %r{/support/} }
     end
 
     def formatter_factories
-      @options[:formats].map do |format_and_out|
-        format = format_and_out[0]
-        path_or_io = format_and_out[1]
+      formats.map do |format, formatter_options, path_or_io|
         begin
           factory = formatter_class(format)
-          yield factory, path_or_io, Cli::Options.new(STDOUT, STDERR, @options)
+          yield factory,
+                formatter_options,
+                path_or_io,
+                Cli::Options.new(STDOUT, STDERR, @options)
         rescue Exception => e
-          e.message << "\nError creating formatter: #{format}"
-          raise e
+          raise e, "#{e.message}\nError creating formatter: #{format}", e.backtrace
         end
       end
     end
 
     def formatter_class(format)
-      if(builtin = Cli::Options::BUILTIN_FORMATS[format])
+      if (builtin = Cli::Options::BUILTIN_FORMATS[format])
         constantize(builtin[0])
       else
         constantize(format)
@@ -201,7 +220,7 @@ module Cucumber
     # formatter wants to display snippets to the user.
     #
     # Each proc should take the following arguments:
-    # 
+    #
     #  - keyword
     #  - step text
     #  - multiline argument
@@ -216,13 +235,17 @@ module Cucumber
       self
     end
 
-  private
+    def event_bus
+      @options[:event_bus]
+    end
+
+    private
 
     def default_options
       {
         :autoload_code_paths => ['features/support', 'features/step_definitions'],
         :filters             => [],
-        :strict              => false,
+        :strict              => Cucumber::Core::Test::Result::StrictConfiguration.new,
         :require             => [],
         :dry_run             => false,
         :fail_fast           => false,
@@ -235,17 +258,12 @@ module Cucumber
         :snippets            => true,
         :source              => true,
         :duration            => true,
-        :event_bus           => Events::Bus.new(Cucumber::Events)
+        :event_bus           => Cucumber::Events.make_event_bus
       }
     end
 
-    def event_bus
-      @options[:event_bus]
-    end
-
-
     def default_features_paths
-      ["features"]
+      ['features']
     end
 
     def with_default_features_path(paths)
@@ -254,7 +272,7 @@ module Cucumber
     end
 
     def remove_excluded_files_from(files)
-      files.reject! {|path| @options[:excludes].detect {|pattern| path =~ pattern } }
+      files.reject! { |path| @options[:excludes].detect { |pattern| path =~ pattern } }
     end
 
     def require_dirs

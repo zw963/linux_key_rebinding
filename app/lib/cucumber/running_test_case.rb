@@ -1,8 +1,9 @@
+# frozen_string_literal: true
+
 require 'delegate'
-require 'cucumber/deprecate'
 
 module Cucumber
-  # Represents the current status of a running test case.
+  # Represents the current status of a running test case.
   #
   # This wraps a `Cucumber::Core::Test::Case` and delegates
   # many methods to that object.
@@ -32,11 +33,11 @@ module Cucumber
       def feature(feature)
       end
 
-      def scenario(scenario)
+      def scenario(_scenario)
         @factory = Scenario
       end
 
-      def scenario_outline(scenario)
+      def scenario_outline(_scenario)
         @factory = ScenarioOutlineExample
       end
 
@@ -80,32 +81,8 @@ module Cucumber
         !failed?
       end
 
-      def title
-        Cucumber.deprecate(
-          "Call #name instead",
-          "RunningTestCase#title",
-          "2.9.9")
-        name
-      end
-
-      def source_tags
-        Cucumber.deprecate(
-          "Call #tags instead",
-          "RunningTestCase#source_tags",
-          "2.9.9")
-        tags
-      end
-
       def source_tag_names
         tags.map &:name
-      end
-
-      def skip_invoke!
-        Cucumber.deprecate(
-          "Call #skip_this_scenario directly (not on any object)",
-          "RunningTestCase#skip_invoke!",
-          "2.9.9")
-        raise Cucumber::Core::Test::Result::Skipped
       end
 
       def outline?

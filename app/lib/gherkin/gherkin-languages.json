@@ -81,6 +81,51 @@
       "Երբ "
     ]
   },
+  "an": {
+    "and": [
+      "* ",
+      "Y ",
+      "E "
+    ],
+    "background": [
+      "Antecedents"
+    ],
+    "but": [
+      "* ",
+      "Pero "
+    ],
+    "examples": [
+      "Eixemplos"
+    ],
+    "feature": [
+      "Caracteristica"
+    ],
+    "given": [
+      "* ",
+      "Dau ",
+      "Dada ",
+      "Daus ",
+      "Dadas "
+    ],
+    "name": "Aragonese",
+    "native": "Aragonés",
+    "scenario": [
+      "Caso"
+    ],
+    "scenarioOutline": [
+      "Esquema del caso"
+    ],
+    "then": [
+      "* ",
+      "Alavez ",
+      "Allora ",
+      "Antonces "
+    ],
+    "when": [
+      "* ",
+      "Cuan "
+    ]
+  },
   "ar": {
     "and": [
       "* ",
@@ -120,6 +165,93 @@
       "* ",
       "متى ",
       "عندما "
+    ]
+  },
+  "ast": {
+    "and": [
+      "* ",
+      "Y ",
+      "Ya "
+    ],
+    "background": [
+      "Antecedentes"
+    ],
+    "but": [
+      "* ",
+      "Peru "
+    ],
+    "examples": [
+      "Exemplos"
+    ],
+    "feature": [
+      "Carauterística"
+    ],
+    "given": [
+      "* ",
+      "Dáu ",
+      "Dada ",
+      "Daos ",
+      "Daes "
+    ],
+    "name": "Asturian",
+    "native": "asturianu",
+    "scenario": [
+      "Casu"
+    ],
+    "scenarioOutline": [
+      "Esbozu del casu"
+    ],
+    "then": [
+      "* ",
+      "Entós "
+    ],
+    "when": [
+      "* ",
+      "Cuando "
+    ]
+  },
+  "az": {
+    "and": [
+      "* ",
+      "Və ",
+      "Həm "
+    ],
+    "background": [
+      "Keçmiş",
+      "Kontekst"
+    ],
+    "but": [
+      "* ",
+      "Amma ",
+      "Ancaq "
+    ],
+    "examples": [
+      "Nümunələr"
+    ],
+    "feature": [
+      "Özəllik"
+    ],
+    "given": [
+      "* ",
+      "Tutaq ki ",
+      "Verilir "
+    ],
+    "name": "Azerbaijani",
+    "native": "Azərbaycanca",
+    "scenario": [
+      "Ssenari"
+    ],
+    "scenarioOutline": [
+      "Ssenarinin strukturu"
+    ],
+    "then": [
+      "* ",
+      "O halda "
+    ],
+    "when": [
+      "* ",
+      "Əgər ",
+      "Nə vaxt ki "
     ]
   },
   "bg": {
@@ -487,7 +619,8 @@
       "Σενάριο"
     ],
     "scenarioOutline": [
-      "Περιγραφή Σεναρίου"
+      "Περιγραφή Σεναρίου",
+      "Περίγραμμα Σεναρίου"
     ],
     "then": [
       "* ",
@@ -1625,6 +1758,45 @@
       "Menawa "
     ]
   },
+  "ka": {
+    "and": [
+      "* ",
+      "და"
+    ],
+    "background": [
+      "კონტექსტი"
+    ],
+    "but": [
+      "* ",
+      "მაგ­რამ"
+    ],
+    "examples": [
+      "მაგალითები"
+    ],
+    "feature": [
+      "თვისება"
+    ],
+    "given": [
+      "* ",
+      "მოცემული"
+    ],
+    "name": "Georgian",
+    "native": "ქართველი",
+    "scenario": [
+      "სცენარის"
+    ],
+    "scenarioOutline": [
+      "სცენარის ნიმუში"
+    ],
+    "then": [
+      "* ",
+      "მაშინ"
+    ],
+    "when": [
+      "* ",
+      "როდესაც"
+    ]
+  },
   "kn": {
     "and": [
       "* ",
@@ -1830,6 +2002,100 @@
       "Ja "
     ]
   },
+  "mk-Cyrl": {
+    "and": [
+      "* ",
+      "И "
+    ],
+    "background": [
+      "Контекст",
+      "Содржина"
+    ],
+    "but": [
+      "* ",
+      "Но "
+    ],
+    "examples": [
+      "Примери",
+      "Сценарија"
+    ],
+    "feature": [
+      "Функционалност",
+      "Бизнис потреба",
+      "Можност"
+    ],
+    "given": [
+      "* ",
+      "Дадено ",
+      "Дадена "
+    ],
+    "name": "Macedonian",
+    "native": "Македонски",
+    "scenario": [
+      "Сценарио",
+      "На пример"
+    ],
+    "scenarioOutline": [
+      "Преглед на сценарија",
+      "Скица",
+      "Концепт"
+    ],
+    "then": [
+      "* ",
+      "Тогаш "
+    ],
+    "when": [
+      "* ",
+      "Кога "
+    ]
+  },
+  "mk-Latn": {
+    "and": [
+      "* ",
+      "I "
+    ],
+    "background": [
+      "Kontekst",
+      "Sodrzhina"
+    ],
+    "but": [
+      "* ",
+      "No "
+    ],
+    "examples": [
+      "Primeri",
+      "Scenaria"
+    ],
+    "feature": [
+      "Funkcionalnost",
+      "Biznis potreba",
+      "Mozhnost"
+    ],
+    "given": [
+      "* ",
+      "Dadeno ",
+      "Dadena "
+    ],
+    "name": "Macedonian (Latin)",
+    "native": "Makedonski (Latinica)",
+    "scenario": [
+      "Scenario",
+      "Na primer"
+    ],
+    "scenarioOutline": [
+      "Pregled na scenarija",
+      "Skica",
+      "Koncept"
+    ],
+    "then": [
+      "* ",
+      "Togash "
+    ],
+    "when": [
+      "* ",
+      "Koga "
+    ]
+  },
   "mn": {
     "and": [
       "* ",
@@ -1911,7 +2177,8 @@
     ],
     "when": [
       "* ",
-      "Als "
+      "Als ",
+      "Wanneer "
     ]
   },
   "no": {
@@ -2125,6 +2392,7 @@
       "* ",
       "Date fiind ",
       "Dat fiind ",
+      "Dată fiind",
       "Dati fiind ",
       "Dați fiind ",
       "Daţi fiind "
@@ -2162,7 +2430,8 @@
     "but": [
       "* ",
       "Но ",
-      "А "
+      "А ",
+      "Иначе "
     ],
     "examples": [
       "Примеры"
@@ -2190,12 +2459,13 @@
     "then": [
       "* ",
       "То ",
+      "Затем ",
       "Тогда "
     ],
     "when": [
       "* ",
-      "Если ",
-      "Когда "
+      "Когда ",
+      "Если "
     ]
   },
   "sk": {

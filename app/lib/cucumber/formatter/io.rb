@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Cucumber
   module Formatter
     module Io
@@ -27,7 +29,7 @@ module Cucumber
         raise "You *must* specify --out DIR for the #{name} formatter" unless String === path
         raise "I can't write #{name} reports to a file - it has to be a directory" if File.file?(path)
         FileUtils.mkdir_p(path) unless File.directory?(path)
-        path
+        File.absolute_path path
       end
     end
   end

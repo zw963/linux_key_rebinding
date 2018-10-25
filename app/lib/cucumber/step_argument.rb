@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Cucumber
   # Defines the location and value of a captured argument from the step
   # text
@@ -11,8 +13,6 @@ module Cucumber
           offset = match.offset(n)[0]
           new(offset, val)
         end
-      else
-        nil
       end
     end
 

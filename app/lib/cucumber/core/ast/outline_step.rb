@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 require 'cucumber/core/ast/location'
 require 'cucumber/core/ast/describes_itself'
 require 'cucumber/core/ast/step'
@@ -10,19 +11,23 @@ module Cucumber
         include HasLocation
         include DescribesItself
 
-        attr_reader :language, :location, :comments, :keyword, :name, :multiline_arg
+        attr_reader :language, :location, :comments, :keyword, :text, :multiline_arg
 
         def initialize(language, location, comments, keyword, text, multiline_arg)
-          @language, @location, @comments, @keyword, @name, @multiline_arg = language, location, comments, keyword, text, multiline_arg
+          @language, @location, @comments, @keyword, @text, @multiline_arg = language, location, comments, keyword, text, multiline_arg
         end
 
         def to_step(row)
-          Ast::ExpandedOutlineStep.new(self, language, row.location, comments, keyword, row.expand(name), replace_multiline_arg(row))
+          Ast::ExpandedOutlineStep.new(self, language, row.location, comments, keyword, row.expand(text), replace_multiline_arg(row))
+        end
+
+        def to_s
+          text
         end
 
         def inspect
-          keyword_and_name = [keyword, name].join(": ")
-          %{#<#{self.class} "#{keyword_and_name}" (#{location})>}
+          keyword_and_text = [keyword, text].join(": ")
+          %{#<#{self.class} "#{keyword_and_text}" (#{location})>}
         end
 
         private
@@ -46,4 +51,3 @@ module Cucumber
     end
   end
 end
-

@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# frozen_string_literal: true
+
 require 'fileutils'
 require 'multi_json'
 require 'cucumber/configuration'
@@ -7,14 +9,13 @@ require 'cucumber/formatter/duration'
 require 'cucumber/file_specs'
 require 'cucumber/filters'
 require 'cucumber/formatter/fanout'
-require 'cucumber/formatter/event_bus_report'
 require 'cucumber/gherkin/i18n'
 require 'cucumber/step_match_search'
 
 module Cucumber
   module FixRuby21Bug9285
     def message
-      String(super).gsub("@ rb_sysopen ", "")
+      String(super).gsub('@ rb_sysopen ', '')
     end
   end
 
@@ -30,8 +31,14 @@ module Cucumber
   class FileNotFoundException < FileException
   end
 
-  class FeatureFolderNotFoundException < FileException
-    include FixRuby21Bug9285 if Cucumber::RUBY_2_1 || Cucumber::RUBY_2_2 || Cucumber::RUBY_2_3
+  class FeatureFolderNotFoundException < Exception
+    def initialize(path)
+      @path = path
+    end
+
+    def message
+      "No such file or directory - #{@path}"
+    end
   end
 
   require 'cucumber/core'
@@ -61,10 +68,12 @@ module Cucumber
       load_step_definitions
       install_wire_plugin
       fire_after_configuration_hook
+      # TODO: can we remove this state?
       self.visitor = report
 
-      receiver = Test::Runner.new(report)
+      receiver = Test::Runner.new(@configuration.event_bus)
       compile features, receiver, filters
+      @configuration.notify :test_run_finished
     end
 
     def features_paths
@@ -87,22 +96,22 @@ module Cucumber
       @support_code.unmatched_step_definitions
     end
 
-    def begin_scenario(scenario)
-      @support_code.fire_hook(:begin_scenario, scenario)
+    def begin_scenario(test_case)
+      @support_code.fire_hook(:begin_scenario, test_case)
     end
 
-    def end_scenario(scenario)
+    def end_scenario(_scenario)
       @support_code.fire_hook(:end_scenario)
     end
 
     # Returns Ast::DocString for +string_without_triple_quotes+.
     #
-    def doc_string(string_without_triple_quotes, content_type='', line_offset=0)
+    def doc_string(string_without_triple_quotes, content_type = '', _line_offset = 0)
       location = Core::Ast::Location.of_caller
       Core::Ast::DocString.new(string_without_triple_quotes, content_type, location)
     end
 
-  private
+    private
 
     def fire_after_configuration_hook #:nodoc
       @support_code.fire_hook(:after_configuration, @configuration)
@@ -112,6 +121,7 @@ module Cucumber
     def features
       @features ||= feature_files.map do |path|
         source = NormalisedEncodingFile.read(path)
+        @configuration.notify :gherkin_source_read, path, source
         Cucumber::Core::Gherkin::Document.new(path, source)
       end
     end
@@ -138,13 +148,13 @@ module Cucumber
           set_encoding
         rescue Errno::EACCES => e
           raise FileNotFoundException.new(e, File.expand_path(path))
-        rescue Errno::ENOENT => e
-          raise FeatureFolderNotFoundException.new(e, path)
+        rescue Errno::ENOENT
+          raise FeatureFolderNotFoundException.new(path)
         end
       end
 
       def read
-        @file.read.encode("UTF-8")
+        @file.read.encode('UTF-8')
       end
 
       private
@@ -169,17 +179,13 @@ module Cucumber
     require 'cucumber/core/report/summary'
     def report
       return @report if @report
-      reports = [summary_report, event_bus_report] + formatters
+      reports = [summary_report] + formatters
       reports << fail_fast_report if @configuration.fail_fast?
       @report ||= Formatter::Fanout.new(reports)
     end
 
     def summary_report
-      @summary_report ||= Core::Report::Summary.new
-    end
-
-    def event_bus_report
-      @event_bus_report ||= Formatter::EventBusReport.new(@configuration)
+      @summary_report ||= Core::Report::Summary.new(@configuration.event_bus)
     end
 
     def fail_fast_report
@@ -187,34 +193,45 @@ module Cucumber
     end
 
     def formatters
-      @formatters ||= @configuration.formatter_factories { |factory, path_or_io, options|
-        create_formatter(factory, path_or_io, options)
-      }
+      @formatters ||=
+        @configuration.formatter_factories do |factory, formatter_options, path_or_io, options|
+          create_formatter(factory, formatter_options, path_or_io, options)
+        end
     end
 
-    def create_formatter(factory, path_or_io, options)
+    def create_formatter(factory, formatter_options, path_or_io, cli_options)
       if !legacy_formatter?(factory)
-        return factory.new(@configuration) if path_or_io.nil?
-        return factory.new(@configuration.with_options(out_stream: path_or_io))
+        if accept_options?(factory)
+          return factory.new(@configuration, formatter_options) if path_or_io.nil?
+          return factory.new(@configuration.with_options(out_stream: path_or_io),
+                             formatter_options)
+        else
+          return factory.new(@configuration) if path_or_io.nil?
+          return factory.new(@configuration.with_options(out_stream: path_or_io))
+        end
       end
       results = Formatter::LegacyApi::Results.new
       runtime_facade = Formatter::LegacyApi::RuntimeFacade.new(results, @support_code, @configuration)
-      formatter = factory.new(runtime_facade, path_or_io, options)
+      formatter = factory.new(runtime_facade, path_or_io, cli_options)
       Formatter::LegacyApi::Adapter.new(
         Formatter::IgnoreMissingMessages.new(formatter),
-        results, @configuration)
+        results, @configuration
+      )
+    end
+
+    def accept_options?(factory)
+      factory.instance_method(:initialize).arity > 1
     end
 
     def legacy_formatter?(factory)
-      factory.instance_method(:initialize).arity > 1
+      factory.instance_method(:initialize).arity > 2
     end
 
     def failure?
       if @configuration.wip?
         summary_report.test_cases.total_passed > 0
       else
-        summary_report.test_cases.total_failed > 0 || summary_report.test_steps.total_failed > 0 ||
-          (@configuration.strict? && (summary_report.test_steps.total_undefined > 0 || summary_report.test_steps.total_pending > 0))
+        !summary_report.ok?(@configuration.strict)
       end
     end
     public :failure?
@@ -230,9 +247,8 @@ module Cucumber
         filters << Cucumber::Core::Test::NameFilter.new(name_regexps)
         filters << Cucumber::Core::Test::LocationsFilter.new(filespecs.locations)
         filters << Filters::Randomizer.new(@configuration.seed) if @configuration.randomize?
-        filters << Filters::Quit.new
-        # TODO: can we just use RbLanguages's step definitions directly?
-        step_match_search = StepMatchSearch.new(@support_code.ruby.method(:step_matches), @configuration)
+        # TODO: can we just use Glue::RegistryAndMore's step definitions directly?
+        step_match_search = StepMatchSearch.new(@support_code.registry.method(:step_matches), @configuration)
         filters << Filters::ActivateSteps.new(step_match_search, @configuration)
         @configuration.filters.each do |filter|
           filters << filter
@@ -242,6 +258,9 @@ module Cucumber
           filters << Filters::ApplyBeforeHooks.new(@support_code)
           filters << Filters::ApplyAfterHooks.new(@support_code)
           filters << Filters::ApplyAroundHooks.new(@support_code)
+          filters << Filters::BroadcastTestRunStartedEvent.new(@configuration)
+          filters << Filters::Quit.new
+          filters << Filters::Retry.new(@configuration)
           # need to do this last so it becomes the first test step
           filters << Filters::PrepareWorld.new(self)
         end
@@ -254,13 +273,11 @@ module Cucumber
     end
 
     def install_wire_plugin
-      Cucumber::Wire::Plugin.new(@configuration).install if @configuration.all_files_to_load.any? {|f| f =~ %r{\.wire$} }
+      Cucumber::Wire::Plugin.new(@configuration).install if @configuration.all_files_to_load.any? { |f| f =~ %r{\.wire$} }
     end
 
     def log
       Cucumber.logger
     end
-
   end
-
 end

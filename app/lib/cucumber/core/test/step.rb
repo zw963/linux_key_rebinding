@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 require 'cucumber/core/test/result'
 require 'cucumber/core/test/action'
 
@@ -35,12 +36,20 @@ module Cucumber
           self.class.new(source, Test::Action.new(location, &block))
         end
 
-        def name
-          source.last.name
+        def text
+          source.last.text
+        end
+
+        def to_s
+          text
         end
 
         def location
           source.last.location
+        end
+
+        def original_location
+          source.last.original_location
         end
 
         def action_location

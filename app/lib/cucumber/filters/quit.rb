@@ -1,8 +1,9 @@
+# frozen_string_literal: true
+
 module Cucumber
   module Filters
-
     class Quit
-      def initialize(receiver=nil)
+      def initialize(receiver = nil)
         @receiver = receiver
       end
 
@@ -22,7 +23,5 @@ module Cucumber
         self.class.new(receiver)
       end
     end
-
   end
 end
-

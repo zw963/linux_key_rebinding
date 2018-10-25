@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 module Cucumber
   module Formatter
     module LegacyApi
@@ -22,7 +23,7 @@ module Cucumber
         # ExampleTableRow#keyword is never called on them,
         # but this will pass silently if it happens anyway
         class NullLanguage
-          def method_missing(*args, &block)
+          def method_missing(*_args, &_block)
             self
           end
 
@@ -79,17 +80,15 @@ module Cucumber
           end
 
           def send_output_to(formatter)
-            unless @already_accepted
-              @messages.each { |message| formatter.puts(message) }
-              @embeddings.each { |embedding| embedding.send_to_formatter(formatter) }
-            end
+            return if @already_accepted
+            @messages.each { |message| formatter.puts(message) }
+            @embeddings.each { |embedding| embedding.send_to_formatter(formatter) }
           end
 
           def describe_exception_to(formatter)
-            unless @already_accepted
-              @result.describe_exception_to(formatter)
-              @already_accepted = true
-            end
+            return if @already_accepted
+            @result.describe_exception_to(formatter)
+            @already_accepted = true
           end
         end
 
@@ -104,27 +103,27 @@ module Cucumber
                                     :embeddings) do
           extend Forwardable
 
-          def_delegators :step, :keyword, :name, :multiline_arg, :location
+          def_delegators :step, :keyword, :text, :multiline_arg, :location
 
           def accept(formatter)
             formatter.before_step(self)
             Ast::Comments.new(step.comments).accept(formatter)
             messages.each { |message| formatter.puts(message) }
             embeddings.each { |embedding| embedding.send_to_formatter(formatter) }
-            formatter.before_step_result *step_result_attributes
+            formatter.before_step_result(*step_result_attributes)
             print_step_name(formatter)
             Ast::MultilineArg.for(multiline_arg).accept(formatter)
             print_exception(formatter)
-            formatter.after_step_result *step_result_attributes
+            formatter.after_step_result(*step_result_attributes)
             formatter.after_step(self)
           end
 
           def step_result_attributes
-            legacy_multiline_arg = if multiline_arg.kind_of?(Core::Ast::EmptyMultilineArgument)
-              nil
-            else
-              step.multiline_arg
-            end
+            legacy_multiline_arg = if multiline_arg.is_a?(Core::Ast::EmptyMultilineArgument)
+                                     nil
+                                   else
+                                     step.multiline_arg
+                                   end
             [keyword, step_match, legacy_multiline_arg, status, exception, source_indent, background, file_colon_line]
           end
 
@@ -154,6 +153,10 @@ module Cucumber
 
           def step_invocation
             self
+          end
+
+          def to_s
+            text
           end
 
           private
@@ -241,6 +244,10 @@ module Cucumber
             '| ' + cells.join(' | ') + ' |'
           end
 
+          def to_s
+            name
+          end
+
           def failed?
             status == :failed
           end
@@ -279,7 +286,7 @@ module Cucumber
         end
 
         Scenario = Struct.new(:status, :name, :location) do
-          def backtrace_line(step_name = "#{name}", line = self.location.line)
+          def backtrace_line(step_name = name.to_s, line = self.location.line)
             "#{location.on_line(line)}:in `#{step_name}'"
           end
 
@@ -293,7 +300,7 @@ module Cucumber
         end
 
         ScenarioOutline = Struct.new(:status, :name, :location) do
-          def backtrace_line(step_name = "#{name}", line = self.location.line)
+          def backtrace_line(step_name = name.to_s, line = self.location.line)
             "#{location.on_line(line)}:in `#{step_name}'"
           end
 
@@ -378,9 +385,7 @@ module Cucumber
             @feature = feature
           end
 
-          def feature
-            @feature
-          end
+          attr_reader :feature
         end
 
       end

@@ -1,5 +1,6 @@
-module Cucumber
+# frozen_string_literal: true
 
+module Cucumber
   # Generates generic file structure for a cucumber project
   class ProjectInitializer
     def run
@@ -26,7 +27,7 @@ module Cucumber
                     :touch
                   end
 
-      report_exists(file_name) || return if File.exists?(file_name)
+      report_exists(file_name) || return if File.exist?(file_name)
 
       report_creating(file_name)
       FileUtils.send file_type, file_name

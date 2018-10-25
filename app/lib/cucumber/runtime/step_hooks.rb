@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Cucumber
   class Runtime
     class StepHooks
@@ -12,6 +14,7 @@ module Cucumber
       end
 
       private
+
       def after_step_hooks(test_step)
         @hooks.map do |hook|
           action = ->(*args) { hook.invoke('AfterStep', [args, test_step]) }

@@ -1,43 +1,43 @@
+# frozen_string_literal: true
 require 'cucumber/core/test/timer'
 
 module Cucumber
   module Core
     module Test
       class Runner
-        attr_reader :report, :running_test_case, :running_test_step
-        private :report, :running_test_case, :running_test_step
+        attr_reader :event_bus, :running_test_case, :running_test_step
+        private :event_bus, :running_test_case, :running_test_step
 
-        def initialize(report)
-          @report = report
+        def initialize(event_bus)
+          @event_bus = event_bus
         end
 
         def test_case(test_case, &descend)
           @running_test_case = RunningTestCase.new
           @running_test_step = nil
-          report.before_test_case(test_case)
+          event_bus.test_case_started(test_case)
           descend.call(self)
-          report.after_test_case(test_case, running_test_case.result)
+          event_bus.test_case_finished(test_case, running_test_case.result)
           self
         end
 
         def test_step(test_step)
           @running_test_step = test_step
-          report.before_test_step test_step
+          event_bus.test_step_started test_step
           step_result = running_test_case.execute(test_step)
-          report.after_test_step test_step, step_result
+          event_bus.test_step_finished test_step, step_result
           @running_test_step = nil
           self
         end
 
         def around_hook(hook, &continue)
           result = running_test_case.execute(hook, &continue)
-          report.after_test_step running_test_step, result if running_test_step
+          event_bus.test_step_finished running_test_step, result if running_test_step
           @running_test_step = nil
           self
         end
 
         def done
-          report.done
           self
         end
 
@@ -102,7 +102,7 @@ module Cucumber
 
               def execute(test_step, monitor, &continue)
                 result = test_step.execute(monitor.result, &continue)
-                result = result.with_message(%(Undefined step: "#{test_step.name}")) if result.undefined?
+                result = result.with_message(%(Undefined step: "#{test_step.text}")) if result.undefined?
                 result = result.with_appended_backtrace(test_step.source.last) if IsStepVisitor.new(test_step).step?
                 result.describe_to(monitor, result)
               end
@@ -126,7 +126,12 @@ module Cucumber
 
             class Failing < Base
               def execute(test_step, monitor, &continue)
-                test_step.skip(monitor.result)
+                result = test_step.skip(monitor.result)
+                if result.undefined?
+                  result = result.with_message(%(Undefined step: "#{test_step.text}"))
+                  result = result.with_appended_backtrace(test_step.source.last)
+                end
+                result
               end
 
               def result(duration)

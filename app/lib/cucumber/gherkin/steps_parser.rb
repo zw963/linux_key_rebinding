@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'gherkin/token_scanner'
 require 'gherkin/token_matcher'
 require 'gherkin/parser'

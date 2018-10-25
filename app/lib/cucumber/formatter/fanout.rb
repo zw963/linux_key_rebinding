@@ -1,6 +1,7 @@
+# frozen_string_literal: true
+
 module Cucumber
   module Formatter
-
     # Forwards any messages sent to this object to all recipients
     # that respond to that message.
     class Fanout < BasicObject
@@ -20,8 +21,6 @@ module Cucumber
       def respond_to_missing?(name, include_private = false)
         recipients.any? { |recipient| recipient.respond_to?(name, include_private) }
       end
-
     end
-
   end
 end

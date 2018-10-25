@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'cucumber/platform'
 require 'cucumber/term/ansicolor'
 
@@ -8,7 +10,7 @@ if Cucumber::WINDOWS_MRI
   end
 end
 
-Cucumber::Term::ANSIColor.coloring = false if !STDOUT.tty? && !ENV.has_key?("AUTOTEST")
+Cucumber::Term::ANSIColor.coloring = false if !STDOUT.tty? && !ENV.key?('AUTOTEST')
 
 module Cucumber
   module Formatter
@@ -52,20 +54,21 @@ module Cucumber
     module ANSIColor
       include Cucumber::Term::ANSIColor
 
-      ALIASES = Hash.new do |h,k|
+      ALIASES = Hash.new do |h, k|
         if k.to_s =~ /(.*)_param/
           h[$1] + ',bold'
         end
       end.merge({
-        'undefined' => 'yellow',
-        'pending'   => 'yellow',
-        'failed'    => 'red',
-        'passed'    => 'green',
-        'outline'   => 'cyan',
-        'skipped'   => 'cyan',
-        'comment'   => 'grey',
-        'tag'       => 'cyan'
-      })
+                  'undefined' => 'yellow',
+                  'pending'   => 'yellow',
+                  'flaky'     => 'yellow',
+                  'failed'    => 'red',
+                  'passed'    => 'green',
+                  'outline'   => 'cyan',
+                  'skipped'   => 'cyan',
+                  'comment'   => 'grey',
+                  'tag'       => 'cyan'
+                })
 
       if ENV['CUCUMBER_COLORS'] # Example: export CUCUMBER_COLORS="passed=red:failed=yellow"
         ENV['CUCUMBER_COLORS'].split(':').each do |pair|
@@ -93,7 +96,7 @@ module Cucumber
           end
           # This resets the colour to the non-param colour
           def #{method_name}_param(string=nil, &proc)
-            #{ALIASES[method_name+'_param'].split(",").join("(") + "(string, &proc" + ")" * ALIASES[method_name+'_param'].split(",").length} + #{ALIASES[method_name].split(",").join(' + ')}
+            #{ALIASES[method_name + '_param'].split(",").join("(") + "(string, &proc" + ")" * ALIASES[method_name + '_param'].split(",").length} + #{ALIASES[method_name].split(",").join(' + ')}
           end
           EOF
           eval(code)
@@ -104,7 +107,7 @@ module Cucumber
         begin
           gem 'genki-ruby-terminfo'
           require 'terminfo'
-          case TermInfo.default_object.tigetnum("colors")
+          case TermInfo.default_object.tigetnum('colors')
           when 0
             raise "Your terminal doesn't support colours."
           when 1
@@ -117,9 +120,9 @@ module Cucumber
           end
         rescue Exception => e
           if e.class.name == 'TermInfo::TermInfoError'
-            STDERR.puts "*** WARNING ***"
+            STDERR.puts '*** WARNING ***'
             STDERR.puts "You have the genki-ruby-terminfo gem installed, but you haven't set your TERM variable."
-            STDERR.puts "Try setting it to TERM=xterm-256color to get grey colour in output."
+            STDERR.puts 'Try setting it to TERM=xterm-256color to get grey colour in output.'
             STDERR.puts "\n"
             alias grey white
           else
@@ -129,19 +132,15 @@ module Cucumber
       end
 
       def self.define_real_grey #:nodoc:
-        def grey(string) #:nodoc:
-          if ::Cucumber::Term::ANSIColor.coloring?
-            "\e[90m#{string}\e[0m"
-          else
-            string
-          end
+        define_method :grey do |string|
+          ::Cucumber::Term::ANSIColor.coloring? ? "\e[90m#{string}\e[0m" : string
         end
       end
 
       define_grey
 
       def cukes(n)
-        ("(::) " * n).strip
+        ('(::) ' * n).strip
       end
 
       def green_cukes(n)

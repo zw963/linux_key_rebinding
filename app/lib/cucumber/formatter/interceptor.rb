@@ -1,4 +1,4 @@
-require 'thread'
+# frozen_string_literal: true
 
 module Cucumber
   module Formatter
@@ -7,20 +7,33 @@ module Cucumber
         attr_reader :pipe
         def initialize(pipe)
           @pipe = pipe
-          @buffer = []
+          @buffer = StringIO.new
           @wrapped = true
         end
 
         def write(str)
-          lock.synchronize do 
+          lock.synchronize do
             @buffer << str if @wrapped
             return @pipe.write(str)
           end
         end
 
+        # @deprecated use #buffer_string
         def buffer
+          require 'cucumber/deprecate.rb'
+          Cucumber.deprecate(
+            'Use Cucumber::Formatter::Interceptor::Pipe#buffer_string instead',
+            'Cucumber::Formatter::Interceptor::Pipe#buffer',
+            '3.99'
+          )
           lock.synchronize do
-            return @buffer.dup
+            return @buffer.string.lines
+          end
+        end
+
+        def buffer_string
+          lock.synchronize do
+            return @buffer.string.dup
           end
         end
 
@@ -33,7 +46,7 @@ module Cucumber
           @pipe.send(method, *args, &blk)
         end
 
-        def respond_to?(method, include_private=false)
+        def respond_to?(method, include_private = false)
           super || @pipe.respond_to?(method, include_private)
         end
 
@@ -70,9 +83,10 @@ module Cucumber
           end
         end
 
-      private
+        private
+
         def lock
-          @lock||=Mutex.new
+          @lock ||= Mutex.new
         end
       end
     end

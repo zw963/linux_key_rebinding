@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'optparse'
 require 'cucumber'
 require 'logger'
@@ -12,7 +14,7 @@ module Cucumber
         end
       end
 
-      def initialize(args, _=nil, out=STDOUT, err=STDERR, kernel=Kernel)
+      def initialize(args, _ = nil, out = STDOUT, err = STDERR, kernel = Kernel)
         @args   = args
         @out    = out
         @err    = err
@@ -23,11 +25,11 @@ module Cucumber
         trap_interrupt
 
         runtime = if existing_runtime
-          existing_runtime.configure(configuration)
-          existing_runtime
-        else
-          Runtime.new(configuration)
-        end
+                    existing_runtime.configure(configuration)
+                    existing_runtime
+                  else
+                    Runtime.new(configuration)
+                  end
 
         runtime.run!
         if Cucumber.wants_to_quit
@@ -46,7 +48,7 @@ module Cucumber
         @err.puts("Couldn't open #{e.path}")
         exit_unable_to_finish
       rescue FeatureFolderNotFoundException => e
-        @err.puts(e.message + ". You can use `cucumber --init` to get started.")
+        @err.puts(e.message + '. You can use `cucumber --init` to get started.')
         exit_unable_to_finish
       rescue ProfilesNotDefinedError, YmlLoadError, ProfileNotFound => e
         @err.puts(e.message)
@@ -68,7 +70,6 @@ module Cucumber
       end
 
       private
-
 
       def exit_ok
         @kernel.exit 0

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'cucumber'
 require 'cucumber/core/ast/location'
 
@@ -29,7 +31,7 @@ module Cucumber
       attr_reader :file
 
       def locations
-        return [ Core::Ast::Location.new(@file) ] if @lines.empty?
+        return [Core::Ast::Location.new(@file)] if @lines.empty?
         @lines.map { |line| Core::Ast::Location.new(@file, line) }
       end
     end

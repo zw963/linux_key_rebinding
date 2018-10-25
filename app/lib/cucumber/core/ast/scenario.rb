@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 require 'cucumber/core/ast/describes_itself'
 require 'cucumber/core/ast/names'
 require 'cucumber/core/ast/empty_background'
@@ -28,16 +29,6 @@ module Cucumber
 
         def children
           raw_steps
-        end
-
-        def to_sexp
-          sexp = [:scenario, line, keyword, name]
-          comment = comment.to_sexp
-          sexp += [comment] if comment
-          tags = tags.to_sexp
-          sexp += tags if tags.any?
-          sexp += step_invocations.to_sexp if step_invocations.any?
-          sexp
         end
 
         private

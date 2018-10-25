@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Cucumber
   class StepDefinitions
     def initialize(configuration = Configuration.default)
@@ -7,7 +9,7 @@ module Cucumber
     end
 
     def to_json
-      @support_code.step_definitions.map{|stepdef| stepdef.to_hash}.to_json
+      @support_code.step_definitions.map(&:to_hash).to_json
     end
   end
 end

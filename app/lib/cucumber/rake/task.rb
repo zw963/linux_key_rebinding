@@ -1,9 +1,13 @@
+# frozen_string_literal: true
+
 require 'cucumber/platform'
 require 'cucumber/gherkin/formatter/ansi_escapes'
 begin
   # Support Rake > 0.8.7
   require 'rake/dsl_definition'
+  # rubocop:disable Lint/HandleExceptions
 rescue LoadError
+  # rubocop:enable Lint/HandleExceptions
 end
 
 module Cucumber
@@ -34,8 +38,8 @@ module Cucumber
         attr_reader :args
 
         def initialize(libs, cucumber_opts, feature_files)
-          raise "libs must be an Array when running in-process" unless Array === libs
-          libs.reverse.each{|lib| $LOAD_PATH.unshift(lib)}
+          raise 'libs must be an Array when running in-process' unless Array === libs
+          libs.reverse.each { |lib| $LOAD_PATH.unshift(lib) }
           @args = (
             cucumber_opts +
             feature_files
@@ -45,7 +49,7 @@ module Cucumber
         def run
           require 'cucumber/cli/main'
           failure = Cucumber::Cli::Main.execute(args)
-          raise "Cucumber failed" if failure
+          raise 'Cucumber failed' if failure
         end
       end
 
@@ -60,16 +64,16 @@ module Cucumber
           @feature_files = feature_files
         end
 
-        def load_path(libs)
-          ['"%s"' % @libs.join(File::PATH_SEPARATOR)]
+        def load_path
+          [format('"%s"', @libs.join(File::PATH_SEPARATOR))]
         end
 
         def quoted_binary(cucumber_bin)
-          ['"%s"' % cucumber_bin]
+          [format('"%s"', cucumber_bin)]
         end
 
         def use_bundler
-          @bundler.nil? ? File.exist?("./Gemfile") && bundler_gem_available? : @bundler
+          @bundler.nil? ? File.exist?('./Gemfile') && bundler_gem_available? : @bundler
         end
 
         def bundler_gem_available?
@@ -80,16 +84,20 @@ module Cucumber
 
         def cmd
           if use_bundler
-            [ Cucumber::RUBY_BINARY, '-S', 'bundle', 'exec', 'cucumber', @cucumber_opts,
-            @feature_files ].flatten
+            [
+              Cucumber::RUBY_BINARY, '-S', 'bundle', 'exec', 'cucumber',
+              @cucumber_opts, @feature_files
+            ].flatten
           else
-            [ Cucumber::RUBY_BINARY, '-I', load_path(@libs), quoted_binary(@cucumber_bin),
-            @cucumber_opts, @feature_files ].flatten
+            [
+              Cucumber::RUBY_BINARY, '-I', load_path,
+              quoted_binary(@cucumber_bin), @cucumber_opts, @feature_files
+            ].flatten
           end
         end
 
         def run
-          sh cmd.join(" ") do |ok, res|
+          sh cmd.join(' ') do |ok, res|
             if !ok
               exit res.exitstatus
             end
@@ -127,7 +135,7 @@ module Cucumber
       attr_accessor :bundler
 
       # Define Cucumber Rake task
-      def initialize(task_name = "cucumber", desc = "Run Cucumber features")
+      def initialize(task_name = 'cucumber', desc = 'Run Cucumber features')
         @task_name, @desc = task_name, desc
         @fork = true
         @libs = ['lib']
@@ -144,16 +152,16 @@ module Cucumber
         end
       end
 
-      def runner(task_args = nil) #:nodoc:
+      def runner(_task_args = nil) #:nodoc:
         cucumber_opts = [(ENV['CUCUMBER_OPTS'] ? ENV['CUCUMBER_OPTS'].split(/\s+/) : nil) || cucumber_opts_with_profile]
-        if(@fork)
+        if @fork
           return ForkedCucumberRunner.new(libs, binary, cucumber_opts, bundler, feature_files)
         end
         InProcessCucumberRunner.new(libs, cucumber_opts, feature_files)
       end
 
       def cucumber_opts_with_profile #:nodoc:
-        Array(cucumber_opts).concat Array(@profile).flat_map {|p| ["--profile", p] }
+        Array(cucumber_opts).concat Array(@profile).flat_map { |p| ['--profile', p] }
       end
 
       def feature_files #:nodoc:
@@ -161,7 +169,7 @@ module Cucumber
       end
 
       def make_command_line_safe(list)
-        list.map{|string| string.gsub(' ', '\ ')}
+        list.map { |string| string.gsub(' ', '\ ') }
       end
     end
   end

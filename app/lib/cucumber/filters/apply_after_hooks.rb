@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Cucumber
   module Filters
     class ApplyAfterHooks < Core::Filter.new(:hooks)

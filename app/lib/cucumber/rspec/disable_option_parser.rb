@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'optparse'
 
 module Spec #:nodoc:
@@ -7,7 +9,7 @@ module Spec #:nodoc:
     # will fail when running cucumber)
     class OptionParser < ::OptionParser #:nodoc:
       NEUTERED_RSPEC = Object.new
-      def NEUTERED_RSPEC.method_missing(m, *args); self; end
+      def NEUTERED_RSPEC.method_missing(_m, *_args); self; end
 
       def self.method_added(m)
         unless @__neutering_rspec

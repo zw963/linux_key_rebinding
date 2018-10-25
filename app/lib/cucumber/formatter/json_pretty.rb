@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'cucumber/formatter/json'
 
 module Cucumber
@@ -7,4 +9,3 @@ module Cucumber
     end
   end
 end
-

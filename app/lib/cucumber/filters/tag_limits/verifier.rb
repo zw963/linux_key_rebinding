@@ -1,7 +1,8 @@
+# frozen_string_literal: true
+
 module Cucumber
   module Filters
     class TagLimits
-
       class Verifier
         def initialize(tag_limits)
           @tag_limits = tag_limits
@@ -27,7 +28,7 @@ module Cucumber
         attr_reader :tag_limits
 
         class Breach
-          INDENT = (" " * 2).freeze
+          INDENT = (' ' * 2).freeze
 
           def initialize(tag_name, limit, locations)
             @tag_name = tag_name
@@ -52,7 +53,6 @@ module Cucumber
           attr_reader :limit
           attr_reader :locations
         end
-
       end
     end
   end

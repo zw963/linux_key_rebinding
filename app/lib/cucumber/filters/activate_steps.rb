@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'cucumber/core/filter'
 require 'cucumber/step_match'
 require 'cucumber/events'
@@ -6,7 +8,6 @@ require 'cucumber/errors'
 module Cucumber
   module Filters
     class ActivateSteps < Core::Filter.new(:step_match_search, :configuration)
-
       def test_case(test_case)
         CaseFilter.new(test_case, step_match_search, configuration).test_case.describe_to receiver
       end
@@ -42,8 +43,12 @@ module Cucumber
           end
 
           def result
-            return NoStepMatch.new(test_step.source.last, test_step.name) unless matches.any?
-            configuration.notify Events::StepMatch.new(test_step, match)
+            begin
+              return NoStepMatch.new(test_step.source.last, test_step.text) unless matches.any?
+            rescue Cucumber::Ambiguous => e
+              return AmbiguousStepMatch.new(e)
+            end
+            configuration.notify :step_activated, test_step, match
             return SkippingStepMatch.new if configuration.dry_run?
             match
           end
@@ -58,7 +63,7 @@ module Cucumber
           end
 
           def matches
-            step_match_search.call(test_step.name)
+            step_match_search.call(test_step.text)
           end
         end
       end

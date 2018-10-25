@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 require 'cucumber/core/ast/describes_itself'
 require 'cucumber/core/ast/location'
 
@@ -8,18 +9,18 @@ module Cucumber
         include HasLocation
         include DescribesItself
 
-        attr_reader :keyword, :name, :language, :comments, :exception, :multiline_arg
+        attr_reader :keyword, :text, :language, :comments, :exception, :multiline_arg
 
-        def initialize(language, location, comments, keyword, name, multiline_arg)
-          @language, @location, @comments, @keyword, @name, @multiline_arg = language, location, comments, keyword, name, multiline_arg
+        def initialize(language, location, comments, keyword, text, multiline_arg)
+          @language, @location, @comments, @keyword, @text, @multiline_arg = language, location, comments, keyword, text, multiline_arg
         end
 
-        def to_sexp
-          [:step, line, keyword, name, @multiline_arg.to_sexp]
+        def to_s
+          text
         end
 
         def backtrace_line
-          "#{location}:in `#{keyword}#{name}'"
+          "#{location}:in `#{keyword}#{text}'"
         end
 
         def actual_keyword(previous_step_keyword = nil)
@@ -34,10 +35,15 @@ module Cucumber
           end
         end
 
-        def inspect
-          keyword_and_name = [keyword, name].join(": ")
-          %{#<#{self.class} "#{keyword_and_name}" (#{location})>}
+        def original_location
+          location
         end
+
+        def inspect
+          keyword_and_text = [keyword, text].join(": ")
+          %{#<#{self.class} "#{keyword_and_text}" (#{location})>}
+        end
+
 
         private
 
@@ -52,19 +58,23 @@ module Cucumber
 
       class ExpandedOutlineStep < Step
 
-        def initialize(outline_step, language, location, comments, keyword, name, multiline_arg)
-          @outline_step, @language, @location, @comments, @keyword, @name, @multiline_arg = outline_step, language, location, comments, keyword, name, multiline_arg
+        def initialize(outline_step, language, location, comments, keyword, text, multiline_arg)
+          @outline_step, @language, @location, @comments, @keyword, @text, @multiline_arg = outline_step, language, location, comments, keyword, text, multiline_arg
         end
 
         def all_locations
           @outline_step.all_locations
         end
 
+        def original_location
+          @outline_step.location
+        end
+
         alias :step_backtrace_line :backtrace_line
 
         def backtrace_line
           "#{step_backtrace_line}\n" +
-          "#{@outline_step.location}:in `#{@outline_step.keyword}#{@outline_step.name}'"
+          "#{@outline_step.location}:in `#{@outline_step.keyword}#{@outline_step.text}'"
         end
 
       end

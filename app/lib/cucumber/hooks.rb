@@ -1,13 +1,13 @@
+# frozen_string_literal: true
+
 require 'pathname'
 require 'cucumber/core/ast/location'
 require 'cucumber/core/test/around_hook'
 
 module Cucumber
-
   # Hooks quack enough like `Cucumber::Core::Ast` source nodes that we can use them as
   # source for test steps
   module Hooks
-
     class << self
       def before_hook(source, location, &block)
         build_hook_step(source, location, block, BeforeHook, Core::Test::UnskippableAction)
@@ -18,11 +18,11 @@ module Cucumber
       end
 
       def after_step_hook(source, location, &block)
-        raise ArgumentError unless source.last.kind_of?(Core::Ast::Step)
+        raise ArgumentError unless source.last.is_a?(Core::Ast::Step)
         build_hook_step(source, location, block, AfterStepHook, Core::Test::Action)
       end
 
-      def around_hook(source, &block)
+      def around_hook(_source, &block)
         Core::Test::AroundHook.new(&block)
       end
 
@@ -42,8 +42,12 @@ module Cucumber
         @location = location
       end
 
-      def name
-        "After hook"
+      def text
+        'After hook'
+      end
+
+      def to_s
+        "#{text} at #{location}"
       end
 
       def match_locations?(queried_locations)
@@ -62,8 +66,12 @@ module Cucumber
         @location = location
       end
 
-      def name
-        "Before hook"
+      def text
+        'Before hook'
+      end
+
+      def to_s
+        "#{text} at #{location}"
       end
 
       def match_locations?(queried_locations)
@@ -82,8 +90,12 @@ module Cucumber
         @location = location
       end
 
-      def name
-        "AfterStep hook"
+      def text
+        'AfterStep hook'
+      end
+
+      def to_s
+        "#{text} at #{location}"
       end
 
       def match_locations?(queried_locations)
@@ -94,6 +106,5 @@ module Cucumber
         visitor.after_step_hook(self, *args)
       end
     end
-
   end
 end

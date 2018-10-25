@@ -1,7 +1,8 @@
+# frozen_string_literal: true
+
 require 'cucumber/multiline_argument'
 
 module Cucumber
-
   # Represents the match found between a Test Step and its activation
   class StepMatch #:nodoc:
     attr_reader :step_definition, :step_arguments
@@ -12,7 +13,10 @@ module Cucumber
     end
 
     def args
-      @step_arguments.map{|g| g.val }
+      current_world = @step_definition.registry.current_world
+      @step_arguments.map do |arg|
+        arg.value(current_world)
+      end
     end
 
     def activate(test_step)
@@ -42,7 +46,7 @@ module Cucumber
     #
     #   lambda { |param| "[#{param}]" }
     #
-    def format_args(format = lambda{|a| a}, &proc)
+    def format_args(format = lambda { |a| a }, &proc)
       replace_arguments(@name_to_match, @step_arguments, format, &proc)
     end
 
@@ -55,30 +59,31 @@ module Cucumber
     end
 
     def backtrace_line
-      "#{file_colon_line}:in `#{@step_definition.regexp_source}'"
+      "#{file_colon_line}:in `#{@step_definition.expression}'"
     end
 
     def text_length
-      @step_definition.regexp_source.unpack('U*').length
+      @step_definition.expression.source.to_s.unpack('U*').length
     end
 
-    def replace_arguments(string, step_arguments, format, &proc)
+    def replace_arguments(string, step_arguments, format)
       s = string.dup
       offset = past_offset = 0
       step_arguments.each do |step_argument|
-        next if step_argument.offset.nil? || step_argument.offset < past_offset
+        group = step_argument.group
+        next if group.value.nil? || group.start < past_offset
 
         replacement = if block_given?
-          proc.call(step_argument.val)
-        elsif Proc === format
-          format.call(step_argument.val)
-        else
-          format % step_argument.val
-        end
+                        yield(group.value)
+                      elsif Proc === format
+                        format.call(group.value)
+                      else
+                        format % group.value
+                      end
 
-        s[step_argument.offset + offset, step_argument.val.length] = replacement
-        offset += replacement.unpack('U*').length - step_argument.val.unpack('U*').length
-        past_offset = step_argument.offset + step_argument.val.length
+        s[group.start + offset, group.value.length] = replacement
+        offset += replacement.unpack('U*').length - group.value.unpack('U*').length
+        past_offset = group.start + group.value.length
       end
       s
     end
@@ -88,6 +93,7 @@ module Cucumber
     end
 
     private
+
     def deep_clone_args
       Marshal.load( Marshal.dump( args ) )
     end
@@ -107,7 +113,7 @@ module Cucumber
       @name = name
     end
 
-    def format_args(*args)
+    def format_args(*_args)
       @name
     end
 
@@ -136,6 +142,16 @@ module Cucumber
     def activate(test_step)
       # noop
       return test_step
+    end
+  end
+
+  class AmbiguousStepMatch
+    def initialize(error)
+      @error = error
+    end
+
+    def activate(test_step)
+      return test_step.with_action { raise @error }
     end
   end
 end

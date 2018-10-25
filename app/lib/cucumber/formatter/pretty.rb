@@ -1,7 +1,11 @@
+# frozen_string_literal: true
+
 require 'fileutils'
 require 'cucumber/formatter/console'
 require 'cucumber/formatter/io'
 require 'cucumber/gherkin/formatter/escaping'
+require 'cucumber/formatter/console_counts'
+require 'cucumber/formatter/console_issues'
 
 module Cucumber
   module Formatter
@@ -22,15 +26,18 @@ module Cucumber
 
       def initialize(runtime, path_or_io, options)
         @runtime, @io, @options = runtime, ensure_io(path_or_io), options
+        @config = runtime.configuration
         @exceptions = []
         @indent = 0
         @prefixes = options[:prefixes] || {}
         @delayed_messages = []
         @previous_step_keyword = nil
         @snippets_input = []
+        @counts = ConsoleCounts.new(runtime.configuration)
+        @issues = ConsoleIssues.new(runtime.configuration)
       end
 
-      def before_features(features)
+      def before_features(_features)
         print_profile_information
       end
 
@@ -38,7 +45,7 @@ module Cucumber
         print_summary(features)
       end
 
-      def before_feature(feature)
+      def before_feature(_feature)
         @exceptions = []
         @indent = 0
       end
@@ -48,7 +55,7 @@ module Cucumber
         @io.flush
       end
 
-      def after_tags(tags)
+      def after_tags(_tags)
         if @indent == 1
           @io.puts
           @io.flush
@@ -68,24 +75,24 @@ module Cucumber
         @io.flush
       end
 
-      def before_feature_element(feature_element)
+      def before_feature_element(_feature_element)
         @indent = 2
         @scenario_indent = 2
       end
 
-      def after_feature_element(feature_element)
+      def after_feature_element(_feature_element)
         print_messages
         @io.puts
         @io.flush
       end
 
-      def before_background(background)
+      def before_background(_background)
         @indent = 2
         @scenario_indent = 2
         @in_background = true
       end
 
-      def after_background(background)
+      def after_background(_background)
         print_messages
         @in_background = nil
         @io.puts
@@ -96,7 +103,7 @@ module Cucumber
         print_feature_element_name(keyword, name, file_colon_line, source_indent)
       end
 
-      def before_examples_array(examples_array)
+      def before_examples_array(_examples_array)
         @indent = 4
         @io.puts
         @visiting_first_example_name = true
@@ -115,7 +122,7 @@ module Cucumber
         @table = outline_table
       end
 
-      def after_outline_table(outline_table)
+      def after_outline_table(_outline_table)
         @table = nil
         @indent = 4
       end
@@ -130,7 +137,7 @@ module Cucumber
         print_messages
       end
 
-      def before_step_result(keyword, step_match, multiline_arg, status, exception, source_indent, background, file_colon_line)
+      def before_step_result(_keyword, _step_match, _multiline_arg, status, exception, _source_indent, background, _file_colon_line)
         @hide_this_step = false
         if exception
           if @exceptions.include?(exception)
@@ -146,7 +153,7 @@ module Cucumber
         @status = status
       end
 
-      def step_name(keyword, step_match, status, source_indent, background, file_colon_line)
+      def step_name(keyword, step_match, status, source_indent, _background, _file_colon_line)
         return if @hide_this_step
         source_indent = nil unless @options[:source]
         name_to_report = format_step(keyword, step_match, status, source_indent)
@@ -157,7 +164,7 @@ module Cucumber
       def doc_string(string)
         return if @options[:no_multiline] || @hide_this_step
         s = %{"""\n#{string}\n"""}.indent(@indent)
-        s = s.split("\n").map{|l| l =~ /^\s+$/ ? '' : l}.join("\n")
+        s = s.split("\n").map { |l| l =~ /^\s+$/ ? '' : l }.join("\n")
         @io.puts(format_string(s, @current_step.status))
         @io.flush
       end
@@ -174,14 +181,14 @@ module Cucumber
         @table = multiline_arg
       end
 
-      def after_multiline_arg(multiline_arg)
+      def after_multiline_arg(_multiline_arg)
         @table = nil
       end
 
-      def before_table_row(table_row)
+      def before_table_row(_table_row)
         return if !@table || @hide_this_step
         @col_index = 0
-        @io.print '  |'.indent(@indent-2)
+        @io.print '  |'.indent(@indent - 2)
       end
 
       def after_table_row(table_row)
@@ -193,7 +200,7 @@ module Cucumber
         end
       end
 
-      def after_table_cell(cell)
+      def after_table_cell(_cell)
         return unless @table
         @col_index += 1
       end
@@ -205,11 +212,11 @@ module Cucumber
         cell_text = escape_cell(value.to_s || '')
         padded = cell_text + (' ' * (width - cell_text.unpack('U*').length))
         prefix = cell_prefix(status)
-        @io.print(' ' + format_string("#{prefix}#{padded}", status) + ::Cucumber::Term::ANSIColor.reset(" |"))
+        @io.print(' ' + format_string("#{prefix}#{padded}", status) + ::Cucumber::Term::ANSIColor.reset(' |'))
         @io.flush
       end
 
-      def before_test_case(test_case)
+      def before_test_case(_test_case)
         @previous_step_keyword = nil
       end
 
@@ -229,7 +236,7 @@ module Cucumber
           @io.print(format_string(line_comment, :comment))
         end
         @io.puts
-        names[1..-1].each {|s| @io.puts "#{s}"}
+        names[1..-1].each { |s| @io.puts s.to_s }
         @io.flush
       end
 
@@ -238,7 +245,7 @@ module Cucumber
       end
 
       def print_summary(features)
-        print_stats(features, @options)
+        print_statistics(features.duration, @config, @counts, @issues)
         print_snippets(@options)
         print_passing_wip(@options)
       end

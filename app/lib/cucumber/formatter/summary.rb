@@ -1,35 +1,57 @@
+# frozen_string_literal: true
+
+require 'cucumber/formatter/io'
+require 'cucumber/formatter/console'
+require 'cucumber/formatter/console_counts'
+require 'cucumber/formatter/console_issues'
+require 'cucumber/core/test/result'
+
 module Cucumber
   module Formatter
-    module Summary
+    # Summary formatter, outputting only feature / scenario titles
+    class Summary
+      include Io
+      include Console
 
-      def scenario_summary(runtime, &block)
-        scenarios_proc = lambda{|status| runtime.scenarios(status)}
-        dump_count(runtime.scenarios.length, "scenario") + dump_status_counts(scenarios_proc, &block)
-      end
+      def initialize(config)
+        @config, @io = config, ensure_io(config.out_stream)
+        @counts = ConsoleCounts.new(@config)
+        @issues = ConsoleIssues.new(@config)
+        @start_time = Time.now
 
-      def step_summary(runtime, &block)
-        steps_proc = lambda{|status| runtime.steps(status)}
-        dump_count(runtime.steps.length, "step") + dump_status_counts(steps_proc, &block)
+        @config.on_event :test_case_started do |event|
+          print_feature event.test_case
+          print_test_case event.test_case
+        end
+
+        @config.on_event :test_case_finished do |event|
+          print_result event.result
+        end
+
+        @config.on_event :test_run_finished do |event|
+          duration = Time.now - @start_time
+          @io.puts
+          print_statistics(duration, @config, @counts, @issues)
+        end
       end
 
       private
 
-      def dump_status_counts(find_elements_proc)
-        counts = [:failed, :skipped, :undefined, :pending, :passed].map do |status|
-          elements = find_elements_proc.call(status)
-          elements.any? ? yield("#{elements.length} #{status.to_s}", status) : nil
-        end.compact
-        if counts.any?
-          " (#{counts.join(', ')})"
-        else
-          ""
-        end
+      def print_feature(test_case)
+        feature = test_case.feature
+        return if @current_feature == feature
+        @io.puts unless @current_feature.nil?
+        @io.puts feature
+        @current_feature = feature
       end
 
-      def dump_count(count, what, state=nil)
-        [count, state, "#{what}#{count == 1 ? '' : 's'}"].compact.join(" ")
+      def print_test_case(test_case)
+        @io.print "  #{test_case.name} "
       end
 
+      def print_result(result)
+        @io.puts format_string(result, result.to_sym)
+      end
     end
   end
 end
