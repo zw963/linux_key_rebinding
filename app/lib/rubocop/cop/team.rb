@@ -45,8 +45,9 @@ module RuboCop
       end
 
       def cops
-        only_options = @options.fetch(:only, [])
-        @cops ||= @cop_classes.enabled(@config, only_options).map do |cop_class|
+        only = @options.fetch(:only, [])
+        safe = @options.fetch(:safe, false)
+        @cops ||= @cop_classes.enabled(@config, only, safe).map do |cop_class|
           cop_class.new(@config, @options)
         end
       end
@@ -59,6 +60,7 @@ module RuboCop
         Force.all.each_with_object([]) do |force_class, forces|
           joining_cops = cops.select { |cop| cop.join_force?(force_class) }
           next if joining_cops.empty?
+
           forces << force_class.new(joining_cops)
         end
       end

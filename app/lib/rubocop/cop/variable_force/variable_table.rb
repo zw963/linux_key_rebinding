@@ -5,8 +5,8 @@ module RuboCop
     class VariableForce
       # A VariableTable manages the lifetime of all scopes and local variables
       # in a program.
-      # This holds scopes as stack structure, and provides a way to add local
-      # variables to current scope and find local variables by considering
+      # This holds scopes as stack structure, provides a way to add local
+      # variables to current scope, and find local variables by considering
       # variable visibility of the current scope.
       class VariableTable
         def initialize(hook_receiver = nil)
@@ -120,6 +120,7 @@ module RuboCop
         def mark_variable_as_captured_by_block_if_so(variable)
           return unless current_scope.node.block_type?
           return if variable.scope == current_scope
+
           variable.capture_with_block!
         end
       end

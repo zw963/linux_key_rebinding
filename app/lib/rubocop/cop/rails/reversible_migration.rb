@@ -169,6 +169,7 @@ module RuboCop
         def on_block(node)
           return unless within_change_method?(node)
           return if within_reversible_or_up_only_block?(node)
+          return if node.body.nil?
 
           check_change_table_node(node.send_node, node.body)
         end
@@ -238,7 +239,7 @@ module RuboCop
             elsif block.send_type?
               check_change_table_offense(arg, block)
             else
-              block.each_child_node do |child_node|
+              block.each_child_node(:send) do |child_node|
                 check_change_table_offense(arg, child_node)
               end
             end

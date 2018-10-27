@@ -3,7 +3,7 @@
 module RuboCop
   module Cop
     module Layout
-      # This cops checks the indentation of hanging closing parentheses in
+      # This cop checks the indentation of hanging closing parentheses in
       # method calls, method definitions, and grouped expressions. A hanging
       # closing parenthesis means `)` preceded by a line break.
       #
@@ -116,9 +116,9 @@ module RuboCop
 
           add_offense(right_paren,
                       location: right_paren,
-                      message:  message(correct_column,
-                                        left_paren,
-                                        right_paren))
+                      message: message(correct_column,
+                                       left_paren,
+                                       right_paren))
         end
 
         def check_for_no_elements(node)
@@ -135,9 +135,9 @@ module RuboCop
           correct_column = candidates.first
           add_offense(right_paren,
                       location: right_paren,
-                      message:  message(correct_column,
-                                        left_paren,
-                                        right_paren))
+                      message: message(correct_column,
+                                       left_paren,
+                                       right_paren))
         end
 
         def expected_column(left_paren, elements)

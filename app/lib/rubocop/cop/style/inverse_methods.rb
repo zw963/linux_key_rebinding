@@ -35,7 +35,7 @@ module RuboCop
         CLASS_COMPARISON_METHODS = %i[<= >= < >].freeze
         EQUALITY_METHODS = %i[== != =~ !~ <= >= < >].freeze
         NEGATED_EQUALITY_METHODS = %i[!= !~].freeze
-        CAMEL_CASE = /[A-Z]+[a-z]+/
+        CAMEL_CASE = /[A-Z]+[a-z]+/.freeze
 
         def_node_matcher :inverse_candidate?, <<-PATTERN
           {
@@ -55,6 +55,7 @@ module RuboCop
 
         def on_send(node)
           return if part_of_ignored_node?(node)
+
           inverse_candidate?(node) do |_method_call, lhs, method, rhs|
             return unless inverse_methods.key?(method)
             return if possible_class_hierarchy_check?(lhs, rhs, method)

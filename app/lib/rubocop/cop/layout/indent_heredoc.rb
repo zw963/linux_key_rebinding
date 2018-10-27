@@ -3,7 +3,7 @@
 module RuboCop
   module Cop
     module Layout
-      # This cops checks the indentation of the here document bodies. The bodies
+      # This cop checks the indentation of the here document bodies. The bodies
       # are indented one step.
       # In Ruby 2.3 or newer, squiggly heredocs (`<<~`) should be used. If you
       # use the older rubies, you should introduce some library to your project
@@ -88,7 +88,7 @@ module RuboCop
 
         def on_heredoc(node)
           body = heredoc_body(node)
-          return if body =~ /\A\s*\z/
+          return if body.strip.empty?
 
           body_indent_level = indent_level(body)
 
