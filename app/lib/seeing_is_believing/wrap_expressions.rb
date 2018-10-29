@@ -30,20 +30,20 @@ class SeeingIsBelieving
           when :total_fucking_failure
             rewriter.replace range,  '.....TOTAL FUCKING FAILURE!.....'
           when :match_current_line
-            rewriter.insert_before range, '~' # Regexp#~
+            rewriter.insert_before_multi range, '~' # Regexp#~
           end
         end
 
         wrappings.each do |line_num, (range, last_col, meta)|
-          rewriter.insert_before range, before_each.call(line_num)
+          rewriter.insert_before_multi range, before_each.call(line_num)
         end
 
         wrappings.each do |line_num, (range, last_col, meta)|
-          rewriter.insert_after range, after_each.call(line_num)
+          rewriter.insert_after_multi range, after_each.call(line_num)
         end
 
-        rewriter.insert_before root_range, before_all.call
-        rewriter.insert_after  root_range, after_all_text
+        rewriter.insert_before_multi root_range, before_all.call
+        rewriter.insert_after_multi  root_range, after_all_text
         rewriter.process
       end
     end
@@ -93,6 +93,12 @@ class SeeingIsBelieving
         .each { |child| wrap_recursive child }
     end
 
+    def add_interpolations_in(ast)
+      ast.children
+         .select { |child| child.type == :begin }
+         .each { |child| add_children child }
+    end
+
     def wrap_recursive(ast)
       return wrappings unless ast.kind_of? ::AST::Node
       case ast.type
@@ -128,7 +134,22 @@ class SeeingIsBelieving
       when :array
         add_to_wrappings ast
         the_begin = ast.location.begin
-        add_children ast if the_begin && the_begin.source !~ /\A%/
+        if !the_begin
+          # uhhhh, idk, nothing seems to hit this branch (at least in its spec)
+          # maybe this is 'a = 1,2,3'? (I'd try it out, but have to call the folks)
+        elsif the_begin.source !~ /\A%/
+          # normal array
+          add_children ast
+        elsif the_begin.source =~ /\A%/
+          # array of literals
+
+          ast.children.each do |child|
+            t = child.type
+            if t == :dsym || t == :dstr
+              add_interpolations_in child
+            end
+          end
+        end
       when :block
         add_to_wrappings ast
 
@@ -205,11 +226,9 @@ class SeeingIsBelieving
       when :str
         add_to_wrappings ast
 
-      when :dstr, :regexp
+      when :regexp, :dstr, :xstr, :dsym
         add_to_wrappings ast
-        ast.children
-           .select { |child| child.type == :begin }
-           .each { |child| add_children child }
+        add_interpolations_in ast
 
       when :hash
         # method arguments might not have braces around them

@@ -24,7 +24,7 @@ class SeeingIsBelieving
       @raw             = raw_code
       @buffer          = Parser::Source::Buffer.new(name||"SeeingIsBelieving")
       @buffer.source   = raw
-      @rewriter        = Parser::Source::TreeRewriter.new buffer
+      @rewriter        = Parser::Source::Rewriter.new buffer
       builder          = Parser::Builders::Default.new.tap { |b| b.emit_file_line_as_literals = false }
       @parser          = Parser::CurrentRuby.new builder
       @syntax          = Syntax.new

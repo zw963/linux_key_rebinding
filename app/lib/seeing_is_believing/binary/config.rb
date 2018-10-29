@@ -102,6 +102,7 @@ class SeeingIsBelieving
             self.lib_options.rewrite_code  = AnnotateMarkedLines.code_rewriter(markers)
             self.remove_value_prefixes     = false
             self.lib_options.require_files << 'pp'
+            self.lib_options.require_files << 'seeing_is_believing/customize_pp'
 
           when '-i', '--inherit-exitstatus', '--inherit-exit-status'
             self.inherit_exitstatus = true
@@ -185,6 +186,12 @@ class SeeingIsBelieving
                 add_error("#{arg} got the alignment strategy #{name.inspect}, expected one of: #{strategy_names}")
               end
             end
+
+          when '--interline-align'
+            self.annotator_options.interline_align = true
+
+          when '--no-interline-align'
+            self.annotator_options.interline_align = false
 
           when '--shebang'
             executable = args.shift
@@ -301,6 +308,8 @@ Options:
                                    chunk (DEFAULT) =>  each chunk of code is at the same alignment
                                    file            =>  the entire file is at the same alignment
                                    line            =>  each line is at its own alignment
+       --[no-]-interline-align   # align results on adjacent lines when they have the same number of results
+                                   defautls to --align
   -t,  --timeout-seconds s       # how long to evaluate the source file before timing out
                                    0 means it will never timeout (this is the default)
                                    accepts floating point values (e.g. 0.5 would timeout after half a second)

@@ -1,3 +1,5 @@
+require 'seeing_is_believing/binary/interline_align'
+
 class SeeingIsBelieving
   module Binary
     class AnnotateEveryLine
@@ -6,9 +8,10 @@ class SeeingIsBelieving
       end
 
       def initialize(body, results, options={})
-        @options = options
-        @body    = body
-        @results = results
+        @options         = options
+        @body            = body
+        @results         = results
+        @interline_align = InterlineAlign.new(results)
       end
 
       def call
@@ -26,7 +29,11 @@ class SeeingIsBelieving
               result = sprintf "%s: %s", @results.exception.class_name, @results.exception.message.gsub("\n", '\n')
               FormatComment.call(line.size, exception_text, result, options)
             elsif @results[line_number].any?
-              result  = @results[line_number].map { |result| result.gsub "\n", '\n' }.join(', ')
+              if @options[:interline_align]
+                result = @interline_align.call line_number, @results[line_number].map { |result| result.gsub "\n", '\n' }
+              else
+                result = @results[line_number].map { |result| result.gsub "\n", '\n' }.join(', ')
+              end
               FormatComment.call(line.size, value_text, result, options)
             else
               ''

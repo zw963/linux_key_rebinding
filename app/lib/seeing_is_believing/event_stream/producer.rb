@@ -1,29 +1,27 @@
-require 'seeing_is_believing/event_stream/events'
 require 'seeing_is_believing/safe'
-require 'thread'
+require 'seeing_is_believing/event_stream/events'
+require 'thread' # <-- do we still need this?
+
+using SeeingIsBelieving::Safe
 
 class SeeingIsBelieving
   module EventStream
     class Producer
       module NullQueue
         extend self
-        def <<(*)   end
-        def shift() end
-        # TODO: this one doesn't have clear, but we can call that on the real one.
-        # find a way to test this situation?
+        Queue.instance_methods.each do |name|
+          define_method(name) { |*| }
+        end
       end
 
       attr_accessor :max_line_captures, :filename
 
       def initialize(resultstream)
-        resultstream           = Safe::Stream[resultstream]
         self.filename          = nil
         self.max_line_captures = Float::INFINITY
         self.recorded_results  = []
-        self.queue             = Safe::Queue[Queue.new]
-        self.producer_thread   = Safe::Thread[
-          build_producer_thread(resultstream)
-        ]
+        self.queue             = Queue.new
+        self.producer_thread   = build_producer_thread(resultstream)
       end
 
       attr_reader :version
@@ -45,7 +43,7 @@ class SeeingIsBelieving
       StackErrors = [SystemStackError]
       StackErrors << Java::JavaLang::StackOverflowError if defined?(RUBY_PLATFORM) && RUBY_PLATFORM == 'java'
       def record_result(type, line_number, value)
-        counts = recorded_results[line_number] ||= Safe::Hash.new(0)
+        counts = recorded_results[line_number] ||= Hash.new(0)
         count  = counts[type]
         recorded_results[line_number][type] = count.next
         if count < max_line_captures
@@ -64,33 +62,30 @@ class SeeingIsBelieving
           rescue Exception
             inspected = "#<no inspect available>"
           end
-          queue << "result #{line_number} #{type} #{to_string_token inspected}"
+          queue << "result #{line_number.to_s} #{type.to_s} #{to_string_token inspected}"
         elsif count == max_line_captures
-          queue << "maxed_result #{line_number} #{type}"
+          queue << "maxed_result #{line_number.to_s} #{type.to_s}"
         end
         value
       end
 
       # records the exception, returns the exitstatus for that exception
       def record_exception(line_number, exception)
-        return exception.status if SystemExit === exception
-        exception = Safe::Exception[exception]
+        return exception.status if SystemExit === exception # TODO === is not in the list
         if !line_number && filename
-          begin line_number = exception.backtrace.grep(/#{filename}/).first[/:\d+/][1..-1].to_i
+          begin line_number = exception.backtrace.grep(/#{filename.to_s}/).first[/:\d+/][1..-1].to_i
           rescue NoMethodError
           end
         end
         line_number ||= -1
-        queue << Safe::Array[[
+        queue << [
           "exception",
-          Safe::Fixnum[line_number],
+          line_number.to_s,
           to_string_token(exception.class.name),
           to_string_token(exception.message),
-          Safe::Fixnum[
-            Safe::Array[exception.backtrace].size
-          ],
-          *Safe::Array[exception.backtrace].map { |line| to_string_token line }
-        ]].join(" ")
+          exception.backtrace.size.to_s,
+          *exception.backtrace.map { |line| to_string_token line }
+        ].join(" ")
         1 # exit status
       end
 
@@ -108,7 +103,7 @@ class SeeingIsBelieving
       end
 
       def finish!
-        queue << :break # note that consumer will continue reading until stream is closed
+        queue << :break # note that consumer will continue reading until stream is closed, which is not the responsibility of the producer
         producer_thread.join
       end
 
@@ -118,17 +113,17 @@ class SeeingIsBelieving
 
       # for a consideration of many different ways of doing this, see 5633064
       def to_string_token(string)
-        Safe::Array[[Safe::Marshal.dump(Safe::String[string].to_s)]].pack('m0')
+        [Marshal.dump(string.to_s)].pack('m0')
       end
 
       def build_producer_thread(resultstream)
         ::Thread.new {
-          Safe::Thread.current.abort_on_exception = true
+          Thread.current.abort_on_exception = true
           begin
             resultstream.sync = true
             loop do
               to_publish = queue.shift
-              break if Safe::Symbol[:break] == to_publish
+              break if :break == to_publish
               resultstream << (to_publish << "\n")
             end
           rescue IOError, Errno::EPIPE
@@ -147,9 +142,7 @@ class SeeingIsBelieving
         loop { break if queue.shift == :fork }
 
         # recreate the thread since forking in Ruby kills threads
-        @producer_thread = Safe::Thread[
-          build_producer_thread(resultstream)
-        ]
+        @producer_thread = build_producer_thread(resultstream)
       end
 
     end
