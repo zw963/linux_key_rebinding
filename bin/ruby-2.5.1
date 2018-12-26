@@ -1,4 +1,4 @@
 #!/bin/sh
 
 ROOT=$(dirname `(readlink -e $0)`)/..
-/bin/bash $ROOT/ruby/bin/ruby --disable-gems -I$ROOT/app/lib -I$ROOT/ruby/lib/ruby/gems/2.4.0/gems/minitest-5.10.1/lib "$@"
+/bin/bash $ROOT/ruby/bin/ruby -I$ROOT/app/lib -I$ROOT/ruby/lib/ruby/gems/2.4.0/gems/minitest-5.10.1/lib "$@"
