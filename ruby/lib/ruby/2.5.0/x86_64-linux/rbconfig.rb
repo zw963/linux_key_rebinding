@@ -9,20 +9,20 @@
 # lost the next time ruby is built.
 
 module RbConfig
-  RUBY_VERSION.start_with?("2.5.") or
-    raise "ruby lib version (2.5.1) doesn't match executable version (#{RUBY_VERSION})"
+  RUBY_VERSION.start_with?("2.6.") or
+    raise "ruby lib version (2.6.0) doesn't match executable version (#{RUBY_VERSION})"
 
   # Ruby installed directory.
-  TOPDIR = File.dirname(__FILE__).chomp!("/lib/ruby/2.5.0/x86_64-linux")
+  TOPDIR = File.dirname(__FILE__).chomp!("/lib/ruby/2.6.0/x86_64-linux")
   # DESTDIR on make install.
   DESTDIR = '' unless defined? DESTDIR
   # The hash configurations stored.
   CONFIG = {}
   CONFIG["DESTDIR"] = DESTDIR
   CONFIG["MAJOR"] = "2"
-  CONFIG["MINOR"] = "5"
-  CONFIG["TEENY"] = "1"
-  CONFIG["PATCHLEVEL"] = "57"
+  CONFIG["MINOR"] = "6"
+  CONFIG["TEENY"] = "0"
+  CONFIG["PATCHLEVEL"] = "0"
   CONFIG["INSTALL"] = '/usr/bin/install -c'
   CONFIG["EXEEXT"] = ""
   CONFIG["prefix"] = (TOPDIR || DESTDIR + "/tmp/ruby")
@@ -30,10 +30,10 @@ module RbConfig
   CONFIG["RUBY_INSTALL_NAME"] = "$(RUBY_BASE_NAME)"
   CONFIG["RUBY_SO_NAME"] = "$(RUBY_BASE_NAME)"
   CONFIG["exec"] = "exec"
-  CONFIG["ruby_pc"] = "ruby-2.5.pc"
+  CONFIG["ruby_pc"] = "ruby-2.6.pc"
+  CONFIG["CC_WRAPPER"] = ""
   CONFIG["PACKAGE"] = "ruby"
   CONFIG["BUILTIN_TRANSSRCS"] = " enc/trans/newline.c"
-  CONFIG["USE_RUBYGEMS"] = "YES"
   CONFIG["MANTYPE"] = "doc"
   CONFIG["vendorarchhdrdir"] = "$(vendorhdrdir)/$(sitearch)"
   CONFIG["sitearchhdrdir"] = "$(sitehdrdir)/$(sitearch)"
@@ -54,7 +54,7 @@ module RbConfig
   CONFIG["sitedir"] = "$(rubylibprefix)/site_ruby"
   CONFIG["rubyarchdir"] = "$(rubylibdir)/$(arch)"
   CONFIG["rubylibdir"] = "$(rubylibprefix)/$(ruby_version)"
-  CONFIG["ruby_version"] = "2.5.0"
+  CONFIG["ruby_version"] = "2.6.0"
   CONFIG["sitearch"] = "$(arch)"
   CONFIG["arch"] = "x86_64-linux"
   CONFIG["sitearchincludedir"] = "$(includedir)/$(sitearch)"
@@ -77,12 +77,13 @@ module RbConfig
   CONFIG["COMMON_HEADERS"] = ""
   CONFIG["COMMON_MACROS"] = ""
   CONFIG["COMMON_LIBS"] = ""
-  CONFIG["MAINLIBS"] = ""
+  CONFIG["MAINLIBS"] = "-lpthread -lrt -lrt -lrt -ldl -lcrypt -lm "
   CONFIG["ENABLE_SHARED"] = "no"
+  CONFIG["DLDSHARED"] = "$(CC) -shared"
   CONFIG["DLDLIBS"] = " -lc"
-  CONFIG["SOLIBS"] = ""
+  CONFIG["SOLIBS"] = "$(MAINLIBS)"
   CONFIG["LIBRUBYARG_SHARED"] = "-Wl,-rpath,$(libdir) -L$(libdir) "
-  CONFIG["LIBRUBYARG_STATIC"] = "-Wl,-rpath,$(libdir) -L$(libdir) -l$(RUBY_SO_NAME)-static"
+  CONFIG["LIBRUBYARG_STATIC"] = "-Wl,-rpath,$(libdir) -L$(libdir) -l$(RUBY_SO_NAME)-static $(MAINLIBS)"
   CONFIG["LIBRUBYARG"] = "$(LIBRUBYARG_STATIC)"
   CONFIG["LIBRUBY"] = "$(LIBRUBY_A)"
   CONFIG["LIBRUBY_ALIASES"] = "lib$(RUBY_SO_NAME).$(SOEXT)"
@@ -94,13 +95,14 @@ module RbConfig
   CONFIG["EXTDLDFLAGS"] = ""
   CONFIG["EXTLDFLAGS"] = ""
   CONFIG["strict_warnflags"] = "-std=gnu99"
-  CONFIG["warnflags"] = "-Wall -Wextra -Wno-unused-parameter -Wno-parentheses -Wno-long-long -Wno-missing-field-initializers -Wno-tautological-compare -Wno-parentheses-equality -Wno-constant-logical-operand -Wno-self-assign -Wunused-variable -Wimplicit-int -Wpointer-arith -Wwrite-strings -Wdeclaration-after-statement -Wimplicit-function-declaration -Wdeprecated-declarations -Wno-packed-bitfield-compat"
+  CONFIG["warnflags"] = "-Wall -Wextra -Wdeclaration-after-statement -Wdeprecated-declarations -Wimplicit-function-declaration -Wimplicit-int -Wpointer-arith -Wwrite-strings -Wmissing-noreturn -Wno-cast-function-type -Wno-constant-logical-operand -Wno-long-long -Wno-missing-field-initializers -Wno-overlength-strings -Wno-packed-bitfield-compat -Wno-parentheses-equality -Wno-self-assign -Wno-tautological-compare -Wno-unused-parameter -Wno-unused-value -Wunused-variable"
   CONFIG["debugflags"] = "-ggdb3"
   CONFIG["optflags"] = "-O3"
   CONFIG["NULLCMD"] = ":"
   CONFIG["ENABLE_DEBUG_ENV"] = ""
   CONFIG["DLNOBJ"] = "dln.o"
   CONFIG["INSTALL_STATIC_LIBRARY"] = "yes"
+  CONFIG["MJIT_SUPPORT"] = "yes"
   CONFIG["EXECUTABLE_EXTS"] = ""
   CONFIG["ARCHFILE"] = ""
   CONFIG["LIBRUBY_RELATIVE"] = "no"
@@ -131,6 +133,7 @@ module RbConfig
   CONFIG["ARCH_FLAG"] = ""
   CONFIG["DLDFLAGS"] = "-L/usr/local/override/lib"
   CONFIG["ALLOCA"] = ""
+  CONFIG["MATHN"] = "yes"
   CONFIG["dsymutil"] = ""
   CONFIG["codesign"] = ""
   CONFIG["POSTLINK"] = ":"
@@ -162,7 +165,7 @@ module RbConfig
   CONFIG["AR"] = "ar"
   CONFIG["RANLIB"] = "ranlib"
   CONFIG["try_header"] = ""
-  CONFIG["CC_VERSION_MESSAGE"] = "gcc (GCC) 4.4.7 20120313 (Red Hat 4.4.7-18)\nCopyright (C) 2010 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+  CONFIG["CC_VERSION_MESSAGE"] = "gcc (GCC) 4.4.7 20120313 (Red Hat 4.4.7-23)\nCopyright (C) 2010 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
   CONFIG["CC_VERSION"] = "$(CC) --version"
   CONFIG["CSRCFLAG"] = ""
   CONFIG["COUTFLAG"] = "-o "
@@ -197,7 +200,7 @@ module RbConfig
   CONFIG["build_cpu"] = "x86_64"
   CONFIG["build"] = "x86_64-pc-linux-gnu"
   CONFIG["RUBY_API_VERSION"] = "$(MAJOR).$(MINOR)"
-  CONFIG["RUBY_PROGRAM_VERSION"] = "2.5.1"
+  CONFIG["RUBY_PROGRAM_VERSION"] = "2.6.0"
   CONFIG["HAVE_GIT"] = "no"
   CONFIG["GIT"] = "git"
   CONFIG["cxxflags"] = "$(optflags) $(debugflags) $(warnflags)"
@@ -206,7 +209,7 @@ module RbConfig
   CONFIG["target_alias"] = ""
   CONFIG["host_alias"] = ""
   CONFIG["build_alias"] = ""
-  CONFIG["LIBS"] = "-lpthread -lrt -ldl -lcrypt -lm "
+  CONFIG["LIBS"] = "-lm "
   CONFIG["ECHO_T"] = ""
   CONFIG["ECHO_N"] = "-n"
   CONFIG["ECHO_C"] = ""
@@ -239,7 +242,8 @@ module RbConfig
   CONFIG["PACKAGE_NAME"] = ""
   CONFIG["PATH_SEPARATOR"] = ":"
   CONFIG["SHELL"] = "/bin/sh"
-  CONFIG["UNICODE_VERSION"] = "10.0.0"
+  CONFIG["UNICODE_VERSION"] = "11.0.0"
+  CONFIG["UNICODE_EMOJI_VERSION"] = "11.0"
   CONFIG["archdir"] = "$(rubyarchdir)"
   CONFIG["topdir"] = File.dirname(__FILE__)
   # Almost same with CONFIG. MAKEFILE_CONFIG has other variable
@@ -297,6 +301,38 @@ module RbConfig
   end
   CONFIG.each_value do |val|
     RbConfig::expand(val)
+  end
+
+  # :nodoc:
+  # call-seq:
+  #
+  #   RbConfig.fire_update!(key, val)               -> string
+  #   RbConfig.fire_update!(key, val, mkconf, conf) -> string
+  #
+  # updates +key+ in +mkconf+ with +val+, and all values depending on
+  # the +key+ in +mkconf+.
+  #
+  #   RbConfig::MAKEFILE_CONFIG.values_at("CC", "LDSHARED") # => ["gcc", "$(CC) -shared"]
+  #   RbConfig::CONFIG.values_at("CC", "LDSHARED")          # => ["gcc", "gcc -shared"]
+  #   RbConfig.fire_update!("CC", "gcc-8")                  # => ["CC", "LDSHARED"]
+  #   RbConfig::MAKEFILE_CONFIG.values_at("CC", "LDSHARED") # => ["gcc-8", "$(CC) -shared"]
+  #   RbConfig::CONFIG.values_at("CC", "LDSHARED")          # => ["gcc-8", "gcc-8 -shared"]
+  #
+  # returns updated keys list, or +nil+ if nothing changed.
+  def RbConfig.fire_update!(key, val, mkconf = MAKEFILE_CONFIG, conf = CONFIG)
+    return if (old = mkconf[key]) == val
+    mkconf[key] = val
+    keys = [key]
+    deps = []
+    begin
+      re = Regexp.new("\\$\\((?:%1$s)\\)|\\$\\{(?:%1$s)\\}" % keys.join('|'))
+      deps |= keys
+      keys.clear
+      mkconf.each {|k,v| keys << k if re =~ v}
+    end until keys.empty?
+    deps.each {|k| conf[k] = mkconf[k].dup}
+    deps.each {|k| expand(conf[k])}
+    deps
   end
 
   # call-seq:
