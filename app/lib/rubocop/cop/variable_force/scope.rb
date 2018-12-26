@@ -8,11 +8,11 @@ module RuboCop
       # A scope instance holds a scope node and variable entries.
       class Scope
         OUTER_SCOPE_CHILD_INDICES = {
-          defs:   0..0,
+          defs: 0..0,
           module: 0..0,
-          class:  0..1,
+          class: 0..1,
           sclass: 0..0,
-          block:  0..0
+          block: 0..0
         }.freeze
 
         attr_reader :node, :variables, :naked_top_level
@@ -61,6 +61,7 @@ module RuboCop
 
         def each_node(&block)
           return to_enum(__method__) unless block_given?
+
           yield node if naked_top_level?
           scan_node(node, &block)
         end
@@ -70,6 +71,7 @@ module RuboCop
         def scan_node(node, &block)
           node.each_child_node do |child_node|
             next unless include?(child_node)
+
             yield child_node
             scan_node(child_node, &block)
           end
@@ -79,16 +81,20 @@ module RuboCop
           return true if !naked_top_level? && target_node.equal?(node)
           return true if ancestor_node?(target_node)
           return false unless target_node.parent.equal?(node)
+
           indices = OUTER_SCOPE_CHILD_INDICES[target_node.parent.type]
           return false unless indices
+
           indices.include?(target_node.sibling_index)
         end
 
         def belong_to_inner_scope?(target_node)
           return false if !target_node.parent || target_node.parent.equal?(node)
           return false unless SCOPE_TYPES.include?(target_node.parent.type)
+
           indices = OUTER_SCOPE_CHILD_INDICES[target_node.parent.type]
           return true unless indices
+
           !indices.include?(target_node.sibling_index)
         end
 

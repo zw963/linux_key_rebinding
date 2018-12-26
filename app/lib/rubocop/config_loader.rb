@@ -22,7 +22,8 @@ module RuboCop
     class << self
       include FileFinder
 
-      attr_accessor :debug, :auto_gen_config, :ignore_parent_exclusion
+      attr_accessor :debug, :auto_gen_config, :ignore_parent_exclusion,
+                    :options_config
       attr_writer :default_configuration
 
       alias debug? debug
@@ -30,7 +31,7 @@ module RuboCop
       alias ignore_parent_exclusion? ignore_parent_exclusion
 
       def clear_options
-        @debug = @auto_gen_config = nil
+        @debug = @auto_gen_config = @options_config = nil
         FileFinder.root_level = nil
       end
 
@@ -43,7 +44,6 @@ module RuboCop
         resolver.resolve_requires(path, hash)
 
         add_missing_namespaces(path, hash)
-        target_ruby_version_to_f!(hash)
 
         resolver.resolve_inheritance_from_gems(hash, hash.delete('inherit_gem'))
         resolver.resolve_inheritance(path, hash, file, debug?)
@@ -117,36 +117,38 @@ module RuboCop
         resolver.merge_with_default(config, config_file)
       end
 
-      def target_ruby_version_to_f!(hash)
-        version = 'TargetRubyVersion'
-        return unless hash['AllCops'] && hash['AllCops'][version]
-
-        hash['AllCops'][version] = hash['AllCops'][version].to_f
-      end
-
       def add_inheritance_from_auto_generated_file
         file_string = " #{AUTO_GENERATED_FILE}"
 
-        if File.exist?(DOTFILE)
-          files = Array(load_yaml_configuration(DOTFILE)['inherit_from'])
+        config_file = options_config || DOTFILE
+
+        if File.exist?(config_file)
+          files = Array(load_yaml_configuration(config_file)['inherit_from'])
+
           return if files.include?(AUTO_GENERATED_FILE)
 
           files.unshift(AUTO_GENERATED_FILE)
           file_string = "\n  - " + files.join("\n  - ") if files.size > 1
-          rubocop_yml_contents = IO.read(DOTFILE, encoding: Encoding::UTF_8)
-                                   .sub(/^inherit_from: *[.\w]+/, '')
-                                   .sub(/^inherit_from: *(\n *- *[.\w]+)+/, '')
+          rubocop_yml_contents = existing_configuration(config_file)
         end
-        write_dotfile(file_string, rubocop_yml_contents)
+
+        write_config_file(config_file, file_string, rubocop_yml_contents)
+
         puts "Added inheritance from `#{AUTO_GENERATED_FILE}` in `#{DOTFILE}`."
       end
 
       private
 
-      def write_dotfile(file_string, rubocop_yml_contents)
-        File.open(DOTFILE, 'w') do |f|
+      def existing_configuration(config_file)
+        IO.read(config_file, encoding: Encoding::UTF_8)
+          .sub(%r{^inherit_from: *[.\/\w]+}, '')
+          .sub(%r{^inherit_from: *(\n *- *[.\/\w]+)+}, '')
+      end
+
+      def write_config_file(file_name, file_string, rubocop_yml_contents)
+        File.open(file_name, 'w') do |f|
           f.write "inherit_from:#{file_string}\n"
-          f.write "\n#{rubocop_yml_contents}" if rubocop_yml_contents
+          f.write "\n#{rubocop_yml_contents}" if rubocop_yml_contents =~ /\S/
         end
       end
 
@@ -181,11 +183,12 @@ module RuboCop
         if defined?(SafeYAML) && SafeYAML.respond_to?(:load)
           SafeYAML.load(yaml_code, filename,
                         whitelisted_tags: %w[!ruby/regexp])
-        elsif RUBY_VERSION >= '2.6'
+        # Ruby 2.6+
+        elsif Gem::Version.new(Psych::VERSION) >= Gem::Version.new('3.1.0.pre1')
           YAML.safe_load(
             yaml_code,
-            whitelist_classes: [Regexp, Symbol],
-            whitelist_symbols: [],
+            permitted_classes: [Regexp, Symbol],
+            permitted_symbols: [],
             aliases: false,
             filename: filename
           )
